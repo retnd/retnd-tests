@@ -1,9 +1,18 @@
 doc: >
   The usage text says each retention flag overrides the loaded config's
-  own resolved value for this preview only. So the override has to reach
-  the preview, and it has to leave the config file and the catalog exactly
-  as they were. Both halves are asserted, because an override that
-  silently rewrote config.yaml would still print the right preview.
+  own resolved value for this preview only. "For this preview only" is
+  what this case pins: every override is accepted, resolved through the
+  same validation a config file goes through, and leaves the config file
+  and the catalog exactly as they were. An override that silently rewrote
+  config.yaml would still print a correct-looking preview, which is why
+  the on-disk half is asserted rather than assumed.
+
+  What this case does not yet prove is that an override changes the
+  itemisation, because on this fixture no setting of the three tier
+  windows changes it. That is downstream of the open question in
+  spdrman/rclone-manager#192 about which timestamp puts an artifact in a
+  retention bucket; see findings/DISC-006.md, and the gap is listed in
+  COVERAGE.md rather than papered over.
 scenario: seeded-local
 argv: [retention, --config, "${CONFIG}", --dry-run, --timezone, "America/Vancouver", --week-starts-on, sunday, --daily-days, "1", --weekly-months, "1", --monthly-months, "1"]
 exit: 0

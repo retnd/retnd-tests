@@ -210,6 +210,25 @@ func TestNDJSONMatcherCanFail(t *testing.T) {
 	}
 }
 
+// TestCountMatcherCanFail covers the matcher several cases lean on to
+// say "these are all the lines there are", which is the only way a case
+// notices an artifact silently left out of a listing.
+func TestCountMatcherCanFail(t *testing.T) {
+	c := baseline()
+	wrong := 99
+	c.Stdout.Matchers = []harness.Matcher{{Count: &wrong}}
+
+	got := run(t, c)
+	assertOnly(t, got, "stdout")
+	assertReadable(t, got[0], "exactly 99 line(s)", "config OK")
+
+	right := 2
+	c.Stdout.Matchers = []harness.Matcher{{Count: &right}}
+	if got := run(t, c); len(got) != 0 {
+		t.Fatalf("the correct line count should pass, got %v", got)
+	}
+}
+
 func assertOnly(t *testing.T, got []harness.Mismatch, dimension string) {
 	t.Helper()
 	if len(got) == 0 {

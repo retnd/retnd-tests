@@ -39,3 +39,16 @@ observed behaviour, and links its filed issue and its pinned case.
 | DISC-003 | [#189](https://github.com/spdrman/rclone-manager/issues/189) | `version` silently accepts unknown flags where every other command exits 2 |
 | DISC-004 | [#190](https://github.com/spdrman/rclone-manager/issues/190) | `daemon` exits 143 after handling SIGTERM, so a normal stop looks like a crash |
 | DISC-005 | [#21](https://github.com/spdrman/rclone-manager/issues/21) | plain `retention` is a preview: FR-20 local deletion is not implemented |
+
+## Open contract questions
+
+Not every disagreement is a divergence. Where the documentation does not
+say what the right answer is, there is nothing to mark expected-to-fail,
+and pretending otherwise would put a marker on a case that the product
+could never satisfy or violate. These get filed as questions, recorded
+here, and pinned by cases that assert only what holds whichever way the
+question is answered.
+
+| Finding | Issue | Summary |
+|---|---|---|
+| DISC-006 | [#192](https://github.com/spdrman/rclone-manager/issues/192) | FR-18 never says which timestamp puts an artifact in a retention bucket, and the two readings disagree about whether an ingested backlog survives |
