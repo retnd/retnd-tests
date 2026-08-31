@@ -36,11 +36,12 @@ func main() {
 		Provenance string `json:"provenance"`
 		CLI        string `json:"cli"`
 		Web        string `json:"web,omitempty"`
+		SourceDir  string `json:"source_dir,omitempty"`
 		Version    string `json:"version"`
 		Commit     string `json:"commit"`
 		Rclone     string `json:"rclone"`
 		Go         string `json:"go"`
-	}{build.Mode, build.Provenance, build.CLI, build.Web, info.BinaryVersion, info.Commit, info.Rclone, info.Go}, "", "  ")
+	}{build.Mode, build.Provenance, build.CLI, build.Web, build.Checkout, info.BinaryVersion, info.Commit, info.Rclone, info.Go}, "", "  ")
 	fmt.Println(string(out))
 }
 

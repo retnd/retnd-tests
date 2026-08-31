@@ -13,7 +13,7 @@ help:
 	@echo "make selftest    prove the harness can fail, per assertion dimension"
 	@echo "make tools       unit tests for the fixture layer and the state differ"
 	@echo "make build       resolve the pinned build under test and run the identity handshake"
-	@echo "make suite-b     the Web UI Playwright suite (not migrated yet, see suites/web-ui)"
+	@echo "make suite-b     the Web UI Playwright suite (needs a browser; see suites/web-ui)"
 	@echo "make suite-c     the UI-to-CLI equivalence suite (not built yet, see suites/equivalence)"
 
 .PHONY: build
@@ -46,9 +46,24 @@ vet:
 gate: vet tools selftest suite-a
 	@echo "gate: green"
 
+# RM_UI_DIR names the ui/shared whose dev server the browser drives. Left
+# unset, the suite resolves the pinned build's own checkout, which also runs
+# the identity handshake on the way.
 .PHONY: suite-b
 suite-b:
-	@echo "Suite B has not been migrated yet. See suites/web-ui/README.md for the preconditions." && exit 1
+	cd suites/web-ui && npm run e2e
+
+.PHONY: suite-b-list
+suite-b-list:
+	cd suites/web-ui && npm run e2e:list
+
+.PHONY: suite-b-install
+suite-b-install:
+	cd suites/web-ui && npm ci && npx playwright install chromium
+
+.PHONY: suite-b-unit
+suite-b-unit:
+	cd suites/web-ui && npm run unit
 
 .PHONY: suite-c
 suite-c:

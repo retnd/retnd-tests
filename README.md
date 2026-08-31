@@ -3,13 +3,13 @@
 End-to-end test suites for [`rclone-manager`](https://github.com/spdrman/rclone-manager),
 run from outside it, against a build it has already released.
 
-Three suites will live here. One of them exists today:
+Three suites live here:
 
 | Suite | What it is | Status |
 |---|---|---|
 | **A. CLI contract** | `backup-manager` driven black-box: argv in, exit code plus stdout plus stderr plus resulting on-disk state out | built, `make suite-a` |
-| **B. Web UI** | the Playwright suite, migrated out of `rclone-manager`'s `ui/shared/e2e/` | not migrated, see [`suites/web-ui/README.md`](suites/web-ui/README.md) |
-| **C. UI to CLI equivalence** | every backend-affecting UI action proved equal to its CLI equivalent by comparing resulting backend state | not built, see [`suites/equivalence/README.md`](suites/equivalence/README.md) |
+| **B. Web UI** | the Playwright suite, migrated out of `rclone-manager`'s `ui/shared/e2e/` | migrated, `make suite-b`, see [`suites/web-ui/README.md`](suites/web-ui/README.md) |
+| **C. UI to CLI equivalence** | every backend-affecting UI action proved equal to its CLI equivalent by comparing resulting backend state | see [`suites/equivalence/README.md`](suites/equivalence/README.md) |
 
 All three share one fixture layer, which is the main reason they share a
 repository. A Web UI test that exercises retention or quarantine needs a
@@ -31,9 +31,11 @@ itself.
 ## Running it
 
 ```sh
-make build      # resolve the pinned build and make it prove its identity
-make suite-a    # the CLI contract suite
-make gate       # everything that has to be green before a commit here
+make build           # resolve the pinned build and make it prove its identity
+make suite-a         # the CLI contract suite
+make suite-b-install # once: Playwright and a Chromium
+make suite-b         # the Web UI suite, against RM_UI_DIR or the pin
+make gate            # everything that has to be green before a commit here
 ```
 
 Suite A needs Go and nothing else. No browser, no Docker, no network

@@ -53,6 +53,12 @@ type Build struct {
 	Mode string
 	// Provenance is a one-line human description of where it came from.
 	Provenance string
+	// Checkout is the rclone-manager source tree this build came from,
+	// empty when the route did not involve one. Suite B needs it: the
+	// browser suite serves the app from that tree's ui/shared, so the page
+	// under test and the binary under test come from the same commit
+	// rather than from two independently chosen places.
+	Checkout string
 }
 
 // DefaultRepoURL is where source mode clones rclone-manager from when
@@ -146,12 +152,17 @@ func resolveLocal() (Build, error) {
 	if os.Getenv("RM_WEB_BINARY") == "" {
 		web = ""
 	}
+	checkout, _ := filepath.Abs(os.Getenv("RM_SOURCE_DIR"))
+	if os.Getenv("RM_SOURCE_DIR") == "" {
+		checkout = ""
+	}
 	return Build{
 		CLI:            abs,
 		Web:            web,
 		ExpectedCommit: commit,
 		Mode:           "local",
 		Provenance:     "local override RM_BINARY=" + abs,
+		Checkout:       checkout,
 	}, nil
 }
 
@@ -215,6 +226,7 @@ func resolveSource(pin Pin) (Build, error) {
 		ExpectedCommit: pin.Commit,
 		Mode:           "source",
 		Provenance:     fmt.Sprintf("built from %s at %s with the %s builder", sourceRepo(), pin.Commit, builder),
+		Checkout:       checkout,
 	}, nil
 }
 

@@ -1,75 +1,106 @@
 # Suite B: the Web UI Playwright suite
 
-Not migrated yet. This directory holds the plan and the preconditions,
-not a half-moved suite.
+Migrated out of `rclone-manager`'s `ui/shared/e2e/`, behaviour-preserving.
 
-## Why it has not moved
+```sh
+cd suites/web-ui && npm ci && npx playwright install chromium   # once
+RM_UI_DIR=/path/to/rclone-manager/ui/shared npm run e2e         # 165 tests
+```
 
-The migration has one property it has to have, and only one: it must be
-behaviour-preserving. The way that is demonstrated is by the suite
-passing at the same count in its new home as in its old one, at the same
-`rclone-manager` commit. Both halves of that are currently unavailable:
+Or from the repository root, `make suite-b`.
 
-1. **The suite is red on `main`.** PR
-   [#181](https://github.com/spdrman/rclone-manager/pull/181) fixes a spec
-   that [#164](https://github.com/spdrman/rclone-manager/issues/164) broke,
-   and it is still an open draft. A migration measured against a red
-   baseline proves nothing, because "it fails the same way afterwards" is
-   not a claim anybody wants.
-2. **The baseline count is not known.** The most recent measurement says
-   174, an earlier one says 158, and a static count of `test(` call sites
-   disagrees with both because some tests are loop-generated. Only
-   `npx playwright test --list` at the chosen baseline commit settles it,
-   and the migration has to carry that number rather than a remembered
-   one.
+## What "behaviour-preserving" was made to mean
 
-Moving it now would mean the one property that makes the move safe could
-not be checked. So the foundation and Suite A landed first, which is what
-the rest of this repository is.
+Not an intention. Three checkable facts, all recorded in the migration
+pull request:
 
-## The plan, in order
+1. **`e2e/` is byte-identical** to `rclone-manager`'s `ui/shared/e2e/` at
+   the baseline commit. `diff -r` between the two directories prints
+   nothing. Every spec, `fixtures.ts`, the port helper, its unit test, and
+   the suite's own README moved without an edit, including the parts of
+   that README that describe the old home. Nothing inside a spec was
+   touched in the same change that moved it, because a migration that
+   edits and moves at once cannot be shown to be faithful.
+2. **The test list is identical**, modulo the one startup line this
+   harness prints about which tree it is testing. `playwright test --list
+   --project=generic --project=small-window` reports **165 tests in 13
+   files** in both homes, and the 165 lines match one for one.
+3. **The pass count is identical**: 165 passed in the old home, 165 passed
+   in the new one, three consecutive times, at the same `rclone-manager`
+   commit.
 
-1. **Baseline capture** in `rclone-manager` at the chosen commit: record
-   `npx playwright test --list` output verbatim, and the pass count from
-   three consecutive full runs of `npm run e2e` across the `generic` and
-   `small-window` projects.
-2. **Copy verbatim** into `suites/web-ui/`: `e2e/**` (every spec plus
-   `fixtures.ts` and its README), `playwright.config.ts`, a `package.json`
-   trimmed to the Playwright bits with the identical `@playwright/test`
-   pin, and a lockfile resolving to the same version.
-3. **Permitted harness deltas, exhaustively:** the `baseURL` and
-   `webServer` block are replaced by harness-managed server startup on an
-   ephemeral port the harness picked and proved free; `reuseExistingServer`
-   is gone, in every form, not conditionally kept; reporter and output
-   paths change. **Zero changes inside `e2e/*.spec.ts` or `fixtures.ts`**,
-   proved by a `diff -r` against the baseline commit's `ui/shared/e2e/`
-   pasted into the migration PR.
-4. **The app under test** comes from `RM_UI_DIR` pointing at a checkout's
-   `ui/shared`, or from the pin's own checkout in a standalone run.
-5. **Faithfulness proof** in the PR: identical `--list` output modulo path
-   prefix, equal pass counts, three consecutive green runs.
-6. **The removal PR in `rclone-manager` is one PR**, carrying the deletion
-   of `ui/shared/e2e/`, the `playwright.config.ts` and `e2e*` scripts, the
-   tests-repo pin file, the `ci-local.sh` gate step, the `nightly-e2e.yml`
-   rewrite, and the documentation in both repositories. The old home and
-   its replacement signal swap in one merge, so there is no window in
-   which a UI regression can land unseen. See `docs/ci-signal.md`.
-7. **Only then, convergence** onto the shared fixture layer, and a
-   `real-backend` project that boots the container image against fixture
-   work directories, moving specs onto it one at a time and only where the
-   asserted state is reachable on a real backend.
+That third number is worth stating carefully, because a remembered one was
+wrong. The count quoted in the issue was 174, an earlier one 158, and a
+static count of `test(` call sites disagreed with both. 174 counts the
+`providers` project's loop-generated re-runs of the provider spec, which
+`npm run e2e` does not run. The baseline for this migration is what
+`--list` says for the two projects `npm run e2e` actually runs, and that
+is 165.
 
-## One thing to be honest about up front
+## The permitted deltas, exhaustively
 
-The suite as it stands does not test the backend. `ui/shared/src/app/createApp.tsx`
-wires `createMockApi(scenarioFromLocation())` only when
-`import.meta.env.DEV` is true, so every `?scenario=` state the specs drive
-(`storage-critical`, `version-mismatch`, and the rest) exists only against
-`npm run dev`. "Migrate the suite" therefore means migrating a mock-backed
-dev-server suite, and "run it against the real built app" is a separate,
-later step that cannot be behaviour-preserving for every spec, because
-some of those scenarios are unreachable on a real backend by design.
+All of them are in `playwright.config.ts` and `harness/`, and all of them
+are about **where the app comes from**, never about what is asserted:
 
-Both are worth doing. Pretending they are one step is what would make the
-result untrustworthy, so the plan keeps them apart and the README will say
-which project proves what.
+| Delta | Why |
+|---|---|
+| the app under test is resolved from `RM_UI_DIR`, then `RM_SOURCE_DIR/ui/shared`, then the pin's own checkout | in the old home it was implicitly "the directory this config sits in", which out here would be this repository, which has no app in it |
+| the derived port is derived from the checkout the **app** is in | out here the config and the app live in two different repositories, and only the app's checkout varies per concurrent run |
+| the port is additionally probed free before Vite is asked for it | one tests-repo checkout can be pointed at many product checkouts, so the collision odds went up rather than down |
+| `webServer.cwd` is the app under test | `npm run dev` has to run where the app is |
+| reporter and `outputDir` are local to this suite | nothing else to say about this one |
+
+Deliberately **not** a delta: `reuseExistingServer` is still an
+unconditional `false`, `--strictPort` is still passed, and there is no
+environment variable that opens either. A run here never adopts a server
+it did not start. That property was bought expensively (`rclone-manager`
+#172: a stale dev server from another worktree answered a run on a shared
+port, a control reported green against a different commit, and the real
+failure was dismissed twice as an ordering flake) and the move out here
+makes the hazard bigger, not smaller.
+
+## What this suite does and does not prove
+
+It drives **the mock API**. `ui/shared/src/app/createApp.tsx` wires
+`createMockApi(scenarioFromLocation())` under `import.meta.env.DEV`, and
+this config runs the dev server, so every `?scenario=` state the specs
+drive is a fixture inside the browser rather than a backend.
+
+That is not a defect of the migration, it is what the suite has always
+been, and it is worth saying out loud in its new home because the move
+makes it easy to assume otherwise. What it proves is product behaviour in
+the browser: information architecture, accessibility, safety invariants,
+capability honesty per provider, and the states an operator can reach.
+
+What it does not prove is that any of that reaches a real backend. That
+claim belongs to Suite C, which drives the real built app against a real
+engine and compares resulting backend state. Two of the scenarios here
+(`storage-critical`, `version-mismatch`) are unreachable against a real
+backend by design, so "run this same suite against the real app" is not a
+behaviour-preserving step and is not attempted as one.
+
+## The app under test
+
+Resolved once, printed at startup, and the run refuses to start if it
+cannot be resolved:
+
+| Source | When |
+|---|---|
+| `RM_UI_DIR` | `rclone-manager`'s own gate sets it, so the app under test is the working tree being committed |
+| `RM_SOURCE_DIR/ui/shared` | the same variable Suite A already uses to name a checkout |
+| the pinned build's checkout | a standalone run, which also gets Suite A's identity handshake on the way, since `tools/getbuild` resolves it |
+
+A resolved directory with no `node_modules/` stops the run and names the
+`npm ci` that fixes it, rather than letting `npm run dev` fail sixty
+seconds later inside a webServer timeout.
+
+## Files
+
+```
+e2e/                     byte-identical to ui/shared/e2e/ at the baseline commit
+harness/under-test.ts    which app, which port, resolved out loud
+harness/pick-free-port.mjs
+playwright.config.ts     the deltas above, and nothing else
+scripts/e2e-all-providers.mjs
+vitest.config.ts         runs e2e/port.test.ts, which ui/shared's vitest used to
+```
