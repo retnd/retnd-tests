@@ -46,10 +46,13 @@ What replaces it is the case, which stays and now asserts the contract
 strictly, with no marker to relax it. The row below is the pointer, so
 that "this used to be wrong" stays findable without the stale write-up.
 
-All four went out together with
-[#209](https://github.com/spdrman/rclone-manager/pull/209), and the pin
-moved to `defa0a6` in the same change: until the pin moves, none of these
-cases can see the fix.
+The pin moves with the fix, every time: until it does, none of these
+cases can see the change that resolved them. DISC-001 through DISC-004
+went out together with
+[#209](https://github.com/spdrman/rclone-manager/pull/209) and the pin
+moved to `defa0a6`. DISC-006 went out with
+[#215](https://github.com/spdrman/rclone-manager/pull/215) and the pin
+moved to `612b48c`.
 
 | Finding | Issue | What it was | The case that now asserts the contract |
 |---|---|---|---|
@@ -57,6 +60,7 @@ cases can see the fix.
 | DISC-002 | [#188](https://github.com/spdrman/rclone-manager/issues/188) | `validate` blamed the argument count when the real problem was flag ordering | `validate/operand-after-flags`, with `validate/unknown-flag-after-operand` and `validate/double-dash-ends-flags` bounding the accommodation |
 | DISC-003 | [#189](https://github.com/spdrman/rclone-manager/issues/189) | `version` silently accepted unknown flags where every other command exits 2 | `version/no-config-flag`, plus `version/rejects-an-operand` for the other way it says no |
 | DISC-004 | [#190](https://github.com/spdrman/rclone-manager/issues/190) | `daemon` exited 143 after handling SIGTERM, so a normal stop looked like a crash | `daemon/sigterm-stops-cleanly`, which now also asserts the shutdown log that used to be a race |
+| DISC-006 | [#192](https://github.com/spdrman/rclone-manager/issues/192) | FR-18 defined the retention buckets and never said which timestamp put an artifact in one, so an ingested backlog collapsed into a single daily, weekly and monthly bucket and five artifacts out of six were delete candidates on the very first pass | `retention/gfs-tiers-from-one-ingest`, with `retention/override-flags-narrow-the-itemisation` showing the same fixture under a narrower chain and `retention/every-artifact-is-kept-or-deleted` still holding the partition |
 
 ## Open contract questions
 
@@ -67,6 +71,15 @@ could never satisfy or violate. These get filed as questions, recorded
 here, and pinned by cases that assert only what holds whichever way the
 question is answered.
 
-| Finding | Issue | Summary |
-|---|---|---|
-| DISC-006 | [#192](https://github.com/spdrman/rclone-manager/issues/192) | FR-18 never says which timestamp puts an artifact in a retention bucket, and the two readings disagree about whether an ingested backlog survives |
+There are none open right now. DISC-006 was the one, and
+[#215](https://github.com/spdrman/rclone-manager/pull/215) answered it by
+writing the missing rule into FR-18: an artifact is placed twice, once by
+the discovery timestamp and once by the producer's own timestamp where
+that one is admissible, and KEEP is the union. It is in the Resolved
+table above.
+
+The section stays because the mechanism is the point, not the current
+count. A question recorded here and pinned by a case that survives either
+answer is what stops the alternative, which is guessing at an answer,
+writing it into a case, and discovering months later that the guess is
+now the contract because nobody remembered it was a guess.

@@ -1,7 +1,7 @@
 {
   "mode": "source",
-  "commit": "defa0a6a0c821c140015aa8f380e93f3a7c8899f",
-  "version": "defa0a6",
+  "commit": "612b48cf72b5bfa91e999116bc07067407678c12",
+  "version": "612b48c",
   "source_builder": "go",
   "image": "",
   "notes": "mode: source | registry | local. See docs/pinning.md. registry mode stays unusable until something is actually pushed to ghcr.io/spdrman/backup-manager, so source is the only honest default today."

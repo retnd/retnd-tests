@@ -74,7 +74,7 @@ place that catches it per command is a case per command.
 | `sources` | `sources/happy`: exactly the configured ids, their remote type, paths and stale threshold | `sources/f1-config-missing`, and `check/f3-zero-sources` covers the empty-config question |
 | `artifacts` | `artifacts/happy`: both seeded artifacts, each with a state from FR-10's vocabulary and nothing else, and the count line; `artifacts/filters-narrow` asserts both the included and the excluded id | `artifacts/nonexistent-backup-set` (exit 1, with `fetch/nonexistent-backup-set` as the control that both commands refuse the same name the same way), `artifacts/f1-config-missing` |
 | `fetch` | `fetch/happy`: FR-23 events, FR-10 transitions, the durable commit, and the incomplete artifact untouched; `fetch/stable-strategy-holds-the-remote-copy`: FR-8 plus FR-15, with the rename-strategy set as its positive control | `fetch/dry-run-changes-nothing`, `fetch/missing-required-flags` (exit 2), `fetch/nonexistent-backup-set` (exit 1), `fetch/unreachable-remote`, `fetch/f1-config-missing` |
-| `retention` | `retention/preview-keeps-the-only-restore-point` (FR-18 tiers and FR-19 protection, hand-derived), `retention/every-artifact-is-kept-or-deleted` (FR-18's KEEP/DELETE partition over six artifacts), `retention/override-flags-do-not-touch-config` | `retention/invalid-timezone`, `retention/invalid-negative-tier`, `retention/apply-is-not-implemented` marked against [#21](https://github.com/spdrman/rclone-manager/issues/21) with `retention/apply-announces-it-is-preview-only` as its control, `retention/f1-config-missing` |
+| `retention` | `retention/preview-keeps-the-only-restore-point` (FR-18 tiers and FR-19 protection, hand-derived), `retention/every-artifact-is-kept-or-deleted` (FR-18's KEEP/DELETE partition over six artifacts), `retention/gfs-tiers-from-one-ingest` (the daily, weekly and monthly windows against each other over a 500-day backlog ingested in one cycle, with typed tier lists per artifact and FR-19's resolved date and provenance), `retention/override-flags-do-not-touch-config` and `retention/override-flags-narrow-the-itemisation`, which are each other's other half: accepted and inert against config, and actually deciding the preview | `retention/invalid-timezone`, `retention/invalid-negative-tier`, `retention/apply-is-not-implemented` marked against [#21](https://github.com/spdrman/rclone-manager/issues/21) with `retention/apply-announces-it-is-preview-only` as its control, `retention/f1-config-missing` |
 | `reconcile` | `reconcile/clean`: exit 0, FR-23 startup, no unresolved findings | `reconcile/f1-config-missing` |
 | `validate` | `validate/happy`: exit 0, checked and passed; `validate/operand-after-flags` and `validate/double-dash-ends-flags` cover the other two orders the banner permits | `validate/corrupted-local-copy` (exit 1 and FR-10 QUARANTINED), `validate/wrong-argument-count` (exit 2), `validate/malformed-artifact-id`, `validate/unresolvable-artifact`, `validate/unknown-flag-after-operand` (exit 2), `validate/f1-config-missing` |
 | `catalog rebuild` | `catalog/rebuild-after-database-loss`, `catalog/rebuild-dry-run-writes-nothing` | `catalog/no-subcommand` (exit 2), `catalog/unknown-subcommand` (exit 2), `catalog/f1-config-missing` |
@@ -110,20 +110,25 @@ Stated rather than implied.
   covered.
 - **`--dry-run` for `retention` is covered; the apply path cannot be**,
   because FR-20 deletion does not exist yet ([#21](https://github.com/spdrman/rclone-manager/issues/21)).
-- **GFS tier boundaries have no coverage**: no case exercises the daily,
-  weekly and monthly windows against each other, `week_starts_on`, or
-  timezone handling. This is not an oversight. Artifacts appear to be
-  bucketed by when the manager received them rather than by their own
-  dates, so every artifact a single-cycle fixture ingests lands in one
-  bucket and no tier arithmetic happens. Which timestamp FR-18 means is
-  an open question, filed as
-  [#192](https://github.com/spdrman/rclone-manager/issues/192) and
-  recorded in `findings/DISC-006.md`. Building this coverage needs that
-  answer first, since the fixture shape depends on it.
-- **The retention override flags are proved accepted, validated and inert
-  against config and catalog, not proved to change the itemisation**, for
-  the same reason. `retention/override-flags-do-not-touch-config` says so
-  in its own doc.
+- **GFS tier boundaries are covered for the default chain only.** The
+  daily, weekly and monthly windows are now exercised against each other
+  over one ingested backlog, in `retention/gfs-tiers-from-one-ingest` and
+  `retention/override-flags-narrow-the-itemisation`, which #215 made
+  possible: before it, every artifact a single-cycle fixture ingested
+  landed in one bucket and there was no tier arithmetic to observe. What
+  is still uncovered is the rest of
+  [spdrman/rclone-manager-tests#3](https://github.com/spdrman/rclone-manager-tests/issues/3):
+  the `quarter`, `half_year`, `year` and custom `days` granularities, a
+  file dated exactly on a window edge, `week_starts_on`, timezone
+  handling, and the cross-midnight case where an artifact produced late
+  on one day and discovered early the next survives in both days'
+  buckets. Those need a fixture that can put a file on a *named* calendar
+  date rather than an offset from now, because whether two dates share a
+  week or a month bucket depends on which weekday and which day of the
+  month the suite happens to run on. The two cases above avoid that by
+  keeping every pair of dates at least 31 days apart, which is
+  bucket-distinct at every granularity whatever today is; that trick does
+  not extend to a case whose whole point is a boundary.
 - **The disk-pressure and quarantine surfaces** FR-21 and FR-10 describe
   are visible in `status` output but have no fixture that drives a set
   into them.

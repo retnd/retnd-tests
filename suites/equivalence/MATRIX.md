@@ -10,17 +10,22 @@ request surface) and from the CLI's twelve registered commands
 (`core/cmd/backup-manager/main.go`), against `rclone-manager` at
 `137f64699203a5ec6d2a6e399a654b99814a5a74`.
 
-**The pin has since moved to `defa0a6`, and this matrix has not been
+**The pin has since moved to `612b48c`, and this matrix has not been
 re-derived over the difference.** Saying so beats letting the header's
 commit quietly become decorative. Exactly one thing entered the surface
 in that range, from
 [#195](https://github.com/spdrman/rclone-manager/pull/195): `client.ts`
 gained `GET /system/first-run` and `POST /system/first-run`, and the
 second of those is backend-mutating (it writes a backup set and
-configures the instance), so it is a row this document owes. Every row
-below is unaffected, since none of them touch that route. Re-derive
-before adding anything else here, rather than appending to a matrix whose
-basis is a commit behind.
+configures the instance), so it is a row this document owes. Nothing
+between `defa0a6` and `612b48c` touched the request surface at all:
+[#215](https://github.com/spdrman/rclone-manager/pull/215) is retention
+arithmetic behind the same routes,
+[#216](https://github.com/spdrman/rclone-manager/pull/216) is the web
+host's own stop and flag order, and `612b48c` is a Playwright spec. Every
+row below is unaffected, since none of them touch the first-run route.
+Re-derive before adding anything else here, rather than appending to a
+matrix whose basis is a commit behind.
 
 **Status vocabulary**, and the word that matters is the fourth:
 
