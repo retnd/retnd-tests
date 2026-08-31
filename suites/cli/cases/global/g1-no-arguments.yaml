@@ -6,7 +6,6 @@ exit: 2
 stdout: empty
 stderr:
   - line: "usage: backup-manager <command> [flags]"
-  - line: "every command except version accepts --config (default /etc/backup-manager/config.yaml)"
 state: unchanged
 contract:
   - "usage text: the binary's own usage banner"

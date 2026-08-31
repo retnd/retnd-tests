@@ -187,18 +187,29 @@ func resolveSource(pin Pin) (Build, error) {
 
 	switch builder {
 	case "go":
-		if _, err := os.Stat(cli); err != nil {
+		web = filepath.Join(binDir, "backup-manager-web")
+		version := pin.Version
+		if version == "" {
+			version = pin.Commit[:7]
+		}
+		// Two binaries, two modules. Suite A needs only the first; Suite C
+		// needs both, because the claim it makes is about the same commit
+		// answering through the CLI and through the web engine, and two
+		// independently chosen builds would make that claim about nothing.
+		for _, target := range []struct{ out, module, pkg string }{
+			{cli, "core", "./cmd/backup-manager"},
+			{web, "apps/generic", "./cmd/backup-manager-web"},
+		} {
+			if _, err := os.Stat(target.out); err == nil {
+				continue
+			}
 			if err := os.MkdirAll(binDir, 0o755); err != nil {
 				return Build{}, err
 			}
-			version := pin.Version
-			if version == "" {
-				version = pin.Commit[:7]
-			}
 			cmd := exec.Command("go", "build",
 				"-ldflags", fmt.Sprintf("-X main.version=%s -X main.commit=%s", version, pin.Commit),
-				"-o", cli, "./cmd/backup-manager")
-			cmd.Dir = filepath.Join(checkout, "core")
+				"-o", target.out, target.pkg)
+			cmd.Dir = filepath.Join(checkout, target.module)
 			// The checkout has its own go.work, and this process may have
 			// been started with a GOFLAGS the product's module does not
 			// accept. Both are scrubbed so the build under test is decided
@@ -207,7 +218,7 @@ func resolveSource(pin Pin) (Build, error) {
 			cmd.Env = append(os.Environ(), "GOFLAGS=", "GOWORK=off")
 			cmd.Stderr = os.Stderr
 			if err := cmd.Run(); err != nil {
-				return Build{}, fmt.Errorf("building backup-manager from %s: %w", checkout, err)
+				return Build{}, fmt.Errorf("building %s from %s: %w", target.pkg, checkout, err)
 			}
 		}
 	case "docker":
