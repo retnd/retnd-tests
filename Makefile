@@ -14,7 +14,7 @@ help:
 	@echo "make tools       unit tests for the fixture layer and the state differ"
 	@echo "make build       resolve the pinned build under test and run the identity handshake"
 	@echo "make suite-b     the Web UI Playwright suite (needs a browser; see suites/web-ui)"
-	@echo "make suite-c     the UI-to-CLI equivalence suite (not built yet, see suites/equivalence)"
+	@echo "make suite-c     the UI-to-CLI equivalence suite (needs a browser; see suites/equivalence)"
 
 .PHONY: build
 build:
@@ -65,6 +65,13 @@ suite-b-install:
 suite-b-unit:
 	cd suites/web-ui && npm run unit
 
+# Boots the real engine and the real production UI bundle per spec, so
+# RM_UI_DIR (or the pin's own checkout) must have its dependencies
+# installed: the bundle is built from it.
 .PHONY: suite-c
 suite-c:
-	@echo "Suite C has not been built yet. See suites/equivalence/README.md for the preconditions." && exit 1
+	cd suites/equivalence && npm test
+
+.PHONY: suite-c-install
+suite-c-install:
+	cd suites/equivalence && npm ci && npx playwright install chromium

@@ -8,6 +8,8 @@ node_modules/
 /suites/web-ui/test-results/
 /suites/web-ui/playwright-report/
 /suites/equivalence/test-results/
+/suites/web-ui/playwright-report/
+/suites/equivalence/playwright-report/
 
 # Go test binaries and coverage output.
 *.test

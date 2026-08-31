@@ -39,6 +39,7 @@ observed behaviour, and links its filed issue and its pinned case.
 | DISC-003 | [#189](https://github.com/spdrman/rclone-manager/issues/189) | `version` silently accepts unknown flags where every other command exits 2 |
 | DISC-004 | [#190](https://github.com/spdrman/rclone-manager/issues/190) | `daemon` exits 143 after handling SIGTERM, so a normal stop looks like a crash |
 | DISC-005 | [#21](https://github.com/spdrman/rclone-manager/issues/21) | plain `retention` is a preview: FR-20 local deletion is not implemented |
+| DISC-007 | [#211](https://github.com/spdrman/rclone-manager/issues/211) | the Web UI's API client calls fourteen `/api/v1` operations neither the contract nor the engine has, so four pages cannot load against a real backend |
 
 ## Open contract questions
 

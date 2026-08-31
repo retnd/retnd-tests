@@ -21,10 +21,9 @@ So the replacement signal goes where the gate is: into `ci-local.sh`.
 
 ## What goes into `rclone-manager`
 
-None of this is implemented yet, and deliberately so: `scripts/ci-local.sh`
-is owned by another in-flight change (#160), and two agents editing one
-gate script at once is how a gate ends up broken for everybody. This
-section is the specification for whoever adds it.
+Implemented. This section was the specification; it now describes what
+landed, and the two places it differs from the original design are called
+out where they occur.
 
 1. **`scripts/e2e/tests-repo.pin`** holds this repository's URL and a full
    commit sha. `scripts/e2e/bump-tests-pin.sh [ref]` moves it, and the
@@ -32,11 +31,22 @@ section is the specification for whoever adds it.
    change here cannot land in the pin unnoticed.
 
 2. **A new non-FAST step in `ci-local.sh`**, so `CI_LOCAL_FAST=1` skips it
-   and the existing never-merge-on-FAST rule already covers that. The step:
+   and the existing never-merge-on-FAST rule already covers that. It lives
+   in `scripts/e2e/run-tests-repo-gate.sh` rather than inline, for the same
+   reason every other proof this gate runs does: a step the gate's own
+   self-test has to stub is easier to stub as one path than as twenty
+   lines. The step:
 
-   - clones or fetches `rclone-manager-tests` into
-     `${XDG_CACHE_HOME:-$HOME/.cache}/rclone-manager-tests-gate` and checks
-     out the pinned sha detached;
+   - clones `rclone-manager-tests` into
+     `${XDG_CACHE_HOME:-$HOME/.cache}/rclone-manager-tests-gate/<sha>` and
+     checks out the pinned sha detached. Keyed by sha rather than one
+     shared directory, which is a change from the original design: this
+     machine carries around fifty worktrees of the product, and one shared
+     working tree that every concurrent gate run checks out into is shared
+     mutable state of exactly the kind that produced #172. A directory
+     there is immutable once complete, and the clone plus its `npm ci`
+     happen in a scratch sibling renamed into place only at the end, so a
+     half-finished attempt can never be mistaken for a good checkout;
    - runs the **Suite A smoke slice** against the working tree's own build:
 
      ```sh
@@ -50,9 +60,9 @@ section is the specification for whoever adds it.
      `commit none` and the identity handshake refuses the run, which is
      the handshake doing its job rather than a problem to work around.
 
-   - once Suite B is migrated, runs it too, with `RM_UI_DIR` pointing at
-     the working tree's `ui/shared`, so the app under test is the commit
-     being made rather than the pinned release.
+   - runs Suite B too, with `RM_UI_DIR` pointing at the working tree's
+     `ui/shared`, so the app under test is the commit being made rather
+     than the pinned release.
 
 3. **Who triggers it, against which build, and how red blocks.** The
    pre-commit hook triggers it on every commit. The build under test is
@@ -61,6 +71,17 @@ section is the specification for whoever adds it.
    green before an admin merge) makes it merge-blocking.
    `git commit --no-verify` stays the documented WIP escape hatch it
    already is.
+
+   **A missing Chromium** was the open question #197 left for whoever
+   implemented this, and it is answered with the repository's own
+   precedent rather than a new shape: the step refuses, names
+   `npx playwright install chromium` as the fix, and `CI_LOCAL_SKIP_E2E=1`
+   is the out-loud opt-out that ledgers through `gate_note_skip`, so that
+   run ends `INCOMPLETE` and says which check it left out. That is exactly
+   how `gate_require_docker` treats a stopped daemon. Docker is the
+   higher-consequence capability and it is refuse-by-default with a
+   ledgered opt-out, so a browser gets the same treatment and not a weaker
+   one.
 
 4. **`nightly-e2e.yml`** is rewritten to check this repository out at the
    pin and run the full Suite B including the seven-provider re-run, still

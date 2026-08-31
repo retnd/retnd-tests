@@ -1,66 +1,96 @@
 # Suite C: Web UI to CLI equivalence
 
-Not built yet. This directory holds the preconditions and the shape of
-the matrix.
+```sh
+cd suites/equivalence && npm ci && npx playwright install chromium   # once
+RM_UI_DIR=/path/to/rclone-manager/ui/shared npm test
+```
 
-The claim this suite makes is stronger than either of the others makes
-alone: **everything the Web UI does to the backend, the CLI does
-identically, and the proof is the resulting backend state rather than the
-rendered page.**
+Or from the repository root, `make suite-c`.
 
-## Preconditions, in order
+The claim is stronger than either other suite makes alone: **everything the
+Web UI does to the backend, the CLI does identically, and the proof is the
+resulting backend state rather than the rendered page.**
 
-1. **Suite B is migrated**, because Suite C drives the browser through
-   Suite B's page objects. Building its own would put selectors in two
-   places.
-2. **The phase gate is clear.** `#158` inherits `#135`'s dependency on
-   `#113` and on every Phase 2 through 4 Web UI issue landing first, and
-   this estate's rule is that a phase is not done while any open issue
-   carries its label. That is a check to run at pickup, not a fact to
-   assume: `gh issue list --label <phase> --state open` has to come back
-   empty.
-3. **The UI surface is re-derived** from the shipped pages rather than
-   from any snapshot, including this one.
+`MATRIX.md` is the checked-in coverage matrix: every backend-mutating or
+materially state-revealing UI function, its CLI equivalent, and what
+equivalent state means for that pair. Where there is no equivalent in
+either direction, the row says so. Where a pair exists but cannot be
+proved today, the row says why and names the issue.
 
-## Mechanics per matrix row
+## How a row is proved
 
-Materialise a scenario, clone the work directory so both sides start from
-bit-identical state, boot the real app against one clone and perform the
-action through the browser, run the CLI equivalent against the other, then
-compare `statesnap` snapshots of both clones plus, where relevant, each
-side's own read surface (`artifacts`, `status`, `sources`, and the
-matching `/api/v1` GETs).
+1. Materialise one fixture scenario **twice**, into two work directories
+   that start bit-identical. Not one copied twice: the fixture layer is
+   deterministic by construction, and `specs/harness.spec.ts` asserts that
+   two materialisations really do agree before anything else runs.
+2. Boot the real engine over the first directory, on a port this process
+   picked, and the real production UI bundle in front of it. The bundle is
+   `vite build` output, where `import.meta.env.DEV` is false, so
+   `createMockApi` is compiled out entirely and every request the page
+   makes is a real one to a real engine.
+3. Enrol an administrator over HTTP and sign in through the real login
+   form. Enrolment is setup, not an action being compared, which is why it
+   goes over HTTP; the credential is generated per run, held in memory, and
+   never written to disk or passed through argv.
+4. Perform the action through the browser on the first directory, and
+   through `backup-manager` on the second.
+5. Compare the two with `tools/equivstate`.
 
-The state oracle is not reimplemented in TypeScript. `tools/statesnap`
-already answers "what is backend state" for Suite A, and if the two sides
-of an equivalence test could disagree about that, the comparison would be
-meaningless. Suite C shells out to it, exactly as it shells out to
-`mkfixture`.
+## The comparison, and what it forgives
 
-## Initial matrix
+`tools/equivstate` is Go, next to `statesnap`, and Suite C shells out to it
+rather than reimplementing it. If the two sides of an equivalence test
+could disagree about what state IS, the comparison would be about nothing.
 
-To be re-derived at pickup. As a starting point:
+It compares two things:
 
-| UI action | CLI equivalent | Equivalent state means |
-|---|---|---|
-| Dashboard health read | `status` | same per-set verdicts, same exit-code-implied overall health |
-| Backups list read | `artifacts` (with filters) | same artifact ids and lifecycle states |
-| Sources and backup-set list | `sources` | same ids |
-| Run backup manually | `fetch --source S --backup-set B` | catalog rows, local tree digests, sidecar manifests |
-| Retention preview | `retention --dry-run` plus matching override flags | identical keep and delete itemisation with tier attribution |
-| Retention apply | `retention` | marked against [#21](https://github.com/spdrman/rclone-manager/issues/21) while FR-20 deletion is unimplemented, the same way Suite A's case is |
-| Catalog rebuild | `catalog rebuild` | rebuilt catalog equal through the read surface |
-| Validate artifact | `validate source/set/artifact` | same resulting lifecycle state |
-| Settings write: retention policy | edit `config.yaml` per FR-5, then `check` | effective config as reported by `check` and `retention --dry-run` |
-| Add, edit or remove a backup set | edit `config.yaml` per FR-5, then `check` | effective config plus a `sources` read-back |
-| Version and build provenance | `version` | same version and commit |
+- **the filesystem**, through `statesnap`: byte digests for every file.
+- **the product's own read surface**: `sources`, `artifacts`, `status`,
+  `check` and `retention --dry-run`, run against both directories with the
+  same binary. This is the better oracle wherever it reaches, because it
+  compares what an operator can observe rather than an internal
+  representation two correct implementations could legitimately differ on.
 
-## Gaps are stated, never faked
+The catalog is compared through the read surface rather than by raw rows,
+because two independent runs write different ingest timestamps into it.
 
-Where a UI function has no CLI equivalent, or a CLI command has no UI
-equivalent, the matrix carries the row with a one-line reason instead of
-an invented equivalence. Expected UI-only rows: quarantine and release,
-local-auth enrolment and password rotation, host-key trust decisions,
-connection tests, the activity feed, live operation progress. Expected
-CLI-only rows: `run`, `daemon`, `check`, and possibly `reconcile`
-depending on what the Phase 3 pages shipped.
+What it forgives is an argument, never a default:
+
+- `--ignore-file SUFFIX` drops a file from the filesystem half, and the
+  spec that passes it says in a comment why. Two suffixes are used today:
+  `config.yaml`, written by the engine's YAML writer on one side and by
+  hand on the other, textually different and semantically the same; and
+  `local-auth.json`, which only the UI side has, because a browser has to
+  sign in and the CLI has no way to enrol an administrator.
+- `--mask-volatile` masks the four values that belong to the machine and
+  the moment rather than to the backend: absolute timestamps, durations,
+  relative times, and the host filesystem's free-space reading. It applies
+  to the read surface and to the text content of files whose bytes differ,
+  which is what lets a sidecar recovery manifest recording the same facts
+  at a different second compare equal. It does not mask sizes, counts or
+  state names, and `tools/equivstate`'s own tests prove that: one case puts
+  a real difference on the same line as a timestamp and requires it to
+  survive.
+
+Every one of those behaviours has a paired negative control in
+`tools/equivstate/equivstate_test.go`. A differ nobody has seen fail is not
+a differ, and this one has been seen to fail on each dimension separately.
+
+## What it proves today
+
+Two rows. `MATRIX.md` says which, and says plainly that the number is a
+finding rather than a scope decision: against a real backend, four of the
+six pages cannot load, because `ui/shared/src/api/client.ts` calls fourteen
+`/api/v1` operations neither the contract nor the engine has
+([#211](https://github.com/spdrman/rclone-manager/issues/211),
+`findings/DISC-007.md`), and the two mutating actions that would matter
+most are refused by a destructive gate that is hardcoded shut pending
+[#92](https://github.com/spdrman/rclone-manager/issues/92).
+
+`specs/contract-gaps.spec.ts` pins every one of those blocks against a live
+engine, in both directions. A blocked row that starts working turns that
+spec red, which forces `MATRIX.md` to be updated rather than left to rot.
+
+That is the same mechanism Suite A's `known_discrepancy` marker uses, and
+it is here for the same reason: a document that records what is missing is
+only useful if something notices when it stops being missing.

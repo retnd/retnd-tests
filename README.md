@@ -9,7 +9,7 @@ Three suites live here:
 |---|---|---|
 | **A. CLI contract** | `backup-manager` driven black-box: argv in, exit code plus stdout plus stderr plus resulting on-disk state out | built, `make suite-a` |
 | **B. Web UI** | the Playwright suite, migrated out of `rclone-manager`'s `ui/shared/e2e/` | migrated, `make suite-b`, see [`suites/web-ui/README.md`](suites/web-ui/README.md) |
-| **C. UI to CLI equivalence** | every backend-affecting UI action proved equal to its CLI equivalent by comparing resulting backend state | see [`suites/equivalence/README.md`](suites/equivalence/README.md) |
+| **C. UI to CLI equivalence** | every backend-affecting UI action proved equal to its CLI equivalent by comparing resulting backend state | built, `make suite-c`, with the matrix in [`suites/equivalence/MATRIX.md`](suites/equivalence/MATRIX.md) |
 
 All three share one fixture layer, which is the main reason they share a
 repository. A Web UI test that exercises retention or quarantine needs a
@@ -35,6 +35,7 @@ make build           # resolve the pinned build and make it prove its identity
 make suite-a         # the CLI contract suite
 make suite-b-install # once: Playwright and a Chromium
 make suite-b         # the Web UI suite, against RM_UI_DIR or the pin
+make suite-c         # UI-to-CLI equivalence, against the real engine
 make gate            # everything that has to be green before a commit here
 ```
 
@@ -85,7 +86,7 @@ The disagreement is written up in [`findings/`](findings/README.md),
 filed against `rclone-manager`, and the case is marked
 `known_discrepancy`, which the runner treats as a strict expected
 failure: red while the issue is open, and red again the moment it starts
-passing, so a fix forces the marker's removal. There are five open
+passing, so a fix forces the marker's removal. There are six open
 entries today.
 
 ## Layout
