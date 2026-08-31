@@ -102,46 +102,50 @@ A resolved directory with no `node_modules/` stops the run and names the
 `npm ci` that fixes it, rather than letting `npm run dev` fail sixty
 seconds later inside a webServer timeout.
 
-## One red at the current pin, and it is not this suite's
+## The one red there used to be, and how it was closed
 
-At `rclone-manager` `defa0a6` this suite is **164 passed, 1 failed**:
+At `rclone-manager` `defa0a6` this suite was **164 passed, 1 failed**:
 
 ```
 [generic] e2e/accessibility.spec.ts:65 accessibility > tab order reaches the section navigation
 Error: Section navigation was not reachable within 12 tab stops
 ```
 
-It is deterministic (three consecutive runs), and none of it belongs to
-the migration. Four things establish that:
+It was deterministic (three consecutive runs) and none of it belonged to
+the migration. Four things established that at the time:
 
-1. the same spec passes against `ui/shared` at `137f646`, the migration
-   baseline, so the suite did not change: the app did;
-2. the same spec fails **in its old home**, run from
+1. the same spec passed against `ui/shared` at `137f646`, the migration
+   baseline, so the suite had not changed: the app had;
+2. the same spec failed **in its old home**, run from
    `rclone-manager/ui/shared` with that repository's own
-   `playwright.config.ts`, at `defa0a6`. This is `rclone-manager` main
+   `playwright.config.ts`, at `defa0a6`. That was `rclone-manager` main
    being red on its own e2e suite, and the move neither caused it nor
-   hides it;
-3. the accessibility property itself is intact. Wait for the shell and
+   hid it;
+3. the accessibility property itself was intact. Wait for the shell and
    the section nav is **three** tab stops away, not more than twelve;
-4. `e2e/` is still byte-identical to `ui/shared/e2e/`, `diff -r` and all.
+4. `e2e/` was still byte-identical to `ui/shared/e2e/`, `diff -r` and all.
 
-The cause is a race the spec always had and now always loses. Line 65
-does a bare `page.goto("/")` and starts pressing Tab immediately, with
-nothing waited on, while every neighbouring test goes through `bm.goto()`,
-which waits for the section nav to render (the comment at line 77 says so,
-in as many words, about the test right below it).
+The cause was a race the spec always had and had started always losing.
+Line 65 did a bare `page.goto("/")` and started pressing Tab immediately,
+with nothing waited on, while every neighbouring test goes through
+`bm.goto()`, which waits for the section nav to render (the comment below
+it says so, in as many words, about the test right underneath).
 [#195](https://github.com/spdrman/rclone-manager/pull/195) then put an
-extra round trip in front of the shell: `App.tsx` now asks
+extra round trip in front of the shell: `App.tsx` asks
 `getFirstRunStatus()` before it can know which mode the instance is in,
 and renders a `<Splash />` until the answer arrives. All twelve Tab
-presses land on that splash.
+presses landed on that splash.
 
-So the fix is one line, in `rclone-manager`'s
-`ui/shared/e2e/accessibility.spec.ts`, and it is the same one the sibling
-test already got: wait for the nav before counting tab stops. It is not
-made here, because `e2e/` is byte-identical to that file by construction
-and this is the change where that claim is being reviewed. Fix it
-upstream, re-sync, and this suite goes to 165.
+The fix belonged upstream, because `e2e/` is byte-identical to
+`ui/shared/e2e/` by construction and editing it here would have spent the
+migration's proof to close a product bug. It landed as `rclone-manager`
+`612b48c`, the file was copied back rather than retyped, `diff -r` against
+`ui/shared/e2e/` at that commit prints nothing, and this suite is
+**165 passed** at the pin.
+
+That round trip is the re-sync procedure, and it is the whole point of
+insisting on byte-identity: a change to a spec goes to the product
+repository, and this copy takes it whole.
 
 ## Type checking, and the one thing it does not check
 
