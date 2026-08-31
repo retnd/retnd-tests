@@ -1,0 +1,21 @@
+doc: >
+  A remote type this build does not register. FR-4 says the production
+  build ships local and SFTP and that further backends need an explicit
+  decision, so anything else has to be refused rather than attempted.
+raw_config: |
+  poll_interval: 15m
+  state:
+    database: ${STATE_DB}
+  sources:
+    - id: production
+      backup_sets:
+        - id: postgres-primary
+          remote: {type: s3}
+          remote_path: ${REMOTE}/a
+          local_path: ${LOCAL}/a
+          completion: {strategy: rename}
+          stale_after: 30h
+  retention:
+    timezone: UTC
+    week_starts_on: monday
+state: none

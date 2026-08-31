@@ -1,0 +1,12 @@
+doc: A configured backup set that has never had a successful cycle.
+poll_interval: 15m
+sources:
+  - id: production
+    backup_sets:
+      - id: postgres-primary
+        remote: {type: local}
+        include: ["*.dump"]
+        completion: {strategy: rename}
+        stale_after: 30h
+state: replay
+replay: fetch

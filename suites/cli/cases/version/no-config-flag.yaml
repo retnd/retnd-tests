@@ -1,0 +1,18 @@
+doc: >
+  The usage banner says every command except version accepts --config.
+  version is the exception, so passing one is not a supported invocation.
+  This case records what the binary does with it today, which is to accept
+  it silently; see findings/DISC-003.md.
+scenario: no-fixture
+argv: [version, --config, "${WORK}/no-such-config.yaml"]
+exit: 2
+stdout: ignored
+stderr:
+  - contains: "backup-manager: "
+state: unchanged
+known_discrepancy: spdrman/rclone-manager#189
+known_discrepancy_dimensions: [exit, stderr]
+contract:
+  - "usage text: every command except version accepts --config"
+  - "exit-code convention: 2 is a usage error; every other command refuses an unknown flag"
+tags: [discrepancy]

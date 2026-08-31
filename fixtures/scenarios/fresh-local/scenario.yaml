@@ -1,0 +1,26 @@
+doc: >
+  The same two backup sets as seeded-local, with artifacts waiting on the
+  remote and nothing yet ingested. This is the fixture for the commands
+  that are supposed to do the ingesting.
+poll_interval: 15m
+sources:
+  - id: production
+    backup_sets:
+      - id: postgres-primary
+        remote: {type: local}
+        include: ["*.dump"]
+        completion: {strategy: stable, stable_for: 10m}
+        stale_after: 30h
+        validation: {hash: sha256}
+        artifacts:
+          - {name: pg-2026-06-01.dump, size: 4096, seed: a1, mtime: now-2h}
+          - {name: pg-in-progress.dump, size: 2048, seed: a2, mtime: now}
+      - id: app-uploads
+        remote: {type: local}
+        include: ["*.tar"]
+        completion: {strategy: rename}
+        stale_after: 30h
+        validation: {hash: sha256}
+        artifacts:
+          - {name: uploads-2026-06-01.tar, size: 8192, seed: b1, mtime: now-3h}
+state: none

@@ -1,0 +1,19 @@
+# Local build provenance recorded per run by tools/getbuild. Machine-specific
+# by definition, so it is never checked in; docs/pinning.md explains what it
+# holds and why the checked-in pin is the only thing that decides a run.
+/.build-under-test.lock.json
+
+# Node lives only inside the suites that need a browser.
+node_modules/
+/suites/web-ui/test-results/
+/suites/web-ui/playwright-report/
+/suites/equivalence/test-results/
+
+# Go test binaries and coverage output.
+*.test
+/coverage.out
+
+# Per-case fixture work directories. Kept inside the repository so a
+# failed run leaves something to look at, and so nothing this suite
+# creates or removes lives outside the workspace.
+/.work/

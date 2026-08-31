@@ -1,0 +1,23 @@
+doc: >
+  FR-19 protects the newest eligible restore point in a backup set. With
+  one committed artifact per set, both are last-known-good and both are
+  kept, with the tier attribution FR-18 defines. The decision is
+  hand-derived from those two requirements, not recorded from a run: one
+  artifact per set can only ever be the daily, the weekly, the monthly and
+  the last-known-good at once.
+scenario: seeded-local
+argv: [retention, --config, "${CONFIG}", --dry-run]
+exit: 0
+stdout:
+  - line: "production/postgres-primary:"
+  - line: "${SP}KEEP${SP}pg-2026-06-01.dump${SP}tiers=[DAILY WEEKLY MONTHLY LAST_KNOWN_GOOD]"
+  - line: "production/app-uploads:"
+  - line: "${SP}KEEP${SP}uploads-2026-06-01.tar${SP}tiers=[DAILY WEEKLY MONTHLY LAST_KNOWN_GOOD]"
+  - absent: "DELETE"
+stderr: empty
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-18 (GFS retention)"
+  - "docs/EPIC.md FR-19 (last-known-good protection)"
+  - "usage text: retention [--dry-run] ... preview GFS/last-known-good retention decisions"
+tags: [smoke]

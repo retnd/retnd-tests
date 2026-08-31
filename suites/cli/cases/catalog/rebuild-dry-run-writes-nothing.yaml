@@ -1,0 +1,17 @@
+doc: >
+  --dry-run reports what a real rebuild would reconstruct and writes
+  nothing. The catalog here already holds both artifacts, so nothing needs
+  reconstructing, and the state assertion covers the whole work directory
+  rather than only the database.
+scenario: seeded-local
+argv: [catalog, rebuild, --config, "${CONFIG}", --dry-run]
+exit: 0
+stdout:
+  - contains: "already has a journal row, left untouched"
+  - line: "dry-run complete: would reconstruct 0 artifact(s); nothing was written"
+stderr: empty
+state: unchanged
+contract:
+  - "usage text: catalog rebuild [--dry-run] - reconstruct a lost/corrupted state database from sidecar recovery manifests"
+  - "docs/EPIC-B-multi-nas.md 19.3 (catalog reconstruction from sidecar recovery manifests)"
+tags: [smoke]

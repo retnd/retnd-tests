@@ -1,0 +1,8 @@
+doc: >
+  A work directory with no usable config, for the cases that are about
+  what the binary does before it ever reads one: no arguments, an unknown
+  command, an unknown flag, and a --config path that does not exist.
+raw_config: |
+  # Deliberately not a usable config. Every case using this scenario points
+  # --config somewhere else, or never gets as far as loading one.
+state: none

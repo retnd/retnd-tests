@@ -1,0 +1,15 @@
+doc: >
+  The usage line makes --source and --backup-set required rather than
+  optional, so omitting them is a usage error and not an attempt to fetch
+  everything.
+scenario: seeded-local
+argv: [fetch, --config, "${CONFIG}"]
+exit: 2
+stdout: empty
+stderr:
+  - line: "backup-manager: fetch requires --source and --backup-set"
+state: unchanged
+contract:
+  - "usage text: fetch --source S --backup-set B [--dry-run]"
+  - "exit-code convention: 2 is a usage error"
+tags: [smoke]

@@ -1,0 +1,21 @@
+doc: >
+  FR-26's version command reports the binary version, the embedded rclone
+  version, the Go version and the build commit. Field presence is the
+  contract; the commit value is pinned because this case doubles as the
+  identity handshake, which is what stops a suite certifying a build
+  nobody meant to test.
+scenario: no-fixture
+argv: [version]
+exit: 0
+stdout:
+  - re: "backup-manager \\S+"
+  - re: "rclone v\\d+\\.\\d+\\.\\d+\\S*"
+  - re: "go go\\d+\\.\\d+(\\.\\d+)?"
+  - re: "commit [0-9a-f]{7,40}(-dirty)?"
+  - count: 4
+stderr: empty
+state: unchanged
+contract:
+  - "usage text: version - report version information"
+  - "docs/EPIC.md FR-24 (binary version and embedded rclone version are exposed)"
+tags: [smoke]

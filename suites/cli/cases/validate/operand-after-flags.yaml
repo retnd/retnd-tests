@@ -1,0 +1,19 @@
+doc: >
+  The usage line is `validate <source/backup-set/artifact>` and the banner
+  says every command except version accepts --config, which together read
+  as "the operand and the flag can both be given". Writing them in that
+  order fails with a message about the argument count, which sends the
+  operator looking at the operand rather than at flag ordering; see
+  findings/DISC-002.md.
+scenario: seeded-local
+argv: [validate, "production/app-uploads/uploads-2026-06-01.tar", --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "production/app-uploads/uploads-2026-06-01.tar: checked=true passed=true"
+stderr: empty
+state: ignored
+known_discrepancy: spdrman/rclone-manager#188
+known_discrepancy_dimensions: [exit, stdout, stderr]
+contract:
+  - "usage text: validate <source/backup-set/artifact>, plus every command except version accepts --config"
+tags: [discrepancy]

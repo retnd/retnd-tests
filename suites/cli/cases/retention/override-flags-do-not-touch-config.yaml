@@ -1,0 +1,18 @@
+doc: >
+  The usage text says each retention flag overrides the loaded config's
+  own resolved value for this preview only. So the override has to reach
+  the preview, and it has to leave the config file and the catalog exactly
+  as they were. Both halves are asserted, because an override that
+  silently rewrote config.yaml would still print the right preview.
+scenario: seeded-local
+argv: [retention, --config, "${CONFIG}", --dry-run, --timezone, "America/Vancouver", --week-starts-on, sunday, --daily-days, "1", --weekly-months, "1", --monthly-months, "1"]
+exit: 0
+stdout:
+  - line: "production/postgres-primary:"
+  - re: "\\s*KEEP\\s+pg-2026-06-01\\.dump\\s+tiers=\\[.*LAST_KNOWN_GOOD\\]"
+stderr: empty
+state: unchanged
+contract:
+  - "usage text: each retention flag overrides the loaded config's own resolved value for this preview only"
+  - "docs/EPIC.md FR-18 (timezone, week_starts_on and the three tier windows are the GFS inputs)"
+tags: [smoke]

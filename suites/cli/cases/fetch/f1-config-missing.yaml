@@ -1,0 +1,12 @@
+doc: fetch honours --config, and refuses when the file is not there.
+scenario: no-fixture
+argv: [fetch, --config, "${WORK}/no-such-config.yaml", --source, production, --backup-set, postgres-primary]
+exit: 1
+stdout: ignored
+stderr:
+  - contains: "backup-manager: "
+  - contains: "${WORK}/no-such-config.yaml"
+state: unchanged
+contract:
+  - "usage text: every command except version accepts --config"
+tags: [smoke]

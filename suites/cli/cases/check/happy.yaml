@@ -1,0 +1,18 @@
+doc: >
+  check validates config and the state database and reports both. The
+  counts are contractual: they are how an operator confirms the file the
+  binary loaded is the file they think they edited.
+scenario: seeded-local
+argv: [check, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "config OK: 1 source(s), 2 backup set(s)"
+  - line: "state database OK: ${STATE_DB}"
+  - count: 2
+stderr: empty
+state: unchanged
+contract:
+  - "usage text: check - validate config and the state database, then exit"
+  - "docs/EPIC.md FR-5 (configuration is validated before processing)"
+  - "docs/EPIC.md FR-9 (the SQLite journal is mandatory)"
+tags: [smoke]

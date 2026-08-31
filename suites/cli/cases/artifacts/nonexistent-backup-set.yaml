@@ -1,0 +1,21 @@
+doc: >
+  A --backup-set naming a set that is not in the config is a mistake, not
+  a query with no results. fetch refuses the identical name with exit 1
+  and "no configured backup set named production/nope", so this asserts
+  the same refusal from artifacts. Observed behaviour today is exit 0 and
+  "0 artifact(s)", which reads to an operator exactly like "this set has
+  no backups yet"; see findings/DISC-001.md.
+scenario: seeded-local
+argv: [artifacts, --config, "${CONFIG}", --source, production, --backup-set, no-such-set]
+exit: 1
+stdout: ignored
+stderr:
+  - contains: "no-such-set"
+state: unchanged
+known_discrepancy: spdrman/rclone-manager#187
+known_discrepancy_dimensions: [exit, stderr]
+contract:
+  - "usage text: artifacts [--source S] [--backup-set B] - list journal artifacts"
+  - "docs/EPIC.md FR-7 (a backup set's identity is source plus set; an unnamed one does not exist)"
+  - "observed refusal in the sibling command: fetch --backup-set nope exits 1"
+tags: [discrepancy]

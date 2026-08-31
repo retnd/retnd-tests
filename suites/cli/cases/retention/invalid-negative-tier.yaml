@@ -1,0 +1,12 @@
+doc: A negative retention window is refused, naming the field and the value.
+scenario: seeded-local
+argv: [retention, --config, "${CONFIG}", --daily-days, "-1"]
+exit: 1
+stdout: empty
+stderr:
+  - contains: "backup-manager: "
+  - contains: "retention.daily_days"
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-18 (GFS retention windows are counts of days and months)"
+tags: [smoke]

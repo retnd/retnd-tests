@@ -1,0 +1,21 @@
+doc: >
+  artifacts lists every journal record with its FR-10 lifecycle state. The
+  seeded fixture ends with one artifact COMPLETE and one COMMITTED, the
+  second because FR-15's deletion-safety delay has not elapsed, so this
+  case also pins that two different lifecycle states are reportable at
+  once rather than collapsed into one.
+scenario: seeded-local
+argv: [artifacts, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "production/postgres-primary/pg-2026-06-01.dump${SP}COMMITTED${SP}remote=pg-2026-06-01.dump${SP}local=${LOCAL}/production/postgres-primary/pg-2026-06-01.dump"
+  - line: "production/app-uploads/uploads-2026-06-01.tar${SP}COMPLETE${SP}remote=uploads-2026-06-01.tar${SP}local=${LOCAL}/production/app-uploads/uploads-2026-06-01.tar"
+  - line: "2 artifact(s)"
+  - absent: "pg-in-progress.dump"
+stderr: empty
+state: unchanged
+contract:
+  - "usage text: artifacts [--source S] [--backup-set B] - list journal artifacts"
+  - "docs/EPIC.md FR-10 (explicit lifecycle states)"
+  - "docs/EPIC.md FR-8 (a candidate MUST be proven complete before ingestion)"
+tags: [smoke]

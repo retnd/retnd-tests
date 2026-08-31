@@ -1,0 +1,23 @@
+doc: >
+  The state-loss recovery sequence: fetch, lose the database, rebuild the
+  catalog from sidecar manifests, then confirm through the product's own
+  read surface that the catalog is back. The read-back is the assertion
+  that matters, because a rebuild that exits 0 and reconstructs nothing
+  would pass an exit-code-only check.
+scenario: fresh-local
+setup:
+  - [fetch, --config, "${CONFIG}", --source, production, --backup-set, app-uploads]
+mutate:
+  - "rm ${STATE_DB}"
+setup_after_mutate:
+  - [catalog, rebuild, --config, "${CONFIG}"]
+argv: [artifacts, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "1 artifact(s)"
+stderr: empty
+state: ignored
+contract:
+  - "docs/EPIC-B-multi-nas.md 19.3 (catalog reconstruction from sidecar recovery manifests)"
+  - "docs/recovery.md (state-loss recovery)"
+tags: [smoke]

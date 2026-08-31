@@ -1,0 +1,18 @@
+doc: >
+  FR-17 reconciliation over a catalog that agrees with what is on disk
+  finds nothing, says so, and exits 0. FR-23's startup events are required
+  because reconcile is a processing run rather than a query.
+scenario: seeded-local
+argv: [reconcile, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - ndjson: {event: startup}
+  - ndjson: {event: rclone_version}
+  - line: "reconciliation complete; no unresolved findings"
+stderr: empty
+state: ignored
+contract:
+  - "usage text: reconcile - run FR-17 reconciliation for every backup set"
+  - "docs/EPIC.md FR-17 (reconciliation)"
+  - "docs/EPIC.md FR-23 (structured logs cover startup/version and reconciliation)"
+tags: [smoke]

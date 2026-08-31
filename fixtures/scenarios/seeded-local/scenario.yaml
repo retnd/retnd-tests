@@ -1,0 +1,30 @@
+doc: >
+  One source with two backup sets on local-type remotes (FR-4), seeded by
+  replaying `fetch` so the catalog holds rows a real cycle produced. The
+  stable-strategy set carries one artifact old enough to count as complete
+  and one written just now, which FR-8's stable strategy must refuse to
+  ingest; that pairing is the positive control for every "the incomplete
+  one was left alone" assertion.
+poll_interval: 15m
+sources:
+  - id: production
+    backup_sets:
+      - id: postgres-primary
+        remote: {type: local}
+        include: ["*.dump"]
+        completion: {strategy: stable, stable_for: 10m}
+        stale_after: 30h
+        validation: {hash: sha256}
+        artifacts:
+          - {name: pg-2026-06-01.dump, size: 4096, seed: a1, mtime: now-2h}
+          - {name: pg-in-progress.dump, size: 2048, seed: a2, mtime: now}
+      - id: app-uploads
+        remote: {type: local}
+        include: ["*.tar"]
+        completion: {strategy: rename}
+        stale_after: 30h
+        validation: {hash: sha256}
+        artifacts:
+          - {name: uploads-2026-06-01.tar, size: 8192, seed: b1, mtime: now-3h}
+state: replay
+replay: fetch

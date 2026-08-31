@@ -1,0 +1,26 @@
+doc: >
+  Real operator flows are sequences, and some bugs only appear in the
+  state carried between commands. This one fetches, re-validates what it
+  fetched, previews retention over it, and then asks status for a verdict:
+  four commands, one work directory, and the last one only says HEALTHY if
+  the three before it left the catalog consistent.
+scenario: fresh-local
+setup:
+  - [fetch, --config, "${CONFIG}", --source, production, --backup-set, postgres-primary]
+  - [fetch, --config, "${CONFIG}", --source, production, --backup-set, app-uploads]
+  - [validate, --config, "${CONFIG}", "production/app-uploads/uploads-2026-06-01.tar"]
+  - [retention, --config, "${CONFIG}", --dry-run]
+argv: [status, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "production/postgres-primary: HEALTHY"
+  - line: "production/app-uploads: HEALTHY"
+  - line: "  current transfers: 0, pending deletes: 0, failures: 0"
+  - line: "  quarantined: 0 (of which unrecoverable: 0)"
+stderr: empty
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-24 (health)"
+  - "docs/EPIC.md FR-13 (verification)"
+  - "docs/EPIC.md FR-10 (lifecycle transitions are durable and idempotent)"
+tags: [smoke]

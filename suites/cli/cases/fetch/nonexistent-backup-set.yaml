@@ -1,0 +1,18 @@
+doc: >
+  A backup set that is not in the config cannot be fetched, and the
+  refusal names the identity FR-7 defines rather than failing later
+  against a remote that was never configured. This is also the positive
+  control for findings/DISC-001.md: the same nonexistent name is refused
+  here and silently accepted by `artifacts`.
+scenario: seeded-local
+argv: [fetch, --config, "${CONFIG}", --source, production, --backup-set, nope]
+exit: 1
+stdout:
+  - ndjson: {event: startup}
+stderr:
+  - line: "backup-manager: app: no configured backup set named production/nope"
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-7 (backup-set isolation: identity is source plus set)"
+  - "exit-code convention: 1 is an operational failure"
+tags: [smoke]

@@ -1,0 +1,29 @@
+doc: >
+  fetch runs one backup set's cycle on demand. FR-23 requires the startup
+  and rclone-version events; FR-10 requires the lifecycle transitions to
+  be reported; FR-14 requires the durable local commit. The artifact that
+  FR-8's stable strategy has not yet proven complete must be left where it
+  is, which is the negative half of the same assertion.
+scenario: fresh-local
+argv: [fetch, --config, "${CONFIG}", --source, production, --backup-set, postgres-primary]
+exit: 0
+stdout:
+  - ndjson: {event: startup}
+  - ndjson: {event: rclone_version}
+  - ndjson: {event: lifecycle_transition, artifact: "production/postgres-primary/pg-2026-06-01.dump", to: TRANSFERRED}
+  - ndjson: {event: lifecycle_transition, artifact: "production/postgres-primary/pg-2026-06-01.dump", to: VERIFIED}
+  - ndjson: {event: commit, artifact: "production/postgres-primary/pg-2026-06-01.dump"}
+  - line: "discovered=1 already_known=0 pending=1 rejected=0 conflicts=0 errors=0"
+  - absent: "pg-in-progress.dump"
+stderr: empty
+state:
+  mode: changed
+  files_present:
+    - "${LOCAL}/production/postgres-primary/pg-2026-06-01.dump"
+    - "${REMOTE}/production/postgres-primary/pg-in-progress.dump"
+contract:
+  - "usage text: fetch --source S --backup-set B [--dry-run] - run one backup set's cycle on demand"
+  - "docs/EPIC.md FR-23 (structured logs cover startup/version, configured rclone version, lifecycle transitions, durable commit)"
+  - "docs/EPIC.md FR-10 (explicit lifecycle states)"
+  - "docs/EPIC.md FR-8 (a candidate MUST be proven complete before ingestion)"
+tags: [smoke]
