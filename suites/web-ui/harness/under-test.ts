@@ -66,10 +66,16 @@ function checkUiDir(dir: string, origin: string): string {
   return dir;
 }
 
+/** The environment variable the runner hands its chosen port to its own
+ *  workers through. Not a knob: nobody sets this by hand, and `E2E_PORT`
+ *  is the documented way to name a port from outside. It exists because
+ *  Playwright re-evaluates this config in every process it starts, and
+ *  the answer has to be the same in all of them. */
+export const PORT_HANDOFF_VAR = "__RM_E2E_PORT";
+
 /** The port this run serves the app under test on.
  *
- *  Two properties, both carried over from the old home for reasons that
- *  cost real time to learn (rclone-manager #172):
+ *  Three properties, all bought expensively:
  *
  *  - **Per checkout, not per machine.** The default is derived from the
  *    git toplevel of the app under test, so two rclone-manager worktrees
@@ -81,19 +87,59 @@ function checkUiDir(dir: string, origin: string): string {
  *    before Vite is asked for it, `--strictPort` stops Vite sliding to
  *    another one, and `reuseExistingServer` is false, so a run that cannot
  *    bind fails loudly instead of reporting on somebody else's build.
+ *  - **The same answer in every process of one run.** See below.
  *
  *  `E2E_PORT` still wins, and is validated rather than coerced. An explicit
  *  port is taken exactly as given, with no free-port scan: "use this port"
  *  and "use a port near this one" are different instructions.
+ *
+ *  # Resolved once, then read back
+ *
+ *  Playwright evaluates `playwright.config.ts` in every process it starts:
+ *  the runner, plus one per worker. Anything this file *computes* therefore
+ *  has to come out the same in all of them, and a free-port scan does not.
+ *  By the time a worker gets here the runner's own Vite is already holding
+ *  the port the runner picked, so the worker's probe finds it taken, walks
+ *  to the next slot, and ends up with a `baseURL` nothing is listening on.
+ *  That is a race, and it lands on the side that works most of the time:
+ *  it showed up once as a single `ERR_CONNECTION_REFUSED` out of 165, with
+ *  the runner on 5930 and one worker on 5931.
+ *
+ *  The scan therefore runs in the runner only. The chosen port goes into
+ *  the runner's own environment, workers are forked from it and inherit it,
+ *  and every process after the first reads it back instead of asking the
+ *  machine again. An inherited value is validated the same way `E2E_PORT`
+ *  is, rather than coerced: a `Number()` over a stale or truncated value
+ *  reaches `baseURL` as `NaN` and buys a 60 second webServer timeout that
+ *  names the server instead of the variable.
+ *
+ *  The blocking CI signal never had this problem, because rclone-manager's
+ *  gate picks a free port itself and passes `E2E_PORT`, which every process
+ *  READS. This makes the standalone `make suite-b` path agree by the same
+ *  construction rather than by luck.
  */
 export function resolvePort(uiDir: string, env: NodeJS.ProcessEnv = process.env): number {
   if ((env.E2E_PORT ?? "").trim() !== "") return resolveE2EPort(env, uiDir);
+
+  const inherited = (env[PORT_HANDOFF_VAR] ?? "").trim();
+  if (inherited !== "") {
+    if (!/^\d+$/.test(inherited) || Number(inherited) < 1 || Number(inherited) > 65535) {
+      throw new Error(
+        `${PORT_HANDOFF_VAR} was inherited as ${JSON.stringify(env[PORT_HANDOFF_VAR])}, which is not a port. ` +
+          "This variable is set by the runner for its own workers and is not meant to be set by hand; " +
+          "use E2E_PORT to name a port from outside."
+      );
+    }
+    return Number(inherited);
+  }
+
   const start = derivePort(gitToplevel(uiDir));
   const chosen = execFileSync(
     process.execPath,
     [resolve(HERE, "pick-free-port.mjs"), String(start), String(PORT_FLOOR), String(PORT_SLOTS)],
     { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] }
   ).trim();
+  env[PORT_HANDOFF_VAR] = chosen;
   return Number(chosen);
 }
 

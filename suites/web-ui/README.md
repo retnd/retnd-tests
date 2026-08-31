@@ -46,7 +46,7 @@ are about **where the app comes from**, never about what is asserted:
 |---|---|
 | the app under test is resolved from `RM_UI_DIR`, then `RM_SOURCE_DIR/ui/shared`, then the pin's own checkout | in the old home it was implicitly "the directory this config sits in", which out here would be this repository, which has no app in it |
 | the derived port is derived from the checkout the **app** is in | out here the config and the app live in two different repositories, and only the app's checkout varies per concurrent run |
-| the port is additionally probed free before Vite is asked for it | one tests-repo checkout can be pointed at many product checkouts, so the collision odds went up rather than down |
+| the port is additionally probed free before Vite is asked for it, **once**, in the runner, and read back by the workers | one tests-repo checkout can be pointed at many product checkouts, so the collision odds went up rather than down. The scan runs once because Playwright re-evaluates this config in every worker, and by then the runner's Vite holds the runner's answer, so a worker that scans again walks to the next slot and points `baseURL` at nothing. `harness/under-test.test.ts` occupies the port and requires the two to agree, with a no-handoff resolver over the same occupied port as the control that the scan really does move on |
 | `webServer.cwd` is the app under test | `npm run dev` has to run where the app is |
 | reporter and `outputDir` are local to this suite | nothing else to say about this one |
 
@@ -99,6 +99,7 @@ seconds later inside a webServer timeout.
 ```
 e2e/                     byte-identical to ui/shared/e2e/ at the baseline commit
 harness/under-test.ts    which app, which port, resolved out loud
+harness/under-test.test.ts  the port is the same number in every process of one run
 harness/pick-free-port.mjs
 playwright.config.ts     the deltas above, and nothing else
 scripts/e2e-all-providers.mjs
@@ -106,11 +107,12 @@ scripts/e2e-all-providers.test.ts
 vitest.config.ts         runs the two unit tests ui/shared's vitest used to
 ```
 
-The two `.test.ts` files came with the code they test: `e2e/port.test.ts`
-pins the port helper's `E2E_PORT` validation, and
+Two of the three `.test.ts` files came with the code they test:
+`e2e/port.test.ts` pins the port helper's `E2E_PORT` validation, and
 `scripts/e2e-all-providers.test.ts` reads back what the seven-provider
 spawner hands each run, including the negative assertion that it no longer
 forces `CI=1` (which used to buy a retry, and a retry is what turned
 rclone-manager #172's deterministic red into something that read as a
-flake). `npm run unit` runs both, and both are in this repository's gate
-and in rclone-manager's.
+flake). The third, `harness/under-test.test.ts`, is new here, because the
+per-process port resolution is new here. `npm run unit` runs all three,
+and all three are in this repository's gate and in rclone-manager's.

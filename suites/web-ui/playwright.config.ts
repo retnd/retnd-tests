@@ -13,7 +13,9 @@ import { resolvePort, resolveUiDir } from "./harness/under-test";
 //   2. the derived port is derived from the checkout the APP is in, not the
 //      checkout the config is in, because out here those are two different
 //      repositories and only the first one varies per concurrent run;
-//   3. the port is additionally probed free before Vite is asked for it;
+//   3. the port is additionally probed free before Vite is asked for it,
+//      once, in the runner, with the workers reading that answer back
+//      rather than probing again (see resolvePort);
 //   4. the dev server is spawned with cwd set to the app under test;
 //   5. reporter and output paths are local to this suite.
 //
