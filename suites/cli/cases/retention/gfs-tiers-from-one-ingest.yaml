@@ -31,6 +31,26 @@ doc: >
     040d  outside daily, inside weekly, inside monthly
     000d  inside all three, and FR-19's protected artifact as well
 
+  Each tier also says which placement selected the artifact for it, and
+  on this fixture that attribution is most of the evidence. All six share
+  a discovery timestamp, so the discovery pass has one daily, one weekly
+  and one monthly bucket and selects exactly one artifact (000d, which
+  wins the name-ordered tie) for all three. Every other selection here
+  therefore exists only because FR-18 admits the producer's own timestamp,
+  and each one has to say so:
+
+    000d  DAILY, WEEKLY and MONTHLY all "both": the two placements agree
+          on it, so none of its tiers rests on untrusted input
+    040d  WEEKLY and MONTHLY both "producer": the discovery pass lost
+          those buckets to 000d
+    100d, 200d, 300d  MONTHLY "producer", for the same reason
+    500d  no tier at all, so nothing to attribute
+
+  That distribution is the ingested-backlog case stated in one line per
+  artifact. A build that regressed to a discovery-only key would not
+  merely move an artifact between tiers, it would have nothing to write
+  in the parentheses for five of these six.
+
   The DELETE line is what makes the rest of it mean something. Without an
   artifact that falls out of every window, "the ladder" would be
   indistinguishable from a chain that had stopped checking windows at all
@@ -55,11 +75,11 @@ exit: 0
 stdout:
   - line: "production/postgres-primary:"
   - line: "${SP}DELETE${SP}pg-01-age-500d.dump${SP}tiers=[]"
-  - line: "${SP}KEEP${SP}pg-02-age-300d.dump${SP}tiers=[MONTHLY]"
-  - line: "${SP}KEEP${SP}pg-03-age-200d.dump${SP}tiers=[MONTHLY]"
-  - line: "${SP}KEEP${SP}pg-04-age-100d.dump${SP}tiers=[MONTHLY]"
-  - line: "${SP}KEEP${SP}pg-05-age-040d.dump${SP}tiers=[WEEKLY MONTHLY]"
-  - line: "${SP}KEEP${SP}pg-06-age-000d.dump${SP}tiers=[DAILY WEEKLY MONTHLY LAST_KNOWN_GOOD]"
+  - line: "${SP}KEEP${SP}pg-02-age-300d.dump${SP}tiers=[MONTHLY(producer)]"
+  - line: "${SP}KEEP${SP}pg-03-age-200d.dump${SP}tiers=[MONTHLY(producer)]"
+  - line: "${SP}KEEP${SP}pg-04-age-100d.dump${SP}tiers=[MONTHLY(producer)]"
+  - line: "${SP}KEEP${SP}pg-05-age-040d.dump${SP}tiers=[WEEKLY(producer) MONTHLY(producer)]"
+  - line: "${SP}KEEP${SP}pg-06-age-000d.dump${SP}tiers=[DAILY(both) WEEKLY(both) MONTHLY(both) LAST_KNOWN_GOOD]"
   - line: "${SP}last-known-good: artifact \"pg-06-age-000d.dump\" is the newest eligible restore point in this backup set, dated ${TS} by the producer's own timestamp on the remote object, and holds FR-19 last-known-good protection"
   # One header, six itemised artifacts, one last-known-good note.
   - count: 8
@@ -67,6 +87,7 @@ stderr: empty
 state: unchanged
 contract:
   - "docs/EPIC.md FR-18 (each tier is evaluated twice over the same artifacts, once per placement, and KEEP is the union)"
+  - "docs/EPIC.md FR-18 (a KEEP names, per tier, which of the two placements selected the artifact for it)"
   - "docs/EPIC.md FR-18 (an ingested backlog keeps its real shape; an artifact older than the longest configured window is still a DELETE candidate)"
   - "docs/EPIC.md FR-18 (default chain: daily over 7 days, weekly over 3 calendar months, monthly over 12 calendar months)"
   - "docs/EPIC.md FR-19 (newest means newest by the artifact's own retention date, and the reason carries the resolved date and says which timestamp produced it)"

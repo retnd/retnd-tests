@@ -33,6 +33,17 @@ doc: >
   The on-disk half is asserted for the same reason the sibling case
   asserts it: an override that rewrote config.yaml would still print a
   correct-looking preview.
+
+  The placement attribution on each surviving tier is the control's own,
+  unchanged: the six artifacts still share a discovery timestamp, so the
+  discovery pass still selects only 000d and everything else that
+  survives still survives on the producer's own timestamp alone. Narrowing
+  a window can take a tier away from an artifact, and here it takes
+  WEEKLY from 040d, but it cannot change which pass found the artifact in
+  a window it is still inside. A build in which these read "both" would
+  be one whose discovery pass had started spreading a single ingest across
+  several buckets, which is the bug spdrman/rclone-manager#192 was filed
+  about in reverse.
 scenario: retention-tiers
 argv: [retention, --config, "${CONFIG}", --dry-run, --daily-days, "1", --weekly-months, "1", --monthly-months, "6"]
 exit: 0
@@ -41,9 +52,9 @@ stdout:
   - line: "${SP}DELETE${SP}pg-01-age-500d.dump${SP}tiers=[]"
   - line: "${SP}DELETE${SP}pg-02-age-300d.dump${SP}tiers=[]"
   - line: "${SP}DELETE${SP}pg-03-age-200d.dump${SP}tiers=[]"
-  - line: "${SP}KEEP${SP}pg-04-age-100d.dump${SP}tiers=[MONTHLY]"
-  - line: "${SP}KEEP${SP}pg-05-age-040d.dump${SP}tiers=[MONTHLY]"
-  - line: "${SP}KEEP${SP}pg-06-age-000d.dump${SP}tiers=[DAILY WEEKLY MONTHLY LAST_KNOWN_GOOD]"
+  - line: "${SP}KEEP${SP}pg-04-age-100d.dump${SP}tiers=[MONTHLY(producer)]"
+  - line: "${SP}KEEP${SP}pg-05-age-040d.dump${SP}tiers=[MONTHLY(producer)]"
+  - line: "${SP}KEEP${SP}pg-06-age-000d.dump${SP}tiers=[DAILY(both) WEEKLY(both) MONTHLY(both) LAST_KNOWN_GOOD]"
   - line: "${SP}last-known-good: artifact \"pg-06-age-000d.dump\" is the newest eligible restore point in this backup set, dated ${TS} by the producer's own timestamp on the remote object, and holds FR-19 last-known-good protection"
   # One header, six itemised artifacts, one last-known-good note. FR-19
   # is unaffected by the narrowed chain: protection is not a tier and a
