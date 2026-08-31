@@ -1,26 +1,25 @@
 doc: >
   FR-1 requires the daemon to handle SIGTERM, use context cancellation and
   shut down without initiating unsafe source deletion. So a daemon that is
-  asked to stop after its first cycle stops, exits 0 the way a service
-  manager expects of a requested stop, and leaves the same committed
-  artifacts a single `run` would have. The exit status is the marked
-  dimension: the daemon reaches its own shutdown path and the process
-  still reports 143 rather than success. Its "daemon shutting down" log
-  line is deliberately not asserted, because whether it is emitted before
-  the process goes away is a race; that is part of the same finding. See
-  findings/DISC-004.md.
+  asked to stop after its first cycle stops, logs its own shutdown, exits
+  0 the way a service manager expects of a requested stop, and leaves the
+  same committed artifacts a single `run` would have. The shutdown log is
+  asserted rather than skipped because exit 0 on its own cannot tell a
+  shutdown that completed from one the process never reached; it used to
+  be a race and it is not one any more. daemon_start is the positive
+  control for that assertion: if the log were not being read at all, both
+  events would be missing rather than only the second.
 scenario: fresh-local
 argv: [daemon, --config, "${CONFIG}"]
 signal: TERM
 stop_after: 6s
 timeout_seconds: 90
 exit: 0
-known_discrepancy: spdrman/rclone-manager#190
-known_discrepancy_dimensions: [exit]
 stdout:
   - ndjson: {event: startup}
   - ndjson: {event: daemon_start}
   - ndjson: {event: commit, artifact: "production/postgres-primary/pg-2026-06-01.dump"}
+  - ndjson: {event: daemon_stop}
 stderr: empty
 state:
   mode: changed
@@ -28,5 +27,6 @@ state:
     - "${LOCAL}/production/postgres-primary/pg-2026-06-01.dump"
 contract:
   - "docs/EPIC.md FR-1 (the daemon SHALL handle SIGTERM/SIGINT, use context cancellation, and shut down without initiating unsafe source deletion)"
+  - "docs/EPIC.md FR-23 (structured logs cover the process lifecycle: this is the counterpart of the daemon_start the same case already asserts)"
   - "usage text: daemon - repeat the processing cycle at poll_interval"
-tags: [slow, discrepancy]
+tags: [slow]

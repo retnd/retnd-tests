@@ -1,9 +1,10 @@
 doc: >
   A backup set that is not in the config cannot be fetched, and the
   refusal names the identity FR-7 defines rather than failing later
-  against a remote that was never configured. This is also the positive
-  control for findings/DISC-001.md: the same nonexistent name is refused
-  here and silently accepted by `artifacts`.
+  against a remote that was never configured. It is also the positive
+  control for artifacts/nonexistent-backup-set: the two commands are
+  asserted to refuse the same name with the same wording, which is what
+  they disagreed about until spdrman/rclone-manager#187 was fixed.
 scenario: seeded-local
 argv: [fetch, --config, "${CONFIG}", --source, production, --backup-set, nope]
 exit: 1

@@ -1,0 +1,21 @@
+doc: >
+  validate accepts --config on either side of its operand, which it does
+  by parsing repeatedly around the operands rather than stopping at the
+  first one. An unknown flag written in that same position still has to be
+  an unknown flag: the accommodation is about where a known flag may go,
+  not about treating anything after the operand as an operand. So this
+  asserts the flag package's own refusal and exit 2, the same shape
+  global/f6-unknown-flag pins for a command with no operand at all, and it
+  is the negative control for validate/operand-after-flags.
+scenario: seeded-local
+argv: [validate, "production/app-uploads/uploads-2026-06-01.tar", --bogus]
+exit: 2
+stdout: empty
+stderr:
+  - line: "flag provided but not defined: -bogus"
+  - line: "Usage of validate:"
+state: unchanged
+contract:
+  - "exit-code convention: flag-parse failures exit 2"
+  - "usage text: validate accepts only --config"
+tags: [smoke]

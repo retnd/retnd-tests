@@ -1,0 +1,19 @@
+doc: >
+  The usage line is `version - report version information`, with no
+  operand in it, so a stray argument is a usage error and not something to
+  ignore. version routes it through the same usageError every other
+  command uses, which is why the message carries the `backup-manager: `
+  prefix here while version/no-config-flag, whose refusal comes out of the
+  flag package instead, does not. That pairing is the point of having both
+  cases: they are the two different ways this command says no.
+scenario: no-fixture
+argv: [version, stray-operand]
+exit: 2
+stdout: empty
+stderr:
+  - line: "backup-manager: version takes no arguments"
+state: unchanged
+contract:
+  - "usage text: version - report version information (no operand)"
+  - "exit-code convention: 2 is a usage error"
+tags: [smoke]

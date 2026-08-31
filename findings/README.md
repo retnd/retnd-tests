@@ -34,12 +34,29 @@ observed behaviour, and links its filed issue and its pinned case.
 
 | Finding | Issue | Summary |
 |---|---|---|
-| DISC-001 | [#187](https://github.com/spdrman/rclone-manager/issues/187) | `artifacts` answers a nonexistent backup set with an empty list and exit 0 |
-| DISC-002 | [#188](https://github.com/spdrman/rclone-manager/issues/188) | `validate` blames the argument count when the real problem is flag ordering |
-| DISC-003 | [#189](https://github.com/spdrman/rclone-manager/issues/189) | `version` silently accepts unknown flags where every other command exits 2 |
-| DISC-004 | [#190](https://github.com/spdrman/rclone-manager/issues/190) | `daemon` exits 143 after handling SIGTERM, so a normal stop looks like a crash |
 | DISC-005 | [#21](https://github.com/spdrman/rclone-manager/issues/21) | plain `retention` is a preview: FR-20 local deletion is not implemented |
 | DISC-007 | [#211](https://github.com/spdrman/rclone-manager/issues/211) | the Web UI's API client calls fourteen `/api/v1` operations neither the contract nor the engine has, so four pages cannot load against a real backend |
+
+## Resolved
+
+A finding leaves this directory when the product agrees with the contract
+again, because a file describing behaviour that no longer exists is worse
+than no file: the next reader cannot tell which entries are still true.
+What replaces it is the case, which stays and now asserts the contract
+strictly, with no marker to relax it. The row below is the pointer, so
+that "this used to be wrong" stays findable without the stale write-up.
+
+All four went out together with
+[#209](https://github.com/spdrman/rclone-manager/pull/209), and the pin
+moved to `defa0a6` in the same change: until the pin moves, none of these
+cases can see the fix.
+
+| Finding | Issue | What it was | The case that now asserts the contract |
+|---|---|---|---|
+| DISC-001 | [#187](https://github.com/spdrman/rclone-manager/issues/187) | `artifacts` answered a nonexistent backup set with an empty list and exit 0 | `artifacts/nonexistent-backup-set` |
+| DISC-002 | [#188](https://github.com/spdrman/rclone-manager/issues/188) | `validate` blamed the argument count when the real problem was flag ordering | `validate/operand-after-flags`, with `validate/unknown-flag-after-operand` and `validate/double-dash-ends-flags` bounding the accommodation |
+| DISC-003 | [#189](https://github.com/spdrman/rclone-manager/issues/189) | `version` silently accepted unknown flags where every other command exits 2 | `version/no-config-flag`, plus `version/rejects-an-operand` for the other way it says no |
+| DISC-004 | [#190](https://github.com/spdrman/rclone-manager/issues/190) | `daemon` exited 143 after handling SIGTERM, so a normal stop looked like a crash | `daemon/sigterm-stops-cleanly`, which now also asserts the shutdown log that used to be a race |
 
 ## Open contract questions
 

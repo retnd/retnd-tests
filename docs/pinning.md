@@ -7,8 +7,8 @@ it, and moving to a newer build is a reviewable one-line change.
 ```json
 {
   "mode": "source",
-  "commit": "8ad310014b5be92e75789c8cff4167942d0c8e42",
-  "version": "8ad3100",
+  "commit": "defa0a6a0c821c140015aa8f380e93f3a7c8899f",
+  "version": "defa0a6",
   "source_builder": "go",
   "image": ""
 }

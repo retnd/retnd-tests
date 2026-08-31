@@ -86,8 +86,13 @@ The disagreement is written up in [`findings/`](findings/README.md),
 filed against `rclone-manager`, and the case is marked
 `known_discrepancy`, which the runner treats as a strict expected
 failure: red while the issue is open, and red again the moment it starts
-passing, so a fix forces the marker's removal. There are six open
-entries today.
+passing, so a fix forces the marker's removal. Two entries are open
+today, alongside one contract question the documentation does not settle
+either way. Four more were retired when
+[#209](https://github.com/spdrman/rclone-manager/pull/209) answered them
+and the pin moved onto it, which is the mechanism working rather than an
+exception to it: the cases stayed and now assert the contract with no
+marker to relax them.
 
 ## Layout
 
