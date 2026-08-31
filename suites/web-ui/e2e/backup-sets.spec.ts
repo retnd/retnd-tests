@@ -70,11 +70,28 @@ test.describe("backup set detail", () => {
   });
 
   test("offers ordinary actions in the header", async ({ page }) => {
+    // Scoped to the header this test is named after, the same way the
+    // destructive-actions test below scopes it. Unscoped, "Edit" and
+    // "Preview retention" would also have been satisfied by controls
+    // further down the page, so the old form proved less than its name.
     // exact: true — "Preview retention" is otherwise a substring match of
     // the Retention section's "Preview retention plan" button too.
-    for (const action of ["Run now", "Test connection", "Edit", "Preview retention"]) {
-      await expect(page.getByRole("button", { name: action, exact: true })).toBeVisible();
+    const header = page.getByRole("heading", { level: 1 }).locator("xpath=../..");
+    for (const action of ["Run all due sets", "Test connection", "Edit", "Preview retention"]) {
+      await expect(header.getByRole("button", { name: action, exact: true })).toBeVisible();
     }
+
+    // "Run now" was this button's label until #214. It went because core
+    // has no per-set run: one cycle walks every enabled backup set, so a
+    // button named for the set on screen claimed something the API cannot
+    // do. The replacement is only honest while it keeps saying that, so
+    // the tooltip is asserted rather than just the new label, and "Run
+    // now" must not come back here under the old meaning.
+    await expect(header.getByRole("button", { name: "Run all due sets", exact: true }))
+      .toHaveAttribute("title", /every enabled backup set, not only this one/);
+    // The loop above is this zero's control: the same getByRole shape,
+    // with exact names, finds four buttons on this page.
+    await expect(page.getByRole("button", { name: "Run now", exact: true })).toHaveCount(0);
   });
 
   test("keeps destructive actions out of the header", async ({ page }) => {
