@@ -42,7 +42,11 @@ test.describe("read equivalence", () => {
     // provable, and worth proving, is that the engine the browser is
     // talking to and the binary the CLI side runs are one build. Without
     // that, every other row in this suite compares two products.
-    const version = runCli(pair.build, pair.cli.work, ["version"]);
+    // No --config: the usage banner exempts version from it and the binary
+    // refuses one outright (spdrman/rclone-manager#189), so the helper's
+    // default would fail this on a usage error before it could compare
+    // anything. Suite A's version/no-config-flag is the case that pins it.
+    const version = runCli(pair.build, pair.cli.work, ["version"], { config: false });
     expect(version.code, version.stderr).toBe(0);
     expect(version.stdout).toContain(pair.build.commit);
 

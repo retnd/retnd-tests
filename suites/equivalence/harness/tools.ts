@@ -99,9 +99,29 @@ export interface CliResult {
 
 /** Runs the product's CLI against one work directory. --config is appended
  *  rather than expected in argv, so a caller cannot accidentally point the
- *  CLI side at the UI side's directory. */
-export function runCli(build: Build, work: string, argv: string[]): CliResult {
-  const r = spawnSync(build.cli, [...argv, "--config", resolve(work, "config.yaml")], { encoding: "utf8" });
+ *  CLI side at the UI side's directory.
+ *
+ *  `version` is the one command that has to opt out, with `config: false`.
+ *  The usage banner says every command *except* version accepts --config,
+ *  and since spdrman/rclone-manager#189 the binary means it: version
+ *  answers an undefined flag the way every other command does, with exit 2
+ *  and the flag package's own complaint. Suite A pins that as
+ *  `version/no-config-flag`. Appending --config unconditionally therefore
+ *  made this helper unable to run the one command whose whole job is to
+ *  say which build it is.
+ *
+ *  It is an opt-out at the call site rather than a name check inside here,
+ *  because a helper that silently drops an argument for some commands and
+ *  not others is exactly the kind of quiet accommodation this suite exists
+ *  to catch elsewhere. A spec that skips the flag says so in its own text. */
+export function runCli(
+  build: Build,
+  work: string,
+  argv: string[],
+  opts: { config?: boolean } = {}
+): CliResult {
+  const full = opts.config === false ? argv : [...argv, "--config", resolve(work, "config.yaml")];
+  const r = spawnSync(build.cli, full, { encoding: "utf8" });
   if (r.error) throw r.error;
   return { code: r.status ?? -1, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
 }
