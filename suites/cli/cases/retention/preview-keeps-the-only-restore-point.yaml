@@ -5,19 +5,33 @@ doc: >
   hand-derived from those two requirements, not recorded from a run: one
   artifact per set can only ever be the daily, the weekly, the monthly and
   the last-known-good at once.
+
+  Each tier also says which of FR-18's two placements selected the
+  artifact for it, and here that is "both" every time, derived the same
+  way: the only artifact in a backup set is the only candidate in every
+  bucket it lands in, so it wins that bucket under the discovery pass and
+  under the producer pass alike. "Both" is the reading that says the KEEP
+  does not rest on the producer's own timestamp, which FR-8 distrusts, and
+  it is the boring case the other two retention cases here are read
+  against.
+
+  LAST_KNOWN_GOOD carries no placement. FR-19's protection is not a bucket
+  selection, so neither timestamp produced it and naming one would be a
+  claim this manager never made.
 scenario: seeded-local
 argv: [retention, --config, "${CONFIG}", --dry-run]
 exit: 0
 stdout:
   - line: "production/postgres-primary:"
-  - line: "${SP}KEEP${SP}pg-2026-06-01.dump${SP}tiers=[DAILY WEEKLY MONTHLY LAST_KNOWN_GOOD]"
+  - line: "${SP}KEEP${SP}pg-2026-06-01.dump${SP}tiers=[DAILY(both) WEEKLY(both) MONTHLY(both) LAST_KNOWN_GOOD]"
   - line: "production/app-uploads:"
-  - line: "${SP}KEEP${SP}uploads-2026-06-01.tar${SP}tiers=[DAILY WEEKLY MONTHLY LAST_KNOWN_GOOD]"
+  - line: "${SP}KEEP${SP}uploads-2026-06-01.tar${SP}tiers=[DAILY(both) WEEKLY(both) MONTHLY(both) LAST_KNOWN_GOOD]"
   - absent: "DELETE"
 stderr: empty
 state: unchanged
 contract:
   - "docs/EPIC.md FR-18 (GFS retention)"
+  - "docs/EPIC.md FR-18 (a KEEP names the tier that kept it and which of the two placements selected it there)"
   - "docs/EPIC.md FR-19 (last-known-good protection)"
   - "usage text: retention [--dry-run] ... preview GFS/last-known-good retention decisions"
 tags: [smoke]
