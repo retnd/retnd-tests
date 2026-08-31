@@ -8,6 +8,13 @@ The command list was re-derived from `core/cmd/backup-manager/main.go` at
 the pinned commit rather than trusted from a snapshot. It registers
 twelve commands.
 
+**Cases pin one claim each.** `artifacts/happy` checks that the listing
+lists, with lifecycle states drawn from FR-10's documented vocabulary; the
+case that pins which state a `stable`-strategy artifact stops at is
+`fetch/stable-strategy-holds-the-remote-copy`, because that is a claim
+about FR-8 and FR-15 rather than about listing. Keeping them apart is
+what stops an ordinary listing case going red when a safety rule changes.
+
 **Contract sources.** Every case names its own in a `contract:` list.
 Across the matrix they are `docs/EPIC.md`'s FR numbers,
 `docs/EPIC-B-multi-nas.md`, `docs/recovery.md`, `container/Dockerfile`'s
@@ -64,8 +71,8 @@ place that catches it per command is a case per command.
 | `check` | `check/happy`: exit 0, the source and set counts, the state database path | the whole F1 to F6 family |
 | `status` | `status/healthy`: exit 0, HEALTHY per set, FR-24's exposed fields | `status/stale-exits-one` (exit 1 and STALE), `status/never-run-is-degraded` (exit 1 and DEGRADED), `status/f1-config-missing` |
 | `sources` | `sources/happy`: exactly the configured ids, their remote type, paths and stale threshold | `sources/f1-config-missing`, and `check/f3-zero-sources` covers the empty-config question |
-| `artifacts` | `artifacts/happy`: both seeded artifacts with their FR-10 lifecycle states; `artifacts/filters-narrow` asserts both the included and the excluded id | `artifacts/nonexistent-backup-set` marked against [#187](https://github.com/spdrman/rclone-manager/issues/187), `artifacts/f1-config-missing` |
-| `fetch` | `fetch/happy`: FR-23 events, FR-10 transitions, the durable commit, and the incomplete artifact untouched | `fetch/dry-run-changes-nothing`, `fetch/missing-required-flags` (exit 2), `fetch/nonexistent-backup-set` (exit 1), `fetch/unreachable-remote`, `fetch/f1-config-missing` |
+| `artifacts` | `artifacts/happy`: both seeded artifacts, each with a state from FR-10's vocabulary and nothing else, and the count line; `artifacts/filters-narrow` asserts both the included and the excluded id | `artifacts/nonexistent-backup-set` marked against [#187](https://github.com/spdrman/rclone-manager/issues/187), `artifacts/f1-config-missing` |
+| `fetch` | `fetch/happy`: FR-23 events, FR-10 transitions, the durable commit, and the incomplete artifact untouched; `fetch/stable-strategy-holds-the-remote-copy`: FR-8 plus FR-15, with the rename-strategy set as its positive control | `fetch/dry-run-changes-nothing`, `fetch/missing-required-flags` (exit 2), `fetch/nonexistent-backup-set` (exit 1), `fetch/unreachable-remote`, `fetch/f1-config-missing` |
 | `retention` | `retention/preview-keeps-the-only-restore-point` (FR-18 tiers and FR-19 protection, hand-derived), `retention/override-flags-do-not-touch-config` | `retention/invalid-timezone`, `retention/invalid-negative-tier`, `retention/apply-is-not-implemented` marked against [#21](https://github.com/spdrman/rclone-manager/issues/21) with `retention/apply-announces-it-is-preview-only` as its control, `retention/f1-config-missing` |
 | `reconcile` | `reconcile/clean`: exit 0, FR-23 startup, no unresolved findings | `reconcile/f1-config-missing` |
 | `validate` | `validate/happy`: exit 0, checked and passed | `validate/corrupted-local-copy` (exit 1 and FR-10 QUARANTINED), `validate/wrong-argument-count` (exit 2), `validate/malformed-artifact-id`, `validate/unresolvable-artifact`, `validate/operand-after-flags` marked against [#188](https://github.com/spdrman/rclone-manager/issues/188), `validate/f1-config-missing` |

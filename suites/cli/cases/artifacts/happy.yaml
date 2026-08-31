@@ -1,21 +1,24 @@
 doc: >
-  artifacts lists every journal record with its FR-10 lifecycle state. The
-  seeded fixture ends with one artifact COMPLETE and one COMMITTED, the
-  second because FR-15's deletion-safety delay has not elapsed, so this
-  case also pins that two different lifecycle states are reportable at
-  once rather than collapsed into one.
+  artifacts lists every journal record with its FR-10 lifecycle state.
+  What is pinned here is the listing: both seeded artifacts appear, each
+  with a state drawn from FR-10's documented vocabulary and nothing else,
+  the count line agrees, and the artifact FR-8 refused to ingest is
+  absent. Which state each one has reached is a different claim, made by
+  the cases that are actually about it, so an ordinary listing case does
+  not go red when a safety rule changes when an artifact leaves COMMITTED.
 scenario: seeded-local
 argv: [artifacts, --config, "${CONFIG}"]
 exit: 0
 stdout:
-  - line: "production/postgres-primary/pg-2026-06-01.dump${SP}COMMITTED${SP}remote=pg-2026-06-01.dump${SP}local=${LOCAL}/production/postgres-primary/pg-2026-06-01.dump"
-  - line: "production/app-uploads/uploads-2026-06-01.tar${SP}COMPLETE${SP}remote=uploads-2026-06-01.tar${SP}local=${LOCAL}/production/app-uploads/uploads-2026-06-01.tar"
+  - re: "production/postgres-primary/pg-2026-06-01\\.dump\\s+(DISCOVERED|TRANSFERRING|TRANSFERRED|VERIFYING|VERIFIED|COMMITTING|COMMITTED|REMOTE_DELETE_PENDING|COMPLETE|FAILED|QUARANTINED)\\s+remote=pg-2026-06-01\\.dump\\s+local=\\$\\{LOCAL\\}/production/postgres-primary/pg-2026-06-01\\.dump"
+  - re: "production/app-uploads/uploads-2026-06-01\\.tar\\s+(DISCOVERED|TRANSFERRING|TRANSFERRED|VERIFYING|VERIFIED|COMMITTING|COMMITTED|REMOTE_DELETE_PENDING|COMPLETE|FAILED|QUARANTINED)\\s+remote=uploads-2026-06-01\\.tar\\s+local=\\$\\{LOCAL\\}/production/app-uploads/uploads-2026-06-01\\.tar"
   - line: "2 artifact(s)"
+  - count: 3
   - absent: "pg-in-progress.dump"
 stderr: empty
 state: unchanged
 contract:
   - "usage text: artifacts [--source S] [--backup-set B] - list journal artifacts"
-  - "docs/EPIC.md FR-10 (explicit lifecycle states)"
+  - "docs/EPIC.md FR-10 (explicit lifecycle states, and the exceptional ones)"
   - "docs/EPIC.md FR-8 (a candidate MUST be proven complete before ingestion)"
 tags: [smoke]

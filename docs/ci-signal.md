@@ -67,6 +67,29 @@ section is the specification for whoever adds it.
    `workflow_dispatch`-only per the estate's Actions-off policy. The
    schedule stays commented unless the owner turns it on.
 
+### When the working tree and the pin disagree
+
+The gate step runs the suite against the working tree's build, while the
+suite's own pin names some other commit. Those are different builds by
+construction, and a case can legitimately go red because the working tree
+predates a behaviour the pinned build has, or because it is ahead of one.
+
+That is the suite doing its job, and the fix is to read which case failed
+rather than to loosen it. A case is written to pin one claim, and its
+`contract:` list names where that claim came from, so a red case names
+the behaviour that differs. If a change in `rclone-manager` deliberately
+changes a documented behaviour, the accompanying tests-repo change updates
+the case and its `contract:` list, and the pin bump lands with it.
+
+What this arrangement will not tolerate is a case that pins several
+unrelated claims at once, because then one deliberate change reddens a
+case that is not about it, and the pressure is to weaken the case rather
+than to update it. `artifacts/happy` and
+`fetch/stable-strategy-holds-the-remote-copy` are split for exactly that
+reason.
+
+### The smoke slice is a new signal
+
 The Suite A smoke slice is worth calling out separately: it is a signal
 `rclone-manager` has never had. Today nothing exercises the CLI
 black-box on a per-commit basis at all. The smoke slice runs the real
