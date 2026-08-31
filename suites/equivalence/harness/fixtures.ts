@@ -50,8 +50,22 @@ export const test = base.extend<{ pair: Pair }, { scenario: string }>({
     // fixture layer is deterministic by construction, so two runs of it
     // produce bit-identical trees, and asserting that they do is the first
     // thing every spec here does.
-    const uiWork = materialise(scenario, label + "-ui", build.cli);
-    const cliWork = materialise(scenario, label + "-cli", build.cli);
+    //
+    // Deterministic "by construction" has one input it cannot supply
+    // itself, which is what "now" means. A scenario's mtimes are offsets
+    // from it, so two materialisations seconds apart are equivalent but
+    // not identical, and two that straddle a second boundary produce
+    // artifacts whose remote mtimes differ by a second. That was
+    // invisible until FR-19's reason line started printing the artifact's
+    // resolved date (spdrman/rclone-manager#215): after it, the two
+    // sides' retention previews disagreed on that line whenever the
+    // boundary fell between the two calls, which is a coin flip weighted
+    // by how long one materialisation takes. Both sides are anchored to
+    // one instant instead, so the pair is identical rather than usually
+    // identical.
+    const anchor = new Date().toISOString();
+    const uiWork = materialise(scenario, label + "-ui", build.cli, anchor);
+    const cliWork = materialise(scenario, label + "-cli", build.cli, anchor);
 
     const bundle = buildUiBundle(resolveUiDir(build));
     const stack = await bootStack(build, uiWork.work, bundle);

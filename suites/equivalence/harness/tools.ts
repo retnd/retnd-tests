@@ -80,12 +80,14 @@ export interface Manifest {
  *  Suite C always materialises a scenario TWICE, into two directories that
  *  start bit-identical, so the only difference between them at comparison
  *  time is which surface the change was made through. */
-export function materialise(scenario: string, label: string, cli: string): Manifest {
+export function materialise(scenario: string, label: string, cli: string, now?: string): Manifest {
   const work = resolve(WORK_ROOT, `equiv-${label}-${process.pid}-${Math.floor(Math.random() * 1e6)}`);
   mkdirSync(work, { recursive: true });
+  const argv = ["--scenario", scenario, "--work", work, "--cli", cli];
+  if (now) argv.push("--now", now);
   const raw = execFileSync(
     tool("mkfixture", "./fixtures/cmd/mkfixture"),
-    ["--scenario", scenario, "--work", work, "--cli", cli],
+    argv,
     { cwd: REPO_ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] }
   );
   return JSON.parse(raw) as Manifest;
