@@ -40,13 +40,48 @@ test.describe("settings", () => {
   });
 
   test("reports full build provenance", async ({ page }) => {
-    for (const label of [
-      "Backup Manager version", "Service version", "Core version",
-      "Embedded rclone", "Database schema", "Platform adapter",
-      "Architecture", "Build commit"
+    // Scoped to the card, so a label that turns up elsewhere on the page
+    // does not count as provenance, and so the negatives below can be
+    // about this card rather than about the whole app (the shell's own
+    // logo reads "rclone-manager", which a page-wide /rclone/ would hit).
+    // The card is a plain <section> with an <h2>, not a landmark, so it is
+    // located by its heading.
+    const provenance = page
+      .locator("section")
+      .filter({ has: page.getByRole("heading", { name: "System information", exact: true }) });
+    const row = (label: string) =>
+      provenance.locator("dt").filter({ hasText: label }).locator("xpath=following-sibling::dd[1]");
+
+    // Each row is asserted with the value beside it, not just the label:
+    // an empty provenance card is the failure this test exists to catch.
+    await expect(row("Service version")).toHaveText(/\S/);
+    await expect(row("API contract")).toHaveText(/^v\d+$/);
+    await expect(row("Backup engine")).toHaveText(/\S/);
+    await expect(row("Go toolchain")).toHaveText(/^go\d/);
+    await expect(row("Configuration revision")).toHaveText(/\S/);
+    await expect(row("Platform adapter")).toHaveText(/\S/);
+    await expect(row("Build commit")).toHaveText(/\S/);
+
+    // #211 removed four rows from this card, and this is the record of
+    // which, so a later reader can tell a deliberate removal from an
+    // assertion that was quietly deleted to reach green. A "Backup
+    // Manager version" separate from the service's, a "Core version", a
+    // database schema number and a build architecture: the version
+    // endpoint has never reported any of the four, so every value the UI
+    // showed for them came from the dev-server mock. None of the four has
+    // a replacement, here or anywhere else. "Embedded rclone" is the one
+    // that was renamed rather than dropped: it is "Backup engine" now,
+    // because the public contract does not name the implementation, and
+    // it is asserted above.
+    for (const gone of [
+      "Backup Manager version", "Core version", "Database schema", "Architecture"
     ]) {
-      await expect(page.getByText(label, { exact: true })).toBeVisible();
+      await expect(provenance.getByText(gone, { exact: true })).toHaveCount(0);
     }
+    // Control for those four zeros: the same query shape, on a label that
+    // is in this card, finds exactly one.
+    await expect(provenance.getByText("Service version", { exact: true })).toHaveCount(1);
+    await expect(provenance.getByText(/rclone/i)).toHaveCount(0);
   });
 });
 
@@ -54,13 +89,30 @@ test.describe("version mismatch", () => {
   test("disables management but keeps information visible", async ({ bm, page }) => {
     await bm.goto("/", "version-mismatch");
 
-    await expect(page.getByText("Backup Manager update required")).toBeVisible();
-    await expect(page.getByText(/Management actions have been disabled/)).toBeVisible();
-    await expect(page.getByText(/UI 1\.3\.0/)).toBeVisible();
-    await expect(page.getByText(/Service 1\.2\.0/)).toBeVisible();
+    // Scoped to the banner: the dashboard also raises a host-key alert in
+    // this scenario, and "keeps information visible" is only worth
+    // anything if the refusal it asserts is the version one.
+    const banner = page.getByRole("alert").filter({ hasText: "Backup Manager update required" });
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText(/management actions have been disabled/);
+
+    // The mismatch is between the /api/v1 contract this interface was
+    // built against and the one the service speaks. It used to be stated
+    // as "UI 1.3.0 · Service 1.2.0", and the first of those two numbers
+    // had no source: nothing reports a version for the interface itself,
+    // so #211 removed it. A banner that names one version cannot describe
+    // a mismatch, so the honest pair is the service and the contract it
+    // speaks, and that pair is what is asserted here.
+    await expect(banner).toContainText(/\/api\/v1 contract/);
+    await expect(banner).toContainText(/Service 1\.2\.0 speaks contract v0/);
+    // Deliberate removal, and its control underneath: the interface still
+    // has no version of its own, so nothing in this banner may claim one.
+    await expect(banner.getByText(/UI \d+\.\d+\.\d+/)).toHaveCount(0);
+    await expect(banner.getByText(/Service \d+\.\d+\.\d+/)).toHaveCount(1);
 
     // Read-only information still renders.
     await expect(page.getByText(/^BACKUPS /)).toBeVisible();
+    await expect(page.getByRole("region", { name: "Key metrics" })).toBeVisible();
 
     // Every mutating control is disabled.
     await expect(page.getByRole("button", { name: "Add backup set" })).toBeDisabled();
@@ -73,7 +125,11 @@ test.describe("version mismatch", () => {
 
     await expect(page.getByRole("button", { name: /Apply retention now/ })).toBeDisabled();
     await expect(page.getByRole("button", { name: /Remove set configuration/ })).toBeDisabled();
-    await expect(page.getByRole("button", { name: "Run now" })).toBeDisabled();
+    // "Run now" until #214. The set-detail header's run button is
+    // deployment-wide now and is named for that; backup-sets.spec.ts
+    // covers the rename and the tooltip that has to carry it. What this
+    // test is about is unchanged: on an incompatible service it is off.
+    await expect(page.getByRole("button", { name: "Run all due sets", exact: true })).toBeDisabled();
   });
 });
 

@@ -9,10 +9,57 @@ RM_UI_DIR=/path/to/rclone-manager/ui/shared npm run e2e         # 165 tests
 
 Or from the repository root, `make suite-b`.
 
-At the currently pinned `rclone-manager` commit one of those 165 is red,
-in both this home and its old one, for a reason that predates the move.
-"One red at the current pin" below has the evidence and the one-line fix,
-which belongs upstream.
+All 165 pass against `rclone-manager` `main`. This paragraph used to say
+one of them was red at the pin, which stopped being true the moment
+`612b48c` landed the fix and the pin moved onto it; "The one red there
+used to be" below has that whole story and is written in the past tense
+for the same reason.
+
+## The byte-identity invariant, and when it ended
+
+Read the next two sections as history. They describe a round trip that
+existed while `e2e/` had an upstream twin, and it does not any more:
+`rclone-manager` #217 (`0ec5f45`) deleted `ui/shared/e2e/` in the same
+change that made this suite that repository's blocking gate step, so this
+directory has been the only home the browser suite has since the day it
+arrived. `diff -r` against `ui/shared/e2e/` no longer has anything to
+compare against.
+
+That matters because it moves where a spec edit belongs. While the twin
+existed, an edit went upstream and this copy took it whole, and editing
+here would have spent the migration's proof. Now there is nothing to
+re-sync from, so a spec that has drifted from the UI is corrected here,
+and the pin in `rclone-manager`'s `scripts/e2e/tests-repo.pin` is what
+moves the correction into that repository's gate.
+
+`fix/223-resync-web-ui-specs` is the first change to use that route, and
+it is worth naming what it did NOT do. `rclone-manager` #214 removed nine
+fields the shared UI was rendering that nothing in the running system
+computes, and six specs here still asked for them. They were updated to
+assert what the UI ships instead, never emptied: each one that lost a
+field either asserts the honest replacement in its place or carries a
+comment saying, in as many words, that the field is gone with no
+replacement. Issue #6 has the reasoning per spec.
+
+### The build pin still points before that commit
+
+`build-under-test.json` names `612b48c`, which predates #214, so these
+six specs would be red against a Suite B run resolved from the build pin
+rather than from `RM_UI_DIR`. That is stated rather than hidden, and it
+is bounded: nothing automated resolves Suite B from that pin.
+`rclone-manager`'s gate step and its `nightly-e2e.yml` both set
+`RM_UI_DIR` to a product checkout, this repository's own `suites.yml`
+runs only the Go targets, and a standalone `make suite-b` with no
+`RM_UI_DIR` refuses to start until someone installs dependencies inside
+the cached checkout anyway.
+
+Moving the build pin is issue #7 and not this change, because the bump
+makes Suite C red on purpose: #214 closed six of the gap rows
+`suites/equivalence/MATRIX.md` records as blocked, and
+`specs/contract-gaps.spec.ts` is the strict expected-failure guard that
+goes red the moment a gap closes so the matrix cannot quietly outgrow
+its own rows. That is a matrix rewrite, and folding it in here would
+make both halves harder to read.
 
 ## What "behaviour-preserving" was made to mean
 
@@ -143,9 +190,12 @@ migration's proof to close a product bug. It landed as `rclone-manager`
 `ui/shared/e2e/` at that commit prints nothing, and this suite is
 **165 passed** at the pin.
 
-That round trip is the re-sync procedure, and it is the whole point of
-insisting on byte-identity: a change to a spec goes to the product
-repository, and this copy takes it whole.
+That round trip was the re-sync procedure, and it was the whole point of
+insisting on byte-identity: a change to a spec went to the product
+repository, and this copy took it whole. It is closed now, for the reason
+at the top of this file: the tree it round-tripped through no longer
+exists, so a spec fix is made here and reaches `rclone-manager` through
+its pin instead.
 
 ## Type checking, and the one thing it does not check
 
@@ -154,9 +204,9 @@ and both configs, and the gate runs it. It went in because Playwright
 transpiles types away without checking them, so until it did, nothing in
 this repository read the types in this suite at all.
 
-`noUnusedLocals` and `noUnusedParameters` are deliberately off, and real
-ESLint is deliberately absent, for one reason: both of them have exactly
-one finding on this tree, and it is inside `e2e/`.
+`noUnusedLocals` and `noUnusedParameters` are off, and real ESLint is
+absent, for one reason: both of them have exactly one finding on this
+tree, and it is inside `e2e/`.
 
 ```
 e2e/shell.spec.ts(20,77): 'page' is declared but its value is never read
@@ -181,16 +231,28 @@ rule was turned off in favour of a check that does not reach these files.
 That is a gap in `rclone-manager`'s gate rather than something the
 migration introduced, and it is why the finding survived the move.
 
-The order that fixes it for both homes: correct
+The order that fixed it for both homes used to be: correct
 `ui/shared/e2e/shell.spec.ts` upstream, give that tsconfig (or a second
 one) the `e2e` directory so the claim its ESLint config makes becomes
 true, re-sync the byte-identical copy here, and then turn both options on
 in this suite with nothing left to suppress.
 
+Half of that is moot now. There is no upstream copy to correct, so the
+binding is this repository's to fix and the two options are this
+repository's to turn on, in a change that does only that. It is left
+alone here on purpose: this branch is a spec re-sync, and folding a
+compiler-option change into it would make the re-sync harder to read.
+The gap it names in `rclone-manager`'s own gate (its `tsconfig.json`
+`include` is `["src"]`, so `tsc --noEmit` there never read `e2e/`) is
+unchanged and still worth closing on the parts of `ui/shared` that do
+still exist.
+
 ## Files
 
 ```
-e2e/                     byte-identical to ui/shared/e2e/ at the baseline commit
+e2e/                     the browser specs; byte-identical to ui/shared/e2e/
+                         until #217 deleted that directory (see the top of
+                         this file), maintained here since
 harness/under-test.ts    which app, which port, resolved out loud
 harness/under-test.test.ts  the port is the same number in every process of one run
 harness/pick-free-port.mjs

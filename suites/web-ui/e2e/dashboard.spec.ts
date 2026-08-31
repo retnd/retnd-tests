@@ -1,5 +1,10 @@
 import { expect, test } from "./fixtures";
 
+/** What relativeAge() (ui/shared/src/utilities/format.ts) can print. The
+ *  suite runs against a fixed fixture but the ages are computed from
+ *  Date.now(), so the shape is the stable thing to assert, not a number. */
+const FRESHNESS = /^(never|just now|\d+ minutes? ago|\d+ hours? ago|\d+ days ago)$/;
+
 test.describe("dashboard", () => {
   test("states the BACKUP verdict, not the daemon's", async ({ bm, page }) => {
     await bm.goto("/");
@@ -22,9 +27,41 @@ test.describe("dashboard", () => {
 
   test("reports freshness figures", async ({ bm, page }) => {
     await bm.goto("/");
-    await expect(page.getByText("Last successful cycle")).toBeVisible();
-    await expect(page.getByText("Newest verified backup")).toBeVisible();
-    await expect(page.getByText("Oldest set freshness")).toBeVisible();
+    const summary = page.getByRole("region", { name: "Backup health" });
+    // The figure rendered against a label in the summary's <dl>: the label
+    // on its own proves only that a row exists, not that anything filled
+    // it in.
+    const figure = (label: string) =>
+      summary.locator("dt").filter({ hasText: label }).locator("xpath=following-sibling::dd[1]");
+
+    // "Last successful cycle" is "Last completed backup" since #214. The
+    // health report separates the newest backup that FINISHED from the
+    // newest one that was VERIFIED, and only the second is a restore
+    // point, so both rows are asserted here: a rename that quietly folded
+    // them back into one figure would fail this.
+    await expect(figure("Last completed backup")).toHaveText(FRESHNESS);
+    await expect(figure("Newest verified backup")).toHaveText(FRESHNESS);
+
+    // Null freshness means some set has never produced a known-good backup
+    // at all, which is an unanswerable question rather than a large number
+    // of hours, so the UI has to say so in words instead of printing one.
+    await expect(figure("Oldest set freshness")).toHaveText(
+      /^(\d+ hours ago|not yet measurable)$/
+    );
+
+    // "Retained artifacts" and "Success rate \u00b7 7d" used to sit in this
+    // same list. #211 removed both: no endpoint has ever computed either,
+    // so against a real deployment they each rendered a confident zero.
+    // "Free space" is the honest figure that took their place here, and it
+    // comes off the health report. Deliberate removal, recorded so a later
+    // reader does not read the shorter list as an assertion someone
+    // deleted: the retained-artifact count and the seven-day success rate
+    // have NO replacement, in this list or anywhere else.
+    await expect(figure("Free space")).toHaveText(/^[\d.]+ (B|KB|MB|GB|TB|PB)$/);
+    await expect(summary.getByText(/Success rate|Retained artifacts/)).toHaveCount(0);
+    // Control for that zero: the same query shape, on a label that is
+    // there, finds it. Without this, a typo would also read as "absent".
+    await expect(summary.getByText(/Oldest set freshness/)).toHaveCount(1);
   });
 
   test("surfaces the host-key change above the metrics", async ({ bm, page }) => {
@@ -44,11 +81,32 @@ test.describe("dashboard", () => {
   test("shows the four metric cards with a storage meter", async ({ bm, page }) => {
     await bm.goto("/");
     const metrics = page.getByRole("region", { name: "Key metrics" });
-    await expect(metrics).toContainText("Backup sets");
-    await expect(metrics).toContainText("Success rate");
-    await expect(metrics).toContainText("Quarantine");
-    await expect(metrics).toContainText("Storage");
-    await expect(page.getByRole("meter", { name: "Storage used" })).toBeVisible();
+    // A MetricCard renders label, then value, then detail line, with no
+    // separator between them, so one regex per card ties the number to the
+    // label above it rather than accepting it anywhere in the region.
+    await expect(metrics).toContainText(/Backup sets\s*\d+\s*\d+ stale \u00b7 \d+ failing/);
+    // This card was "Success rate \u00b7 7d" until #214. The success rate had
+    // no source anywhere in the running system: it came off the dev-server
+    // mock, and on a real deployment it would have rendered a confident
+    // percentage of nothing. Its slot now carries a count of sets needing
+    // attention, which the health report really does compute from the
+    // per-set states, so the honest replacement is what is asserted rather
+    // than the check simply being dropped.
+    await expect(metrics).toContainText(/Degraded or stale\s*\d+\s*sets needing attention/);
+    await expect(metrics).toContainText(/Quarantine\s*\d+\s*need review/);
+    await expect(metrics).toContainText(/Storage\s*[\d.]+ (B|KB|MB|GB|TB|PB) free/);
+    await expect(metrics.getByText(/Success rate/)).toHaveCount(0);
+    // Control for that zero, as in "reports freshness figures" above.
+    await expect(metrics.getByText(/Degraded or stale/)).toHaveCount(1);
+
+    const meter = page.getByRole("meter", { name: "Storage used" });
+    await expect(meter).toBeVisible();
+    const used = Number(await meter.getAttribute("aria-valuenow"));
+    expect(used).toBeGreaterThanOrEqual(0);
+    expect(used).toBeLessThanOrEqual(100);
+    // The meter and the sentence under it are two renderings of one
+    // number, and an operator reads the sentence.
+    await expect(metrics).toContainText(new RegExp("used \u00b7 " + used + "%"));
   });
 
   test("renders an active transfer with staged progress", async ({ bm, page }) => {

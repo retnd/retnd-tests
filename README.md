@@ -137,12 +137,13 @@ Node on it; the hook runs the script.
 Playwright transpiles types away without checking them, so before the
 type check went in, nothing in this repository ever read the types in
 Suites B and C at all. What the check does not turn on is
-`noUnusedLocals`/`noUnusedParameters`: `suites/web-ui/e2e/` is
-byte-identical to `rclone-manager`'s `ui/shared/e2e/`, that is the
-migration's proof, and the one unused binding in there would have to be
-edited to satisfy them. It belongs upstream, where the migrated copy
-inherits the fix on the next re-sync. Real ESLint is not here for the
-same reason, spelled out in `suites/web-ui/README.md`.
+`noUnusedLocals`/`noUnusedParameters`, and the reason has changed: while
+`suites/web-ui/e2e/` was byte-identical to `rclone-manager`'s
+`ui/shared/e2e/` the one unused binding in there belonged upstream, but
+#217 deleted that directory, so it is this repository's to fix and these
+options are this repository's to turn on, in a change of its own. Real
+ESLint is absent for the same reason, spelled out in
+`suites/web-ui/README.md`.
 
 ## The CI signal
 
