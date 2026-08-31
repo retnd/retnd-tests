@@ -1,5 +1,12 @@
 import { expect, test } from "./fixtures";
 
+/** The row's recovery actions, in the order they are offered. Reinstate is
+ *  last and carries the ellipsis, because it is the only one that opens a
+ *  confirmation before it does anything. */
+const REINSTATE = "Reinstate\u2026";
+const ACTIONS = ["Inspect", "Revalidate", "Retry ingestion", REINSTATE];
+const CONFIRM = "Reinstate and keep the remote source";
+
 test.describe("quarantine", () => {
   test.beforeEach(async ({ bm }) => {
     await bm.goto("/quarantine");
@@ -26,12 +33,91 @@ test.describe("quarantine", () => {
     ).toBeVisible();
   });
 
-  test("offers only the three safe recovery actions", async ({ page }) => {
+  /** Four since rclone-manager #229, which shipped the button for the
+   *  reinstatement path #220 had already built end to end. Named rather than
+   *  counted: a bare count says nothing about WHICH actions a row offers, so
+   *  swapping one for another used to pass it. */
+  test("offers the four safe recovery actions, and names every one of them", async ({ page }) => {
     const row = page.getByRole("row").nth(1);
-    await expect(row.getByRole("button", { name: "Inspect" })).toBeVisible();
-    await expect(row.getByRole("button", { name: "Revalidate" })).toBeVisible();
-    await expect(row.getByRole("button", { name: "Retry ingestion" })).toBeVisible();
-    await expect(row.getByRole("button")).toHaveCount(3);
+    for (const action of ACTIONS) {
+      await expect(row.getByRole("button", { name: action, exact: true })).toBeVisible();
+    }
+    await expect(row.getByRole("button")).toHaveCount(ACTIONS.length);
+  });
+
+  /** Reinstating is the only one of the four that cannot be undone: it
+   *  permanently forfeits the backup's remote deletion (rclone-manager ADR
+   *  0004, FR-15), so the remote source is preserved for good. It must
+   *  therefore not read as a fourth Retry ingestion, and this pins the
+   *  difference rather than trusting the label to carry it. */
+  test("sets Reinstate apart from the three actions that cost nothing", async ({ page }) => {
+    const row = page.getByRole("row").nth(1);
+
+    // A trailing ellipsis is this product's "this opens a confirmation"
+    // affordance ("Apply retention now…", "Remove set configuration…"), and
+    // Reinstate is the only action in the row that carries one. The other
+    // three take effect on the click.
+    const opensAConfirmation = row.getByRole("button", { name: /…$/ });
+    await expect(opensAConfirmation).toHaveCount(1);
+    await expect(opensAConfirmation).toHaveAccessibleName(REINSTATE);
+
+    // And it is not painted like its neighbours: a different button tier,
+    // plus a glyph none of the other three has.
+    const chrome = (name: string) =>
+      row.getByRole("button", { name, exact: true }).evaluate((el) => {
+        const style = getComputedStyle(el);
+        return [
+          style.backgroundColor,
+          style.borderColor,
+          String(el.querySelector("[aria-hidden='true']") !== null)
+        ].join("|");
+      });
+    expect(await chrome(REINSTATE)).not.toBe(await chrome("Retry ingestion"));
+  });
+
+  test("Reinstate asks first, and the question states what it costs", async ({ page }) => {
+    await page.getByRole("row").nth(1).getByRole("button", { name: REINSTATE, exact: true }).click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/permanently forfeits/i)).toBeVisible();
+    await expect(dialog.getByText(/never delete it/i)).toBeVisible();
+    // §35: the consequence is named in the confirm button itself, and the
+    // half of the deal being paid is in there with the half being bought.
+    await expect(dialog.getByRole("button", { name: CONFIRM, exact: true })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: /^(OK|Yes|Confirm|Submit)$/ })).toHaveCount(0);
+  });
+
+  test("cancelling the confirmation reinstates nothing", async ({ page }) => {
+    const row = page.getByRole("row").nth(1);
+    await row.getByRole("button", { name: REINSTATE, exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Cancel", exact: true }).click();
+
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(row.getByRole("button", { name: REINSTATE, exact: true })).toBeVisible();
+    await expect(page.getByRole("status")).toHaveCount(0);
+  });
+
+  /** The mock API answers with a reinstatement that took, which is the one
+   *  outcome that returns the backup to service. It is also the only one
+   *  that has bought anything, so it is the one that has to say what it
+   *  cost. (The row itself stays put here only because the mock's quarantine
+   *  list is a fixed fixture; against a real service the artifact is
+   *  COMMITTED again and leaves the list on the reload.) */
+  test("a reinstatement says the remote source is kept from now on", async ({ page }) => {
+    await page.getByRole("row").nth(1).getByRole("button", { name: REINSTATE, exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: CONFIRM, exact: true }).click();
+
+    const notice = page.getByRole("status");
+    await expect(notice).toBeVisible();
+    await expect(notice).toContainText(/back in service/i);
+    await expect(notice).toContainText(/kept for good/i);
+    await expect(notice).toContainText(/never delete it/i);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+
+  test("says a reinstated backup keeps its remote source for good, before anyone clicks", async ({ page }) => {
+    await expect(page.getByText(/reinstated backup keeps its remote source for good/i)).toBeVisible();
   });
 
   test("never offers to delete the remote anyway", async ({ page }) => {
