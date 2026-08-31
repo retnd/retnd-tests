@@ -17,7 +17,7 @@ npm run e2e:all-providers       # provider treatment across all seven
 | --- | --- |
 | `shell.spec.ts` | lockup, section nav, active-link state, counts, theme persistence |
 | `dashboard.spec.ts` | backup-vs-service health separation, host-key escalation, metrics, transfer stages, empty + storage-critical scenarios |
-| `backup-sets.spec.ts` | card content, non-colour-only state, halted set cannot run, detail sections, destructive-action placement |
+| `backup-sets.spec.ts` | card content, non-colour-only state, page-level (not per-card) run control and its tooltip, detail sections, destructive-action placement |
 | `wizard.spec.ts` | six steps, per-step fields, trust decision, inferred-completion warning, acknowledgement gate (including re-arming on uncheck) |
 | `backups.spec.ts` | table semantics, all seven columns, multi-classification, filtering, artifact detail, lifecycle ordering |
 | `retention.spec.ts` | server-issued plan id, keep/delete itemisation, stale-plan refusal, consequence-named confirm, safe default focus, Escape |
