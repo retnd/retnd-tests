@@ -1,0 +1,25 @@
+doc: >
+  --dry-run is only worth having if it is provably inert. This asserts the
+  whole work directory afterwards, files and catalog rows alike, rather
+  than only the absence of a transfer message: a dry run that wrote a
+  journal row while printing nothing would pass the weaker check.
+scenario: fresh-local
+setup:
+  # `check` opens the journal, which creates the database and applies its
+  # migrations. Doing that first is what makes the assertion below sharp:
+  # with the database already in place, a dry run has to leave the work
+  # directory byte-identical, rather than being excused for the schema it
+  # would have created anyway.
+  - [check, --config, "${CONFIG}"]
+argv: [fetch, --config, "${CONFIG}", --source, production, --backup-set, postgres-primary, --dry-run]
+exit: 0
+stdout: ignored
+stderr: empty
+state:
+  mode: unchanged
+  files_absent:
+    - "${LOCAL}/production/postgres-primary/pg-2026-06-01.dump"
+contract:
+  - "usage text: fetch --source S --backup-set B [--dry-run]"
+  - "docs/EPIC.md FR-20 (local deletion safety: a preview writes nothing)"
+tags: [smoke]

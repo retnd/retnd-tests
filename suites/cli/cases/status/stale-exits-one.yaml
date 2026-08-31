@@ -1,0 +1,20 @@
+doc: >
+  The backup set's newest known-good backup is older than its stale_after
+  threshold, so FR-24's STALE verdict applies. status exits 1 for
+  anything short of HEALTHY, which is what makes it usable as a container
+  healthcheck; that exit code is the whole point of the command, so it is
+  asserted separately from the word on stdout.
+scenario: stale-local
+mutate:
+  - "sleep 4s"
+argv: [status, --config, "${CONFIG}"]
+exit: 1
+stdout:
+  - line: "production/postgres-primary: STALE"
+  - line: "  stale threshold: 1s"
+stderr: empty
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-24 (backup-set states HEALTHY/DEGRADED/STALE/FAILING; stale threshold exposed)"
+  - "container/Dockerfile HEALTHCHECK: status exits 0 only when every set is healthy"
+tags: [slow]

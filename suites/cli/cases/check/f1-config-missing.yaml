@@ -1,0 +1,16 @@
+doc: >
+  A --config path that does not exist is an operational failure, named
+  with the path so an operator can see which file was looked for.
+scenario: no-fixture
+argv: [check, --config, "${WORK}/no-such-config.yaml"]
+exit: 1
+stdout: empty
+stderr:
+  - contains: "backup-manager: "
+  - contains: "${WORK}/no-such-config.yaml"
+  - contains: "no such file or directory"
+state: unchanged
+contract:
+  - "usage text: every command except version accepts --config"
+  - "exit-code convention: 1 is an operational failure, prefixed backup-manager: "
+tags: [smoke]

@@ -1,0 +1,20 @@
+doc: >
+  `--` ends flag parsing, which is the escape hatch that lets an operand
+  be written even when it looks like a flag. Parsing flags on both sides
+  of the operand is the kind of change that can quietly eat that
+  terminator, so this asserts the documented meaning survives it: the
+  flags before `--` are still parsed, and the operand after it is still
+  the operand. It asserts the same successful validation
+  validate/operand-after-flags does, from the third of the three orders
+  the banner permits.
+scenario: seeded-local
+argv: [validate, --config, "${CONFIG}", "--", "production/app-uploads/uploads-2026-06-01.tar"]
+exit: 0
+stdout:
+  - line: "production/app-uploads/uploads-2026-06-01.tar: checked=true passed=true"
+stderr: empty
+state: ignored
+contract:
+  - "POSIX utility syntax guidelines: -- terminates the options"
+  - "usage text: validate <source/backup-set/artifact>, plus every command except version accepts --config"
+tags: [smoke]

@@ -1,0 +1,17 @@
+doc: >
+  A state database that is not a database is an operational failure that
+  names the state database, so an operator knows which file to restore
+  rather than which config line to edit.
+scenario: corrupt-state
+argv: [check, --config, "${CONFIG}"]
+exit: 1
+stdout: empty
+stderr:
+  - contains: "backup-manager: "
+  - contains: "state"
+  - contains: "not a database"
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-9 (SQLite lifecycle journal)"
+  - "exit-code convention: 1 is an operational failure"
+tags: [smoke]

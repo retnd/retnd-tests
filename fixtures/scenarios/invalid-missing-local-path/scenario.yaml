@@ -1,0 +1,20 @@
+doc: >
+  A backup set with no local_path. FR-5 lists local_path as part of the
+  minimum configuration a backup set carries, and there is no default for
+  it to fall back to.
+raw_config: |
+  poll_interval: 15m
+  state:
+    database: ${STATE_DB}
+  sources:
+    - id: production
+      backup_sets:
+        - id: postgres-primary
+          remote: {type: local}
+          remote_path: ${REMOTE}/a
+          completion: {strategy: rename}
+          stale_after: 30h
+  retention:
+    timezone: UTC
+    week_starts_on: monday
+state: none

@@ -1,0 +1,26 @@
+doc: >
+  Two backup sets under one source sharing an id. FR-7 makes the identity
+  source-plus-set, so this config has two sets that are the same set.
+raw_config: |
+  poll_interval: 15m
+  state:
+    database: ${STATE_DB}
+  sources:
+    - id: production
+      backup_sets:
+        - id: postgres-primary
+          remote: {type: local}
+          remote_path: ${REMOTE}/a
+          local_path: ${LOCAL}/a
+          completion: {strategy: rename}
+          stale_after: 30h
+        - id: postgres-primary
+          remote: {type: local}
+          remote_path: ${REMOTE}/b
+          local_path: ${LOCAL}/b
+          completion: {strategy: rename}
+          stale_after: 30h
+  retention:
+    timezone: UTC
+    week_starts_on: monday
+state: none

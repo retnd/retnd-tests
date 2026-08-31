@@ -1,0 +1,15 @@
+doc: >
+  FR-5 lists local_path among the minimum a backup set carries, and there
+  is no documented default, so an omitted one is refused rather than
+  guessed at.
+scenario: invalid-missing-local-path
+argv: [check, --config, "${CONFIG}"]
+exit: 1
+stdout: empty
+stderr:
+  - contains: "backup-manager: "
+  - contains: "local_path"
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-5 (configuration example: local_path per backup set)"
+tags: [smoke]

@@ -1,0 +1,21 @@
+doc: >
+  A fetch against a remote that is not there must leave the catalog
+  saying nothing happened. The claim is made through `artifacts` rather
+  than by reading the database, because the operator-visible answer to
+  "did a backup happen" is the one that matters, and an exit code from the
+  failed command would not have proved it.
+scenario: unreachable-remote
+allow_setup_failure: true
+setup:
+  - [fetch, --config, "${CONFIG}", --source, production, --backup-set, postgres-primary]
+argv: [artifacts, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "0 artifact(s)"
+  - count: 1
+stderr: empty
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-10 (lifecycle transitions are durable; a cycle that failed records no success)"
+  - "docs/EPIC.md FR-22 (retry and error classification)"
+tags: [smoke]

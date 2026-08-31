@@ -1,0 +1,22 @@
+doc: >
+  A --backup-set naming a set that is not in the config is a mistake, not
+  a query with no results. FR-7 makes a backup set's identity source plus
+  set, so a name that appears nowhere in config is not an identity to
+  filter over, and answering it with an empty list would give a typo the
+  same reply as a correctly configured set that has not run yet. Those
+  two call for opposite responses from an operator. fetch refuses the
+  identical name with exit 1 and the same wording, and this asserts that
+  artifacts agrees with it; fetch/nonexistent-backup-set is the positive
+  control that the same name really is refused elsewhere.
+scenario: seeded-local
+argv: [artifacts, --config, "${CONFIG}", --source, production, --backup-set, no-such-set]
+exit: 1
+stdout: empty
+stderr:
+  - line: "backup-manager: app: no configured backup set named production/no-such-set"
+state: unchanged
+contract:
+  - "usage text: artifacts [--source S] [--backup-set B] - list journal artifacts"
+  - "docs/EPIC.md FR-7 (a backup set's identity is source plus set; an unnamed one does not exist)"
+  - "the sibling command's refusal: fetch --backup-set nope exits 1 with the same message"
+tags: [smoke]

@@ -1,0 +1,59 @@
+doc: >
+  The other half of what the retention override flags claim.
+  retention/override-flags-do-not-touch-config proves they are accepted,
+  validated and inert against the config file and the catalog. This one
+  proves they actually decide the preview, which is the part that was
+  unprovable while an ingested backlog collapsed into a single bucket: on
+  a fixture where every setting of the three windows produced the same one
+  KEEP, an override that did nothing at all and an override that worked
+  were the same output.
+
+  Same fixture and same command as retention/gfs-tiers-from-one-ingest,
+  which is this case's control, with the chain narrowed to one day, one
+  month of weeks and six months. Three artifacts move from KEEP to DELETE
+  and a fourth loses a tier, and each of the three flags is responsible
+  for part of that:
+
+    --monthly-months 6   drops 300d and 200d out of the monthly window,
+                         whose longest six-calendar-month reach is 183
+                         days, and keeps 100d and 040d, whose shortest
+                         reach is 151
+    --weekly-months 1    pulls the weekly window back to the first of this
+                         month, which 040d is always before, so it holds
+                         MONTHLY and loses WEEKLY
+    --daily-days 1       leaves only today in the daily window
+
+  Neither case alone carries the claim. Read on its own this one is
+  consistent with a chain that ignores its inputs and keeps only the
+  newest artifact, which is exactly what the build before
+  spdrman/rclone-manager#215 did on this fixture under any flags at all.
+  It is the pair, one fixture and two chains giving two different
+  itemisations, that shows the flags reached the arithmetic.
+
+  The on-disk half is asserted for the same reason the sibling case
+  asserts it: an override that rewrote config.yaml would still print a
+  correct-looking preview.
+scenario: retention-tiers
+argv: [retention, --config, "${CONFIG}", --dry-run, --daily-days, "1", --weekly-months, "1", --monthly-months, "6"]
+exit: 0
+stdout:
+  - line: "production/postgres-primary:"
+  - line: "${SP}DELETE${SP}pg-01-age-500d.dump${SP}tiers=[]"
+  - line: "${SP}DELETE${SP}pg-02-age-300d.dump${SP}tiers=[]"
+  - line: "${SP}DELETE${SP}pg-03-age-200d.dump${SP}tiers=[]"
+  - line: "${SP}KEEP${SP}pg-04-age-100d.dump${SP}tiers=[MONTHLY]"
+  - line: "${SP}KEEP${SP}pg-05-age-040d.dump${SP}tiers=[MONTHLY]"
+  - line: "${SP}KEEP${SP}pg-06-age-000d.dump${SP}tiers=[DAILY WEEKLY MONTHLY LAST_KNOWN_GOOD]"
+  - line: "${SP}last-known-good: artifact \"pg-06-age-000d.dump\" is the newest eligible restore point in this backup set, dated ${TS} by the producer's own timestamp on the remote object, and holds FR-19 last-known-good protection"
+  # One header, six itemised artifacts, one last-known-good note. FR-19
+  # is unaffected by the narrowed chain: protection is not a tier and a
+  # window cannot take it away.
+  - count: 8
+stderr: empty
+state: unchanged
+contract:
+  - "usage text: each retention flag overrides the loaded config's own resolved value for this preview only"
+  - "docs/EPIC.md FR-18 (a tier's window runs from the start of the bucket keep - 1 units back from today, through today inclusive)"
+  - "docs/EPIC.md FR-18 (the weekly tier buckets by week and measures its look-back in calendar months)"
+  - "docs/EPIC.md FR-19 (the newest eligible restore point is protected whatever the chain selects)"
+tags: [smoke]

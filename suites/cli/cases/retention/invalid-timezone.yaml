@@ -1,0 +1,19 @@
+doc: >
+  A --timezone that is not a loadable IANA zone is refused, naming the
+  field and the value. Exit 1 rather than 2 is derived, not assumed: the
+  flag overrides a config value, and every other invalid config value in
+  this binary is an operational failure reported through the same
+  validation path.
+scenario: seeded-local
+argv: [retention, --config, "${CONFIG}", --timezone, "Nowhere/Nothing"]
+exit: 1
+stdout: empty
+stderr:
+  - contains: "backup-manager: "
+  - contains: "retention.timezone"
+  - contains: "Nowhere/Nothing"
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-18 (retention.timezone is an IANA timezone)"
+  - "usage text: retention flags override the loaded config's own resolved value"
+tags: [smoke]

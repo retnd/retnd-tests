@@ -1,0 +1,13 @@
+doc: Invoked with no command at all, the binary refuses with a usage error rather than guessing.
+scenario: no-fixture
+argv: []
+no_arguments: true
+exit: 2
+stdout: empty
+stderr:
+  - line: "usage: backup-manager <command> [flags]"
+state: unchanged
+contract:
+  - "usage text: the binary's own usage banner"
+  - "exit-code convention: 2 is a usage error"
+tags: [smoke]

@@ -1,0 +1,26 @@
+doc: >
+  FR-24 requires status to distinguish process health from backup health
+  and to expose the newest known-good backup's age, the stale threshold,
+  current transfers, pending deletes, failures, quarantined count and free
+  space. Every set is fresh here, so every verdict is HEALTHY and the exit
+  code is 0.
+scenario: seeded-local
+argv: [status, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "process: backup-manager ${ANY}, go ${ANY}, rclone ${ANY}"
+  - line: "production/postgres-primary: HEALTHY"
+  - line: "production/app-uploads: HEALTHY"
+  - line: "  newest known-good backup: ${DUR}"
+  - line: "  stale threshold: 30h0m0s"
+  - line: "  current transfers: 0, pending deletes: 0, failures: 0"
+  - line: "  quarantined: 0 (of which unrecoverable: 0)"
+  - re: "  free space: \\d+ bytes"
+  - absent: "STALE"
+  - absent: "FAILING"
+stderr: empty
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-24 (health: the HEALTHY/DEGRADED/STALE/FAILING vocabulary and the exposed fields)"
+  - "usage text: status - report process and backup-set health (FR-24)"
+tags: [smoke]

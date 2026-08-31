@@ -1,0 +1,19 @@
+doc: >
+  A backup set that is not in the config cannot be fetched, and the
+  refusal names the identity FR-7 defines rather than failing later
+  against a remote that was never configured. It is also the positive
+  control for artifacts/nonexistent-backup-set: the two commands are
+  asserted to refuse the same name with the same wording, which is what
+  they disagreed about until spdrman/rclone-manager#187 was fixed.
+scenario: seeded-local
+argv: [fetch, --config, "${CONFIG}", --source, production, --backup-set, nope]
+exit: 1
+stdout:
+  - ndjson: {event: startup}
+stderr:
+  - line: "backup-manager: app: no configured backup set named production/nope"
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-7 (backup-set isolation: identity is source plus set)"
+  - "exit-code convention: 1 is an operational failure"
+tags: [smoke]

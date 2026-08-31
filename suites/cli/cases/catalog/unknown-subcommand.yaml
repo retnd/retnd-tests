@@ -1,0 +1,11 @@
+doc: An unknown catalog subcommand names what it did not recognise and exits 2.
+scenario: seeded-local
+argv: [catalog, frobnicate]
+exit: 2
+stdout: empty
+stderr:
+  - line: 'backup-manager: catalog: unknown subcommand "frobnicate" (expected "rebuild")'
+state: unchanged
+contract:
+  - "usage text: catalog rebuild [--dry-run]"
+tags: [smoke]

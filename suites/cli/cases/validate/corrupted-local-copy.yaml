@@ -1,0 +1,22 @@
+doc: >
+  FR-13 verification against a durable local copy whose bytes were changed
+  underneath it. The recomputed hash cannot match, so validate fails, and
+  FR-10's QUARANTINED state is the documented destination for an artifact
+  that failed validation. Both the exit code and the resulting lifecycle
+  state are asserted, the second through the product's own read surface in
+  the sequence case, because an exit code alone would not prove the
+  journal learned anything.
+scenario: seeded-local
+mutate:
+  - "corrupt ${LOCAL}/production/app-uploads/uploads-2026-06-01.tar"
+argv: [validate, --config, "${CONFIG}", "production/app-uploads/uploads-2026-06-01.tar"]
+exit: 1
+stdout:
+  - line: "production/app-uploads/uploads-2026-06-01.tar: checked=true passed=false"
+  - contains: "QUARANTINED"
+stderr: empty
+state: changed
+contract:
+  - "docs/EPIC.md FR-13 (verification)"
+  - "docs/EPIC.md FR-10 (QUARANTINED is an explicit exceptional state)"
+tags: [smoke]

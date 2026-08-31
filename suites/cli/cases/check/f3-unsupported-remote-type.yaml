@@ -1,0 +1,16 @@
+doc: >
+  FR-4 says the production build registers local and SFTP and that further
+  backends need an explicit decision. Anything else is refused at config
+  time, naming the field and the value.
+scenario: invalid-remote-type
+argv: [check, --config, "${CONFIG}"]
+exit: 1
+stdout: empty
+stderr:
+  - contains: "backup-manager: "
+  - contains: "s3"
+  - re: ".*sources\\[0\\]\\.backup_sets\\[0\\]\\.remote.*"
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-4 (required rclone backends: local filesystem and SFTP)"
+tags: [smoke]

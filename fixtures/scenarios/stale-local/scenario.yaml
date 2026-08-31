@@ -1,0 +1,21 @@
+doc: >
+  One backup set with a deliberately tiny stale_after, so a case can cross
+  FR-24's freshness threshold by waiting a few seconds rather than by
+  pretending about the clock. The threshold is crossed in the one
+  direction that cannot reverse: an idle backup set does not become fresh
+  again while a test runs, so a slow machine only makes the assertion more
+  true.
+poll_interval: 15m
+sources:
+  - id: production
+    backup_sets:
+      - id: postgres-primary
+        remote: {type: local}
+        include: ["*.dump"]
+        completion: {strategy: rename}
+        stale_after: 1s
+        validation: {hash: sha256}
+        artifacts:
+          - {name: pg-2026-03-01.dump, size: 4096, seed: c1, mtime: now-2h}
+state: replay
+replay: fetch

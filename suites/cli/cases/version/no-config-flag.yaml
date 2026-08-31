@@ -1,0 +1,21 @@
+doc: >
+  The usage banner says every command except version accepts --config.
+  version is the exception, so passing one is not a supported invocation,
+  and "does not accept --config" and "ignores --config" are different
+  promises: only the first is documented. Every other command in this
+  binary answers a flag it does not define with exit 2 and the flag
+  package's own complaint, so version answers the same way.
+  global/f6-unknown-flag is the positive control for that convention,
+  and this asserts the identical shape.
+scenario: no-fixture
+argv: [version, --config, "${WORK}/no-such-config.yaml"]
+exit: 2
+stdout: empty
+stderr:
+  - line: "flag provided but not defined: -config"
+  - line: "Usage of version:"
+state: unchanged
+contract:
+  - "usage text: every command except version accepts --config"
+  - "exit-code convention: 2 is a usage error; every other command refuses an unknown flag"
+tags: [smoke]

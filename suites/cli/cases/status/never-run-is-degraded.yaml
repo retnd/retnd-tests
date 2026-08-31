@@ -1,0 +1,17 @@
+doc: >
+  A configured backup set that has never had an artifact discovered is not
+  healthy and is not stale either: nothing has ever been good, so there is
+  no age to compare. FR-24's DEGRADED is the state for that, and status
+  exits 1 because the set is short of HEALTHY.
+scenario: never-run
+argv: [status, --config, "${CONFIG}"]
+exit: 1
+stdout:
+  - line: "production/postgres-primary: DEGRADED"
+  - line: "  newest known-good backup: never"
+stderr: empty
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-24 (backup-set states HEALTHY/DEGRADED/STALE/FAILING; last completed backup and its age are exposed)"
+  - "container/Dockerfile HEALTHCHECK: status exits 0 only when every set is healthy"
+tags: [smoke]

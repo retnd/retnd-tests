@@ -1,0 +1,73 @@
+doc: >
+  FR-18 places every artifact twice, once by the discovery timestamp and
+  once by the producer's own timestamp where that one is admissible, and
+  KEEP is the union of what the tier chain selects under each placement.
+  The consequence the requirement spells out is what this case pins: an
+  ingested backlog keeps its real shape, so artifacts dated days apart
+  land in different daily buckets, artifacts dated months apart land in
+  different monthly buckets, and an artifact older than the longest
+  configured window is still a DELETE candidate.
+
+  Six dumps spanning 500 days arrive in one fetch, so they share a
+  discovery timestamp to the microsecond and nothing but the producer's
+  own timestamp tells them apart. Under a discovery-only key the whole
+  backlog would occupy one daily, one weekly and one monthly bucket, each
+  tier would pick a single representative and five of the six would be
+  delete candidates on the first pass. Here each artifact is placed on its
+  own date, and the default 7-day / 3-month / 12-month chain sorts them
+  into a ladder.
+
+  Tier lists are asserted by name and by type rather than counted. A count
+  would be satisfied by the wrong artifacts carrying the right number of
+  tiers, and the whole point of the two-pass rule is which artifact ends
+  up where. The verdicts are hand-derived from the chain's own arithmetic
+  against the fixture's offsets, not recorded from a run:
+
+    500d  outside daily (7 days), outside weekly (at most 91 days) and
+          outside monthly (at most 365 days), so DELETE with no tiers
+    300d  inside monthly only
+    200d  inside monthly only
+    100d  outside weekly (which cannot reach past 91 days), inside monthly
+    040d  outside daily, inside weekly, inside monthly
+    000d  inside all three, and FR-19's protected artifact as well
+
+  The DELETE line is what makes the rest of it mean something. Without an
+  artifact that falls out of every window, "the ladder" would be
+  indistinguishable from a chain that had stopped checking windows at all
+  and was keeping whatever it was handed.
+
+  FR-19's line is asserted in full rather than by shape. It has to carry
+  the resolved date and say which of the two timestamps produced it, and
+  the artifact it names has to be the newest backup rather than the newest
+  arrival. Under the old reading it was the artifact that happened to sort
+  last by name, which on a backlog is routinely the oldest file in the
+  set.
+
+  Note on the fixture: because all six share a discovery timestamp,
+  FR-18's discovery pass has a genuine tie for today's buckets, and the
+  requirement does not say how a tie breaks. The scenario is built so the
+  artifact whose own date already puts it in today's buckets is also the
+  one that wins any name-ordered tie, so the union reads as the producer
+  pass's shape and no expectation here rests on the tie-break's direction.
+scenario: retention-tiers
+argv: [retention, --config, "${CONFIG}", --dry-run]
+exit: 0
+stdout:
+  - line: "production/postgres-primary:"
+  - line: "${SP}DELETE${SP}pg-01-age-500d.dump${SP}tiers=[]"
+  - line: "${SP}KEEP${SP}pg-02-age-300d.dump${SP}tiers=[MONTHLY]"
+  - line: "${SP}KEEP${SP}pg-03-age-200d.dump${SP}tiers=[MONTHLY]"
+  - line: "${SP}KEEP${SP}pg-04-age-100d.dump${SP}tiers=[MONTHLY]"
+  - line: "${SP}KEEP${SP}pg-05-age-040d.dump${SP}tiers=[WEEKLY MONTHLY]"
+  - line: "${SP}KEEP${SP}pg-06-age-000d.dump${SP}tiers=[DAILY WEEKLY MONTHLY LAST_KNOWN_GOOD]"
+  - line: "${SP}last-known-good: artifact \"pg-06-age-000d.dump\" is the newest eligible restore point in this backup set, dated ${TS} by the producer's own timestamp on the remote object, and holds FR-19 last-known-good protection"
+  # One header, six itemised artifacts, one last-known-good note.
+  - count: 8
+stderr: empty
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-18 (each tier is evaluated twice over the same artifacts, once per placement, and KEEP is the union)"
+  - "docs/EPIC.md FR-18 (an ingested backlog keeps its real shape; an artifact older than the longest configured window is still a DELETE candidate)"
+  - "docs/EPIC.md FR-18 (default chain: daily over 7 days, weekly over 3 calendar months, monthly over 12 calendar months)"
+  - "docs/EPIC.md FR-19 (newest means newest by the artifact's own retention date, and the reason carries the resolved date and says which timestamp produced it)"
+tags: [smoke]

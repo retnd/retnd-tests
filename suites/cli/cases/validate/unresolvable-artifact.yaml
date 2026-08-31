@@ -1,0 +1,15 @@
+doc: >
+  A well-formed id naming an artifact the journal has never seen is an
+  operational failure that names the id.
+scenario: seeded-local
+argv: [validate, --config, "${CONFIG}", "production/app-uploads/no-such-artifact"]
+exit: 1
+stdout: ignored
+stderr:
+  - contains: "backup-manager: "
+  - contains: "production/app-uploads/no-such-artifact"
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-9 (the journal is the record of artifact identity)"
+  - "exit-code convention: 1 is an operational failure"
+tags: [smoke]
