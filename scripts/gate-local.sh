@@ -60,13 +60,15 @@ done
 # check; both tsconfigs were already written for it and both were already
 # clean, which is why this is a wiring change rather than a cleanup.
 #
-# What it deliberately does not turn on is noUnusedLocals/noUnusedParameters.
-# Suite B's e2e/ is byte-identical to rclone-manager's ui/shared/e2e/ and
-# that is the migration's proof; the one unused binding in there
-# (e2e/shell.spec.ts, an unused `page` fixture) would have to be edited to
-# satisfy them, and editing that tree to satisfy a check here would trade
-# the stronger property for the weaker one. It belongs upstream, and the
-# migrated copy inherits the fix on the next re-sync.
+# What it does not turn on is noUnusedLocals/noUnusedParameters. That used
+# to be because Suite B's e2e/ was byte-identical to rclone-manager's
+# ui/shared/e2e/ and editing it here to satisfy a check here would have
+# traded the migration's proof for something weaker. That reason expired
+# with rclone-manager #217, which deleted the upstream directory, so the
+# one unused binding in there (e2e/shell.spec.ts, an unused `page`
+# fixture) is now this repository's to fix and these two options are this
+# repository's to turn on. Still open, in a change of its own: see
+# suites/web-ui/README.md.
 echo "==> Suite B and Suite C type checks"
 (cd suites/web-ui && npm run --silent typecheck)
 (cd suites/equivalence && npm run --silent typecheck)
