@@ -102,5 +102,15 @@ harness/under-test.ts    which app, which port, resolved out loud
 harness/pick-free-port.mjs
 playwright.config.ts     the deltas above, and nothing else
 scripts/e2e-all-providers.mjs
-vitest.config.ts         runs e2e/port.test.ts, which ui/shared's vitest used to
+scripts/e2e-all-providers.test.ts
+vitest.config.ts         runs the two unit tests ui/shared's vitest used to
 ```
+
+The two `.test.ts` files came with the code they test: `e2e/port.test.ts`
+pins the port helper's `E2E_PORT` validation, and
+`scripts/e2e-all-providers.test.ts` reads back what the seven-provider
+spawner hands each run, including the negative assertion that it no longer
+forces `CI=1` (which used to buy a retry, and a retry is what turned
+rclone-manager #172's deterministic red into something that read as a
+flake). `npm run unit` runs both, and both are in this repository's gate
+and in rclone-manager's.

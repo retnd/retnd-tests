@@ -34,4 +34,23 @@ go test ./suites/cli/harness/... -count=1
 echo "==> Suite A: the CLI contract"
 go test ./suites/cli -count=1
 
+# Suite B's own unit tests, which need no browser: the port helper's
+# E2E_PORT validation and the seven-provider spawner's argv. Suites B and C
+# themselves are not in this gate, because they need a Chromium and this
+# repository is cloned onto machines that have none; rclone-manager's gate
+# runs Suite B on every commit, which is where the browser signal belongs.
+#
+# Refused rather than skipped when the dependencies are missing. A gate that
+# prints a skip and carries on is the shape rclone-manager's #160 was about,
+# and importing it here would be a strange thing to do in the repository
+# whose whole argument is that a check nobody notices stopping is worse than
+# no check.
+if [ ! -d suites/web-ui/node_modules ]; then
+  echo "suites/web-ui has no installed dependencies, so its unit tests cannot run." >&2
+  echo "  fix: cd suites/web-ui && npm ci" >&2
+  exit 1
+fi
+echo "==> Suite B unit tests"
+(cd suites/web-ui && npm run --silent unit)
+
 echo "gate: green"
