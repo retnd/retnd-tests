@@ -1,0 +1,15 @@
+doc: >
+  FR-5 requires configuration to be validated before destructive
+  processing begins. A file that is not parseable never gets that far, and
+  the refusal has to name a parse problem rather than a generic failure.
+scenario: malformed-yaml
+argv: [check, --config, "${CONFIG}"]
+exit: 1
+stdout: empty
+stderr:
+  - contains: "backup-manager: "
+  - re: ".*(yaml|parse|unmarshal|line \\d+).*"
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-5 (configuration SHALL be validated before destructive processing begins)"
+tags: [smoke]

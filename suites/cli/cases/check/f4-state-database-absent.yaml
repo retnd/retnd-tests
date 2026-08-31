@@ -1,0 +1,21 @@
+doc: >
+  A first start has no state database yet. FR-9 makes SQLite mandatory and
+  makes migrations version-controlled, which only makes sense if opening a
+  database that is not there creates it; nothing in the docs makes a
+  missing file an error. So check succeeds and the database exists
+  afterwards, which is also the positive control for the corrupt-database
+  case below: the same code path can create and can refuse.
+scenario: absent-state
+argv: [check, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "config OK: 1 source(s), 1 backup set(s)"
+  - line: "state database OK: ${STATE_DB}"
+stderr: empty
+state:
+  mode: changed
+  files_present: ["${STATE_DB}"]
+contract:
+  - "docs/EPIC.md FR-9 (SQLite is mandatory; schema migrations are version-controlled)"
+  - "usage text: check - validate config and the state database, then exit"
+tags: [smoke]

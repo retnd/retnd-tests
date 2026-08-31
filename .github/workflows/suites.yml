@@ -1,0 +1,30 @@
+# Manual only, matching the estate's deliberate Actions-off policy: the
+# real gate is scripts/gate-local.sh via the pre-commit hook, and a
+# required check nothing triggers would gate nothing. This exists so a
+# run can be asked for from the web UI when someone wants one on a clean
+# machine rather than on a laptop.
+#
+# Whether this repository should also get a schedule is the owner's call.
+# It has none of the flake history that drove the policy elsewhere.
+name: suites
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: which suite to run
+        required: true
+        default: gate
+        type: choice
+        options: [gate, suite-a, smoke, selftest, tools]
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: run the selected suite
+        run: make ${{ inputs.suite }}

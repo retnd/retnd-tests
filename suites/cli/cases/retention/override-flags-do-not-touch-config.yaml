@@ -1,0 +1,29 @@
+doc: >
+  The usage text says each retention flag overrides the loaded config's
+  own resolved value for this preview only. "For this preview only" is
+  what this case pins: every override is accepted, resolved through the
+  same validation a config file goes through, and leaves the config file
+  and the catalog exactly as they were. An override that silently rewrote
+  config.yaml would still print a correct-looking preview, which is why
+  the on-disk half is asserted rather than assumed.
+
+  What this case does not prove is that an override changes the
+  itemisation, and it cannot: this fixture holds one artifact per set, so
+  no setting of the three tier windows moves anything. That half is
+  retention/override-flags-narrow-the-itemisation's, over a fixture with
+  six artifacts spread across the windows. Splitting them is deliberate.
+  A case that pinned both claims would go red on a window change for a
+  reason that has nothing to do with whether an override wrote to the
+  config file.
+scenario: seeded-local
+argv: [retention, --config, "${CONFIG}", --dry-run, --timezone, "America/Vancouver", --week-starts-on, sunday, --daily-days, "1", --weekly-months, "1", --monthly-months, "1"]
+exit: 0
+stdout:
+  - line: "production/postgres-primary:"
+  - re: "\\s*KEEP\\s+pg-2026-06-01\\.dump\\s+tiers=\\[.*LAST_KNOWN_GOOD\\]"
+stderr: empty
+state: unchanged
+contract:
+  - "usage text: each retention flag overrides the loaded config's own resolved value for this preview only"
+  - "docs/EPIC.md FR-18 (timezone, week_starts_on and the three tier windows are the GFS inputs)"
+tags: [smoke]

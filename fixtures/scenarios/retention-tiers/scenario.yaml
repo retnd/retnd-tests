@@ -1,0 +1,47 @@
+doc: >
+  A backlog: six dumps whose producer timestamps span 500 days, all
+  ingested by one fetch cycle, so every artifact shares a discovery
+  timestamp and only the producer's own timestamp tells them apart. This
+  is the shape FR-18's two-pass rule exists for, and the shape that makes
+  the daily, weekly and monthly windows visible against each other in one
+  preview.
+
+  The offsets are chosen so that no verdict depends on what day the suite
+  runs. Every pair is at least 31 days apart, which puts each artifact in
+  its own day, its own week and its own month bucket whatever weekday or
+  day-of-month today happens to be, and each one sits well inside or well
+  outside the window it is about rather than near its edge:
+
+    000d  inside the 7-day daily window
+    040d  outside daily, inside the weekly window (which is 3 calendar
+          months, so at least 59 days, and 40 is safely under that)
+    100d  outside weekly (which is at most 91 days) and inside monthly
+    200d  monthly
+    300d  monthly (the shortest 12-calendar-month window is 334 days)
+    500d  outside every window, so a DELETE candidate
+
+  Artifact names sort oldest-first, which matters: all six carry the same
+  discovery timestamp, so the discovery pass's representative for today's
+  buckets falls to FR-18's tie-break, and naming the newest backup last
+  makes that representative the artifact whose own date already puts it in
+  those buckets. The union is then exactly the shape the producer pass
+  gives, and reads as one.
+poll_interval: 15m
+sources:
+  - id: production
+    backup_sets:
+      - id: postgres-primary
+        remote: {type: local}
+        include: ["*.dump"]
+        completion: {strategy: rename}
+        stale_after: 24000h
+        validation: {hash: sha256}
+        artifacts:
+          - {name: pg-01-age-500d.dump, size: 1024, seed: t500, mtime: now-500d}
+          - {name: pg-02-age-300d.dump, size: 1024, seed: t300, mtime: now-300d}
+          - {name: pg-03-age-200d.dump, size: 1024, seed: t200, mtime: now-200d}
+          - {name: pg-04-age-100d.dump, size: 1024, seed: t100, mtime: now-100d}
+          - {name: pg-05-age-040d.dump, size: 1024, seed: t040, mtime: now-40d}
+          - {name: pg-06-age-000d.dump, size: 1024, seed: t000, mtime: now-1h}
+state: replay
+replay: fetch

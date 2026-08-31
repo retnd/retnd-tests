@@ -1,0 +1,19 @@
+doc: >
+  The usage line is `validate <source/backup-set/artifact>` and the banner
+  says every command except version accepts --config, which together read
+  as "the operand and the flag can both be given" without putting them in
+  an order. Command, then subject, then options is the order most CLIs
+  take, so this asserts that writing the flag after the operand validates
+  the artifact rather than complaining about the argument count.
+  validate/wrong-argument-count is the positive control that a genuine
+  arity error is still an arity error.
+scenario: seeded-local
+argv: [validate, "production/app-uploads/uploads-2026-06-01.tar", --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "production/app-uploads/uploads-2026-06-01.tar: checked=true passed=true"
+stderr: empty
+state: ignored
+contract:
+  - "usage text: validate <source/backup-set/artifact>, plus every command except version accepts --config"
+tags: [smoke]

@@ -1,0 +1,16 @@
+doc: >
+  A well-formed invocation whose operand is not an artifact id at all is
+  refused with the shape the id has to take, so an operator can fix it
+  from the message.
+scenario: seeded-local
+argv: [validate, --config, "${CONFIG}", not-an-id]
+exit: 1
+stdout: ignored
+stderr:
+  - contains: "backup-manager: "
+  - contains: "source/backup-set/name"
+state: unchanged
+contract:
+  - "usage text: validate <source/backup-set/artifact>"
+  - "docs/EPIC.md FR-7 (identity is source plus set)"
+tags: [smoke]

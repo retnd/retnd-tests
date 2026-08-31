@@ -1,0 +1,39 @@
+doc: >
+  FR-8 ranks the completion strategies and says producer-controlled
+  atomic completion is the one to prefer; the stable strategy only proves
+  that size and mtime stopped moving, which is not the producer saying it
+  is done. FR-15 then makes remote deletion the last step of
+  COMMITTED to REMOTE_DELETE_PENDING to COMPLETE, and requires the manager
+  to refuse when it cannot revalidate. Put together, an artifact ingested
+  under the stable strategy keeps its remote copy until something stronger
+  than "the file stopped changing" says it is safe to drop it, and its
+  lifecycle stops short of COMPLETE.
+
+  The rename-strategy set in the same fixture is the positive control: the
+  producer's own atomic rename is the proof FR-8 wants, so that artifact
+  does reach COMPLETE and its remote copy does go away. Without that half,
+  this case could not tell a working safety rule from a product that never
+  deletes anything.
+scenario: fresh-local
+setup:
+  - [fetch, --config, "${CONFIG}", --source, production, --backup-set, postgres-primary]
+  - [fetch, --config, "${CONFIG}", --source, production, --backup-set, app-uploads]
+argv: [artifacts, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - re: "production/postgres-primary/pg-2026-06-01\\.dump\\s+COMMITTED\\s+.*"
+  - re: "production/app-uploads/uploads-2026-06-01\\.tar\\s+COMPLETE\\s+.*"
+stderr: empty
+state:
+  mode: unchanged
+  files_present:
+    - "${REMOTE}/production/postgres-primary/pg-2026-06-01.dump"
+    - "${LOCAL}/production/postgres-primary/pg-2026-06-01.dump"
+    - "${LOCAL}/production/app-uploads/uploads-2026-06-01.tar"
+  files_absent:
+    - "${REMOTE}/production/app-uploads/uploads-2026-06-01.tar"
+contract:
+  - "docs/EPIC.md FR-8 (producer-controlled atomic completion SHOULD be preferred; a candidate MUST be proven complete before ingestion)"
+  - "docs/EPIC.md FR-15 (remote delete safety: deletion only through COMMITTED to REMOTE_DELETE_PENDING to COMPLETE, and refused when revalidation fails)"
+  - "docs/EPIC.md FR-10 (explicit lifecycle states)"
+tags: [smoke]

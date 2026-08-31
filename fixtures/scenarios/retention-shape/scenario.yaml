@@ -1,0 +1,24 @@
+doc: >
+  One backup set carrying artifacts spread across the GFS windows FR-18
+  defines, so the tier arithmetic has something to be non-trivial about:
+  two inside the daily window, two more inside the weekly one, one inside
+  the monthly one, and one past every window.
+poll_interval: 15m
+sources:
+  - id: production
+    backup_sets:
+      - id: postgres-primary
+        remote: {type: local}
+        include: ["*.dump"]
+        completion: {strategy: rename}
+        stale_after: 9600h
+        validation: {hash: sha256}
+        artifacts:
+          - {name: pg-age-000d.dump, size: 1024, seed: r0, mtime: now-2h}
+          - {name: pg-age-003d.dump, size: 1024, seed: r3, mtime: now-3d}
+          - {name: pg-age-020d.dump, size: 1024, seed: r20, mtime: now-20d}
+          - {name: pg-age-050d.dump, size: 1024, seed: r50, mtime: now-50d}
+          - {name: pg-age-200d.dump, size: 1024, seed: r200, mtime: now-200d}
+          - {name: pg-age-500d.dump, size: 1024, seed: r500, mtime: now-500d}
+state: replay
+replay: fetch

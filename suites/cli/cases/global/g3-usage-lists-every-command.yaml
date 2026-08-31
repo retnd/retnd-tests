@@ -1,0 +1,28 @@
+doc: >
+  The usage banner is itself a contract: it is where an operator learns
+  which commands exist. This case pins the command list, so a command
+  added or removed without documenting it fails here rather than being
+  discovered by an operator.
+scenario: no-fixture
+argv: []
+no_arguments: true
+exit: 2
+stdout: empty
+stderr:
+  - line: "  run${SP}perform one processing cycle and exit"
+  - line: "  daemon${SP}repeat the processing cycle at poll_interval"
+  - line: "  check${SP}validate config and the state database, then exit"
+  - line: "  status${SP}report process and backup-set health (FR-24)"
+  - line: "  sources${SP}list configured sources and backup sets"
+  - line: "  artifacts [--source S] [--backup-set B]${SP}list journal artifacts"
+  - line: "  fetch --source S --backup-set B [--dry-run]${SP}run one backup set's cycle on demand"
+  - line: "  reconcile${SP}run FR-17 reconciliation for every backup set"
+  - line: "  validate <source/backup-set/artifact>${SP}re-check one artifact's durable local copy"
+  - line: "  catalog rebuild [--dry-run]${SP}reconstruct a lost/corrupted state database from sidecar recovery manifests"
+  - line: "  version${SP}report version information"
+  - re: "  retention \\[--dry-run\\].*"
+state: unchanged
+contract:
+  - "usage text: the binary's own usage banner"
+  - "docs/EPIC.md FR-1, FR-24, FR-17, FR-26"
+tags: [smoke]

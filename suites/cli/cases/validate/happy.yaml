@@ -1,0 +1,16 @@
+doc: >
+  FR-13 verification, re-run on demand against an already-committed
+  artifact's durable local copy. Passing means the recomputed hash still
+  matches the one recorded at verification, and the exit code is 0.
+scenario: seeded-local
+argv: [validate, --config, "${CONFIG}", "production/app-uploads/uploads-2026-06-01.tar"]
+exit: 0
+stdout:
+  - ndjson: {event: startup}
+  - line: "production/app-uploads/uploads-2026-06-01.tar: checked=true passed=true"
+stderr: empty
+state: ignored
+contract:
+  - "usage text: validate <source/backup-set/artifact> - re-check one artifact's durable local copy"
+  - "docs/EPIC.md FR-13 (verification)"
+tags: [smoke]

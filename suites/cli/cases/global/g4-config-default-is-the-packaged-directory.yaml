@@ -1,0 +1,25 @@
+doc: >
+  The usage banner states where --config looks when nobody passes it, and
+  that a directory there resolves to config.yaml inside it. Both halves are
+  operator-facing contract: the first is what a hand-run binary reads, the
+  second is what makes the packaged bind mount work at all.
+
+  Split out of g1-no-arguments rather than asserted alongside it. g1 is
+  about refusing an empty argv with exit 2; this is about a documented path.
+  A case that pins two unrelated claims goes red for the wrong reason when
+  either one deliberately changes, and the pressure then is to weaken the
+  case instead of updating it.
+scenario: no-fixture
+argv: []
+no_arguments: true
+exit: 2
+stdout: empty
+stderr:
+  - line: "every command except version accepts --config (default /etc/backup-manager/config/config.yaml;"
+  - line: "a directory resolves to config.yaml inside it, which is what packaging mounts)"
+state: unchanged
+contract:
+  - "docs/runtime-contract.md: the configuration-mount row, /etc/backup-manager/config is a writable DIRECTORY holding config.yaml (issue #196)"
+  - "docs/runtime-contract.md: a --config that resolves to a directory reads config.yaml inside it"
+  - "docs/deployment.md: /etc/backup-manager/config (writable) is the DIRECTORY holding the manager's YAML"
+tags: [smoke]

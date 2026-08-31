@@ -1,0 +1,14 @@
+doc: >
+  A valid config whose state database does not exist yet. What the CLI is
+  contractually supposed to do here (create it, or refuse) is one of the
+  behaviours this suite derives rather than assumes; see the F4 cases.
+poll_interval: 15m
+sources:
+  - id: production
+    backup_sets:
+      - id: postgres-primary
+        remote: {type: local}
+        include: ["*.dump"]
+        completion: {strategy: rename}
+        stale_after: 30h
+state: absent

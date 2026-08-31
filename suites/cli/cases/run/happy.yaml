@@ -1,0 +1,26 @@
+doc: >
+  FR-1: run performs one processing cycle and exits. Over the fresh
+  fixture that means both backup sets get their cycle, the complete
+  artifacts land locally per FR-14, and FR-8 keeps the in-progress one on
+  the remote.
+scenario: fresh-local
+argv: [run, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - ndjson: {event: startup}
+  - ndjson: {event: rclone_version}
+  - ndjson: {event: commit, artifact: "production/postgres-primary/pg-2026-06-01.dump"}
+  - ndjson: {event: commit, artifact: "production/app-uploads/uploads-2026-06-01.tar"}
+stderr: empty
+state:
+  mode: changed
+  files_present:
+    - "${LOCAL}/production/postgres-primary/pg-2026-06-01.dump"
+    - "${LOCAL}/production/app-uploads/uploads-2026-06-01.tar"
+    - "${REMOTE}/production/postgres-primary/pg-in-progress.dump"
+contract:
+  - "docs/EPIC.md FR-1 (run performs one processing cycle and exits)"
+  - "docs/EPIC.md FR-8 (a candidate MUST be proven complete before ingestion)"
+  - "docs/EPIC.md FR-14 (durable NAS commit)"
+  - "docs/EPIC.md FR-23 (structured logs cover startup/version and durable commit)"
+tags: [smoke]

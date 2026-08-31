@@ -1,0 +1,13 @@
+doc: An unknown command names what it did not recognise, then prints the usage banner, and exits 2.
+scenario: no-fixture
+argv: [frobnicate]
+exit: 2
+stdout: empty
+stderr:
+  - line: 'backup-manager: unknown command "frobnicate"'
+  - line: "usage: backup-manager <command> [flags]"
+state: unchanged
+contract:
+  - "usage text: the binary's own usage banner"
+  - "exit-code convention: 2 is a usage error"
+tags: [smoke]

@@ -1,0 +1,22 @@
+doc: >
+  FR-20 defines local deletion, and the usage text distinguishes plain
+  `retention` from `retention --dry-run`, which only means something if
+  one of them applies. Today neither does: plain retention prints the same
+  preview plus a note saying so. The case asserts the documented apply
+  contract and is expected to fail until issue #21 lands; the note's
+  presence is asserted separately so the divergence stays visible rather
+  than becoming invisible.
+scenario: seeded-local
+argv: [retention, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - absent: "not implemented"
+stderr: empty
+state:
+  mode: changed
+known_discrepancy: spdrman/rclone-manager#21
+known_discrepancy_dimensions: [stdout, state]
+contract:
+  - "docs/EPIC.md FR-20 (local deletion safety)"
+  - "usage text: retention [--dry-run] ... implies plain retention is not a dry run"
+tags: [discrepancy]

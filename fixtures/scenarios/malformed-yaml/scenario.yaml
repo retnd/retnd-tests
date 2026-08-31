@@ -1,0 +1,14 @@
+doc: >
+  A config file that is not valid YAML. FR-5 requires configuration to be
+  validated before destructive processing begins; this is the case where
+  it cannot even be parsed.
+raw_config: |
+  poll_interval: 15m
+  state:
+    database: ${STATE_DB}
+  sources:
+    - id: production
+     backup_sets:
+        - id: postgres-primary
+  	  remote: {type: local}
+state: none

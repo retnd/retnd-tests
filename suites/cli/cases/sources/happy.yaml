@@ -1,0 +1,19 @@
+doc: >
+  sources lists exactly the configured sources and backup sets, with the
+  identity FR-7 defines (source plus set) and the paths and stale
+  threshold each one resolved to.
+scenario: seeded-local
+argv: [sources, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "production"
+  - line: "${SP}production/postgres-primary${SP}remote=local${SP}remote_path=${REMOTE}/production/postgres-primary${SP}local_path=${LOCAL}/production/postgres-primary${SP}stale_after=30h0m0s${ANY}"
+  - line: "${SP}production/app-uploads${SP}remote=local${SP}remote_path=${REMOTE}/production/app-uploads${SP}local_path=${LOCAL}/production/app-uploads${SP}stale_after=30h0m0s${ANY}"
+  - absent: "no-such-source"
+stderr: empty
+state: unchanged
+contract:
+  - "usage text: sources - list configured sources and backup sets"
+  - "docs/EPIC.md FR-7 (backup-set isolation: identity is source plus set)"
+  - "docs/EPIC.md FR-5 (remote, remote_path, local_path, stale_after per backup set)"
+tags: [smoke]

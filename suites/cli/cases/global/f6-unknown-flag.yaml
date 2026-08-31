@@ -1,0 +1,15 @@
+doc: >
+  An unrecognised flag is a usage error. flag.ContinueOnError prints its
+  own complaint and the command's own flag usage, and the exit code is 2.
+scenario: seeded-local
+argv: [check, --config, "${CONFIG}", --bogus]
+exit: 2
+stdout: empty
+stderr:
+  - line: "flag provided but not defined: -bogus"
+  - line: "Usage of check:"
+state: unchanged
+contract:
+  - "exit-code convention: flag-parse failures exit 2"
+  - "usage text: check accepts only --config"
+tags: [smoke]

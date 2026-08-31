@@ -1,0 +1,19 @@
+doc: >
+  A remote that is not there must fail loudly and must not record a
+  success. The state assertion is the load-bearing half: a catalog that
+  gained a row here would mean the product believes a backup happened that
+  did not.
+scenario: unreachable-remote
+argv: [fetch, --config, "${CONFIG}", --source, production, --backup-set, postgres-primary]
+exit: 1
+stdout:
+  - ndjson: {event: startup}
+stderr:
+  - contains: "backup-manager: "
+state:
+  mode: changed
+contract:
+  - "docs/EPIC.md FR-22 (retry and error classification)"
+  - "docs/EPIC.md FR-10 (lifecycle transitions are durable; a failed cycle records no success)"
+  - "exit-code convention: 1 is an operational failure"
+tags: [smoke]

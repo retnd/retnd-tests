@@ -1,0 +1,22 @@
+doc: >
+  The recovery path the command exists for: the state database is gone and
+  the sidecar recovery manifests are all that is left. A rebuild
+  reconstructs the catalog, and the proof is the product's own read
+  surface afterwards rather than a row count only this repository can see.
+scenario: seeded-local
+mutate:
+  - "rm ${STATE_DB}"
+argv: [catalog, rebuild, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - contains: "pg-2026-06-01.dump"
+  - contains: "uploads-2026-06-01.tar"
+stderr: empty
+state:
+  mode: changed
+  files_present: ["${STATE_DB}"]
+contract:
+  - "usage text: catalog rebuild - reconstruct a lost/corrupted state database from sidecar recovery manifests"
+  - "docs/EPIC-B-multi-nas.md 19.3 (catalog reconstruction)"
+  - "docs/recovery.md (state-loss recovery)"
+tags: [smoke]

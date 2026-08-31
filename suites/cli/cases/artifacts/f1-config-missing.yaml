@@ -1,0 +1,12 @@
+doc: artifacts honours --config, and refuses when the file is not there.
+scenario: no-fixture
+argv: [artifacts, --config, "${WORK}/no-such-config.yaml"]
+exit: 1
+stdout: empty
+stderr:
+  - contains: "backup-manager: "
+  - contains: "${WORK}/no-such-config.yaml"
+state: unchanged
+contract:
+  - "usage text: every command except version accepts --config"
+tags: [smoke]

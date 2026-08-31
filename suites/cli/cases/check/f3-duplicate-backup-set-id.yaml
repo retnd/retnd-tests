@@ -1,0 +1,17 @@
+doc: >
+  FR-7 makes a backup set's identity source-plus-set. Two sets under one
+  source sharing an id are the same set twice, so validation names the
+  offending field rather than picking one.
+scenario: invalid-duplicate-set
+argv: [check, --config, "${CONFIG}"]
+exit: 1
+stdout: empty
+stderr:
+  - contains: "backup-manager: "
+  - contains: "postgres-primary"
+  - re: ".*sources\\[0\\]\\.backup_sets\\[1\\].*"
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-7 (backup-set isolation: identity is source plus set)"
+  - "docs/EPIC.md FR-5 (configuration SHALL be validated)"
+tags: [smoke]

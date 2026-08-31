@@ -1,0 +1,13 @@
+doc: sources honours --config, and refuses when the file is not there.
+scenario: no-fixture
+argv: [sources, --config, "${WORK}/no-such-config.yaml"]
+exit: 1
+stdout: empty
+stderr:
+  - contains: "backup-manager: "
+  - contains: "${WORK}/no-such-config.yaml"
+state: unchanged
+contract:
+  - "usage text: every command except version accepts --config"
+  - "exit-code convention: 1 is an operational failure"
+tags: [smoke]

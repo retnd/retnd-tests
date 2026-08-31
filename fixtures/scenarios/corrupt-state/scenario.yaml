@@ -1,0 +1,15 @@
+doc: >
+  A valid config pointing at a state database file that is not a SQLite
+  database at all. No schema knowledge is involved in building it, which
+  is why this is the one pre-baked database fixture this repository allows
+  itself.
+poll_interval: 15m
+sources:
+  - id: production
+    backup_sets:
+      - id: postgres-primary
+        remote: {type: local}
+        include: ["*.dump"]
+        completion: {strategy: rename}
+        stale_after: 30h
+state: corrupt

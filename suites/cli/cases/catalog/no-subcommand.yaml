@@ -1,0 +1,14 @@
+doc: >
+  The usage line is `catalog rebuild [--dry-run]`, so bare `catalog` names
+  no operation and is a usage error that says which subcommand it wanted.
+scenario: seeded-local
+argv: [catalog]
+exit: 2
+stdout: empty
+stderr:
+  - line: 'backup-manager: catalog: missing subcommand (expected "rebuild")'
+state: unchanged
+contract:
+  - "usage text: catalog rebuild [--dry-run]"
+  - "exit-code convention: 2 is a usage error"
+tags: [smoke]

@@ -1,0 +1,14 @@
+doc: >
+  A syntactically fine config with no sources at all. Whether that is a
+  validation failure or an empty deployment is exactly the kind of
+  question this suite derives from the contract rather than from whatever
+  the binary happens to do.
+raw_config: |
+  poll_interval: 15m
+  state:
+    database: ${STATE_DB}
+  sources: []
+  retention:
+    timezone: UTC
+    week_starts_on: monday
+state: none

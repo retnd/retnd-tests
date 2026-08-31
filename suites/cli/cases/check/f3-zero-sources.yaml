@@ -1,0 +1,16 @@
+doc: >
+  A config with no sources configures nothing to back up. FR-5's whole
+  point is that the file describes the deployment, so an empty sources
+  list is a mistake to report rather than an empty deployment to accept
+  silently.
+scenario: zero-sources
+argv: [check, --config, "${CONFIG}"]
+exit: 1
+stdout: empty
+stderr:
+  - contains: "backup-manager: "
+  - contains: "sources"
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-5 (configuration SHALL be validated before destructive processing begins)"
+tags: [smoke]

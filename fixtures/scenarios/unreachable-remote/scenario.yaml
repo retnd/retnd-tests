@@ -1,0 +1,16 @@
+doc: >
+  A local-type remote whose directory does not exist. An unreachable
+  remote without a container: the failure the product has to handle is
+  "the remote is not there", and a missing directory is exactly that for
+  a local backend.
+poll_interval: 15m
+sources:
+  - id: production
+    backup_sets:
+      - id: postgres-primary
+        remote: {type: local}
+        remote_path: ${WORK}/remote-that-does-not-exist
+        include: ["*.dump"]
+        completion: {strategy: rename}
+        stale_after: 30h
+state: none
