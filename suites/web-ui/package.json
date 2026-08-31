@@ -9,10 +9,13 @@
     "e2e:ui": "playwright test --ui",
     "e2e:providers": "playwright test --project=providers",
     "e2e:all-providers": "node scripts/e2e-all-providers.mjs",
-    "unit": "vitest run"
+    "unit": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@playwright/test": "^1.47.0",
+    "@types/node": "^22.20.1",
+    "typescript": "^5.9.3",
     "vitest": "^2.1.0"
   }
 }

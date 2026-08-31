@@ -7,11 +7,14 @@ GO ?= go
 
 .PHONY: help
 help:
-	@echo "make gate        the full local gate: everything that must be green before a commit"
+	@echo "make gate        the Go half of the local gate (no Node needed)"
+	@echo "                 scripts/gate-local.sh is the one the pre-commit hook runs,"
+	@echo "                 and it adds the two type checks and Suite B's unit tests"
 	@echo "make suite-a     the CLI contract suite (no browser, no Docker)"
 	@echo "make smoke       the fast slice of Suite A, for rclone-manager's own per-commit gate"
 	@echo "make selftest    prove the harness can fail, per assertion dimension"
 	@echo "make tools       unit tests for the fixture layer and the state differ"
+	@echo "make typecheck   tsc --noEmit over the TypeScript in Suites B and C"
 	@echo "make build       resolve the pinned build under test and run the identity handshake"
 	@echo "make suite-b     the Web UI Playwright suite (needs a browser; see suites/web-ui)"
 	@echo "make suite-c     the UI-to-CLI equivalence suite (needs a browser; see suites/equivalence)"
@@ -41,6 +44,14 @@ vet:
 	@unformatted=$$(gofmt -l .); \
 	if [ -n "$$unformatted" ]; then echo "not gofmt-clean:"; echo "$$unformatted"; exit 1; fi
 	$(GO) vet ./...
+
+# tsc --noEmit over both TypeScript suites. Playwright transpiles types
+# away without checking them, so without this nothing in the repository
+# ever reads them.
+.PHONY: typecheck
+typecheck:
+	cd suites/web-ui && npm run --silent typecheck
+	cd suites/equivalence && npm run --silent typecheck
 
 .PHONY: gate
 gate: vet tools selftest suite-a

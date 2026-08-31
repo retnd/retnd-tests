@@ -9,6 +9,11 @@ RM_UI_DIR=/path/to/rclone-manager/ui/shared npm run e2e         # 165 tests
 
 Or from the repository root, `make suite-b`.
 
+At the currently pinned `rclone-manager` commit one of those 165 is red,
+in both this home and its old one, for a reason that predates the move.
+"One red at the current pin" below has the evidence and the one-line fix,
+which belongs upstream.
+
 ## What "behaviour-preserving" was made to mean
 
 Not an intention. Three checkable facts, all recorded in the migration
@@ -27,7 +32,10 @@ pull request:
    files** in both homes, and the 165 lines match one for one.
 3. **The pass count is identical**: 165 passed in the old home, 165 passed
    in the new one, three consecutive times, at the same `rclone-manager`
-   commit.
+   commit. That commit is `137f646`, the baseline, and the claim is about
+   the two homes agreeing rather than about the number being permanent:
+   at the pin's current commit both homes now say 164, together, for the
+   reason set out below. Agreeing is the property that was being bought.
 
 That third number is worth stating carefully, because a remembered one was
 wrong. The count quoted in the issue was 174, an earlier one 158, and a
@@ -93,6 +101,87 @@ cannot be resolved:
 A resolved directory with no `node_modules/` stops the run and names the
 `npm ci` that fixes it, rather than letting `npm run dev` fail sixty
 seconds later inside a webServer timeout.
+
+## One red at the current pin, and it is not this suite's
+
+At `rclone-manager` `defa0a6` this suite is **164 passed, 1 failed**:
+
+```
+[generic] e2e/accessibility.spec.ts:65 accessibility > tab order reaches the section navigation
+Error: Section navigation was not reachable within 12 tab stops
+```
+
+It is deterministic (three consecutive runs), and none of it belongs to
+the migration. Four things establish that:
+
+1. the same spec passes against `ui/shared` at `137f646`, the migration
+   baseline, so the suite did not change: the app did;
+2. the same spec fails **in its old home**, run from
+   `rclone-manager/ui/shared` with that repository's own
+   `playwright.config.ts`, at `defa0a6`. This is `rclone-manager` main
+   being red on its own e2e suite, and the move neither caused it nor
+   hides it;
+3. the accessibility property itself is intact. Wait for the shell and
+   the section nav is **three** tab stops away, not more than twelve;
+4. `e2e/` is still byte-identical to `ui/shared/e2e/`, `diff -r` and all.
+
+The cause is a race the spec always had and now always loses. Line 65
+does a bare `page.goto("/")` and starts pressing Tab immediately, with
+nothing waited on, while every neighbouring test goes through `bm.goto()`,
+which waits for the section nav to render (the comment at line 77 says so,
+in as many words, about the test right below it).
+[#195](https://github.com/spdrman/rclone-manager/pull/195) then put an
+extra round trip in front of the shell: `App.tsx` now asks
+`getFirstRunStatus()` before it can know which mode the instance is in,
+and renders a `<Splash />` until the answer arrives. All twelve Tab
+presses land on that splash.
+
+So the fix is one line, in `rclone-manager`'s
+`ui/shared/e2e/accessibility.spec.ts`, and it is the same one the sibling
+test already got: wait for the nav before counting tab stops. It is not
+made here, because `e2e/` is byte-identical to that file by construction
+and this is the change where that claim is being reviewed. Fix it
+upstream, re-sync, and this suite goes to 165.
+
+## Type checking, and the one thing it does not check
+
+`npm run typecheck` is `tsc --noEmit` over `e2e/`, `harness/`, `scripts/`
+and both configs, and the gate runs it. It went in because Playwright
+transpiles types away without checking them, so until it did, nothing in
+this repository read the types in this suite at all.
+
+`noUnusedLocals` and `noUnusedParameters` are deliberately off, and real
+ESLint is deliberately absent, for one reason: both of them have exactly
+one finding on this tree, and it is inside `e2e/`.
+
+```
+e2e/shell.spec.ts(20,77): 'page' is declared but its value is never read
+```
+
+That is an unused Playwright fixture in a destructured parameter list,
+and it is a real (small) finding. But `e2e/` being byte-identical to
+`ui/shared/e2e/` is this suite's whole migration argument, so editing it
+to satisfy a check added here would trade a strong property for a weak
+one. The alternative, configuring the check to ignore its own only
+finding, is worse: a check that has been told not to look at the one
+thing it can see is coverage in appearance only, which is the shape this
+whole repository exists to argue against.
+
+So it goes upstream, and it turns out it has to. Nothing catches that
+binding in its old home either: `ui/shared`'s ESLint config switches
+`@typescript-eslint/no-unused-vars` off on the stated grounds that "TS's
+own noUnused* compiler options already cover this project-wide", and
+`ui/shared/tsconfig.json` has both options on, but its `include` is
+`["src"]`, so `tsc --noEmit` there has never read `e2e/` at all. The
+rule was turned off in favour of a check that does not reach these files.
+That is a gap in `rclone-manager`'s gate rather than something the
+migration introduced, and it is why the finding survived the move.
+
+The order that fixes it for both homes: correct
+`ui/shared/e2e/shell.spec.ts` upstream, give that tsconfig (or a second
+one) the `e2e` directory so the claim its ESLint config makes becomes
+true, re-sync the byte-identical copy here, and then turn both options on
+in this suite with nothing left to suppress.
 
 ## Files
 

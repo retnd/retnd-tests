@@ -45,11 +45,32 @@ go test ./suites/cli -count=1
 # and importing it here would be a strange thing to do in the repository
 # whose whole argument is that a check nobody notices stopping is worse than
 # no check.
-if [ ! -d suites/web-ui/node_modules ]; then
-  echo "suites/web-ui has no installed dependencies, so its unit tests cannot run." >&2
-  echo "  fix: cd suites/web-ui && npm ci" >&2
-  exit 1
-fi
+for suite in suites/web-ui suites/equivalence; do
+  if [ ! -d "$suite/node_modules" ]; then
+    echo "$suite has no installed dependencies, so its unit tests and type check cannot run." >&2
+    echo "  fix: cd $suite && npm ci" >&2
+    exit 1
+  fi
+done
+
+# Playwright transpiles types away without checking them, so nothing else
+# in this repository ever reads the types in these two suites: a spec that
+# passes a string where the harness wants a number transpiles fine and
+# fails in the browser, or worse, does not. `tsc --noEmit` is the whole
+# check; both tsconfigs were already written for it and both were already
+# clean, which is why this is a wiring change rather than a cleanup.
+#
+# What it deliberately does not turn on is noUnusedLocals/noUnusedParameters.
+# Suite B's e2e/ is byte-identical to rclone-manager's ui/shared/e2e/ and
+# that is the migration's proof; the one unused binding in there
+# (e2e/shell.spec.ts, an unused `page` fixture) would have to be edited to
+# satisfy them, and editing that tree to satisfy a check here would trade
+# the stronger property for the weaker one. It belongs upstream, and the
+# migrated copy inherits the fix on the next re-sync.
+echo "==> Suite B and Suite C type checks"
+(cd suites/web-ui && npm run --silent typecheck)
+(cd suites/equivalence && npm run --silent typecheck)
+
 echo "==> Suite B unit tests"
 (cd suites/web-ui && npm run --silent unit)
 

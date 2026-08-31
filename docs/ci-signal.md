@@ -121,8 +121,17 @@ browser, and takes a couple of seconds.
 
 The mirror of the same pattern: `.husky/pre-commit` runs
 `scripts/gate-local.sh`, which runs `go vet`, the tool and fixture unit
-tests, the harness self-tests, and Suite A in full against the pinned
-build. `make gate` is the single documented command.
+tests, the harness self-tests, Suite A in full against the pinned build,
+`tsc --noEmit` over Suites B and C, and Suite B's unit tests.
+
+The two type checks are there because Playwright transpiles types away
+without checking them, and the ESLint config that used to read this code
+stayed behind in `ui/shared` when the suite moved. Without them nothing
+reads the types in either TypeScript suite. They need `npm ci` in both
+suite directories, and the gate refuses rather than skips when that is
+missing, for the same reason everything else here does. `make gate` is
+the Go-only half, which is what the `workflow_dispatch` job runs, since
+that runner sets up Go and nothing else.
 
 A `workflow_dispatch`-only workflow exists for on-demand cloud runs,
 matching the estate's policy. Whether this repository, which has none of

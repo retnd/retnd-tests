@@ -121,10 +121,26 @@ git config core.hooksPath .husky
 
 That wires `.husky/pre-commit` to `scripts/gate-local.sh`, which is the
 gate: `gofmt`, `go vet`, the fixture and state-differ unit tests, the
-harness self-tests, and Suite A in full. It mirrors how `rclone-manager`
+harness self-tests, Suite A in full, `tsc --noEmit` over both TypeScript
+suites, and Suite B's own unit tests. It mirrors how `rclone-manager`
 gates itself, and for the same reason: the merge signal in this estate is
 local, so a red gate has to refuse the commit rather than annotate it
 afterwards.
+
+It needs Go, plus `npm ci` in `suites/web-ui` and `suites/equivalence`.
+It refuses rather than skips when those are missing, and names the `npm
+ci` that fixes it. `make gate` is the Go-only half, for a machine with no
+Node on it; the hook runs the script.
+
+Playwright transpiles types away without checking them, so before the
+type check went in, nothing in this repository ever read the types in
+Suites B and C at all. What the check does not turn on is
+`noUnusedLocals`/`noUnusedParameters`: `suites/web-ui/e2e/` is
+byte-identical to `rclone-manager`'s `ui/shared/e2e/`, that is the
+migration's proof, and the one unused binding in there would have to be
+edited to satisfy them. It belongs upstream, where the migrated copy
+inherits the fix on the next re-sync. Real ESLint is not here for the
+same reason, spelled out in `suites/web-ui/README.md`.
 
 ## The CI signal
 
