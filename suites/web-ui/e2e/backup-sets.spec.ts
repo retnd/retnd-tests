@@ -14,8 +14,15 @@ test.describe("backup sets", () => {
     await expect(card).toContainText("Retention");
     await expect(card).toContainText("Last validation");
     await expect(card.getByRole("button", { name: "Open" })).toBeVisible();
-    await expect(card.getByRole("button", { name: "Run now" })).toBeVisible();
     await expect(card.getByRole("button", { name: "Test connection" })).toBeVisible();
+    // A card carries no run control at all since #231, and this line used
+    // to assert one named "Run now". It kept passing after #214 rewired
+    // that button's handler to api.runCycle(), which runs one pass over
+    // EVERY enabled backup set: the label still existed, so the assertion
+    // was still true and had stopped meaning what it said. The two
+    // assertions above are this zero's control, so an empty card or a
+    // renamed role cannot satisfy it by matching nothing.
+    await expect(card.getByRole("button", { name: /run/i })).toHaveCount(0);
   });
 
   test("state is never conveyed by colour alone", async ({ bm, page }) => {
@@ -39,11 +46,46 @@ test.describe("backup sets", () => {
     await expect(stale).toContainText(/Expected within/);
   });
 
-  test("a halted set cannot be run", async ({ bm, page }) => {
+  // This test was "a halted set cannot be run", and it asserted that one
+  // card's "Run now" button was disabled. It proved less than its name
+  // twice over (#231). The button it named ran a deployment-wide cycle,
+  // so every OTHER card's identical button still started the very run it
+  // claimed was refused; and the `halted` flag doing the disabling was a
+  // field nothing computed, filled with a literal `false` by the HTTP
+  // client on every set, so against a real service the disabled state it
+  // asserted never occurred at all.
+  //
+  // What is worth asserting is where the run control lives and whether it
+  // says how far it reaches, so that is what this now checks.
+  test("the run control belongs to the page, not to a card, and says how far it reaches", async ({ bm, page }) => {
     await bm.goto("/sets");
-    const halted = page.getByRole("article").filter({ hasText: "Failing" }).first();
-    await expect(halted.getByRole("button", { name: "Run now" })).toBeDisabled();
-    await expect(halted).toContainText(/halted/i);
+
+    const header = page.getByRole("heading", { level: 1 }).locator("xpath=../..");
+    const run = header.getByRole("button", { name: "Run all due sets", exact: true });
+    await expect(run).toBeVisible();
+    // The tooltip, not just the label. A label alone cannot say that this
+    // button walks every enabled backup set, and asserting only the label
+    // is how a rewired handler passed under a stale name through #214.
+    await expect(run).toHaveAttribute("title", /every enabled backup set, not only this one/);
+    // One of it on the whole page, however many sets are configured.
+    await expect(page.getByRole("button", { name: "Run all due sets", exact: true })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "Run now", exact: true })).toHaveCount(0);
+
+    const cards = page.getByRole("article");
+    await expect(cards.first()).toBeVisible();
+    const count = await cards.count();
+    expect(count).toBeGreaterThan(1);
+    for (let i = 0; i < count; i++) {
+      await expect(cards.nth(i).getByRole("button", { name: /run/i })).toHaveCount(0);
+      // Control for each zero: the same query shape, on a button every
+      // card really does carry, finds exactly one.
+      await expect(cards.nth(i).getByRole("button", { name: "Open", exact: true })).toHaveCount(1);
+    }
+
+    // A set the manager has stopped still says so, in the sentence that
+    // explains its state rather than in a status word derived from a flag
+    // the service never sends.
+    await expect(cards.filter({ hasText: "Failing" }).first()).toContainText(/halted/i);
   });
 
   test("opens a set detail page", async ({ bm, page }) => {
