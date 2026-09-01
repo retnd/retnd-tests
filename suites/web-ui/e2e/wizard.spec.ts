@@ -68,8 +68,10 @@ test.describe("add backup set wizard", () => {
     await page.getByRole("radio", { name: /Use managed key/ }).click();
     // Used to show a picklist of two hardcoded key names and a fabricated
     // "Already installed on 2 other backup sets" count, with no
-    // managed-key store behind either.
-    await expect(page.getByLabel("Managed key")).toHaveCount(0);
+    // managed-key store behind either. exact: true — a loose match also
+    // catches the "Use managed key" radio's own label above, which
+    // legitimately contains "managed key" as a substring.
+    await expect(page.getByLabel("Managed key", { exact: true })).toHaveCount(0);
     await expect(page.getByText(/other backup sets/i)).toHaveCount(0);
     await expect(page.getByText(/Reusing a managed key on save isn.t available yet/)).toBeVisible();
   });
