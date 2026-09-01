@@ -9,13 +9,21 @@ test.describe("settings", () => {
     // "Default retention for new sets" used to be here, as a static row of
     // badges wired to nothing. B3.7 (#140) replaced it with the real,
     // writable Retention policy card asserted in its own describe below.
+    //
+    // "Polling interval" and "Log level" used to be here too, both
+    // decorative selects wired to nothing (rclone-manager#299). Neither
+    // is on the page any more: poll_interval is a real config key but a
+    // duration in minutes, not the 15/30/60 seconds that select offered,
+    // and there is no log-level concept in config.Config to wire the
+    // other one to.
     for (const label of [
-      "Polling interval", "Log level",
       "Storage warning threshold", "Storage critical threshold",
       "Retention policy"
     ]) {
       await expect(page.getByText(label, { exact: true })).toBeVisible();
     }
+    await expect(page.getByText("Polling interval", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Log level", { exact: true })).toHaveCount(0);
   });
 
   test("makes the platform abstraction explicit", async ({ page }) => {
