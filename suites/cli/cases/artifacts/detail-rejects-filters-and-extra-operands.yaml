@@ -1,0 +1,17 @@
+doc: >
+  The detail operand and the list form's --source/--backup-set filters
+  cannot be combined (there is nothing left to narrow once one artifact
+  is already named by id), and the command takes at most one operand.
+  Both are usage errors (exit 2), the same arity discipline issue #188
+  established for `validate`'s own operand.
+scenario: seeded-local
+argv: [artifacts, --config, "${CONFIG}", --source, production, "production/postgres-primary/pg-2026-06-01.dump"]
+exit: 2
+stdout: empty
+stderr:
+  - line: "backup-manager: artifacts: --source/--backup-set cannot be combined with an artifact argument"
+state: unchanged
+contract:
+  - "usage text: artifacts [--source S] [--backup-set B] - list journal artifacts"
+  - "usage text: artifacts <source/backup-set/name> - print full detail for one artifact"
+tags: [smoke]

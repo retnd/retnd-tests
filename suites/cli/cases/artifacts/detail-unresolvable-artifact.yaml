@@ -1,0 +1,16 @@
+doc: >
+  A well-formed id the journal has never seen is an operational failure
+  that names the id, mirroring validate/unresolvable-artifact.yaml for
+  the identical id shape.
+scenario: seeded-local
+argv: [artifacts, --config, "${CONFIG}", "production/postgres-primary/no-such-artifact.dump"]
+exit: 1
+stdout: ignored
+stderr:
+  - contains: "backup-manager: "
+  - contains: "production/postgres-primary/no-such-artifact.dump"
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-9 (the journal is the record of artifact identity)"
+  - "exit-code convention: 1 is an operational failure"
+tags: [smoke]
