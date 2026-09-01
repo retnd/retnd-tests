@@ -13,7 +13,7 @@ stdout:
   - ndjson: {event: lifecycle_transition, artifact: "production/postgres-primary/pg-2026-06-01.dump", to: TRANSFERRED}
   - ndjson: {event: lifecycle_transition, artifact: "production/postgres-primary/pg-2026-06-01.dump", to: VERIFIED}
   - ndjson: {event: commit, artifact: "production/postgres-primary/pg-2026-06-01.dump"}
-  - line: "discovered=1 already_known=0 pending=1 rejected=0 conflicts=0 errors=0"
+  - line: "discovered=1 already_known=0 pending=1 rejected=0 conflicts=0 errors=0 failed=0"
   - absent: "pg-in-progress.dump"
 stderr: empty
 state:
