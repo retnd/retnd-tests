@@ -69,7 +69,7 @@ test.describe("provider: " + PLATFORM, () => {
 
   test("offers a native storage picker only when supported", async ({ page }) => {
     await page.goto("/sets/new");
-    await page.getByRole("button", { name: "Storage & retention" }).click();
+    await page.getByRole("button", { name: "Storage & validation" }).click();
 
     if (expected.picker) {
       await expect(page.getByRole("button", { name: /Browse volumes/ })).toBeVisible();
