@@ -1,0 +1,56 @@
+doc: >
+  issue #284's whole point: an operator asking about one FAILED or
+  QUARANTINED artifact is told the reason the journal recorded at the
+  transition, without opening the state database. This drives a real
+  quarantine (validate finds a corrupted local copy, exactly like
+  validate/corrupted-local-copy.yaml) and then asks `artifacts` about that
+  one artifact by name.
+
+  Two absences are asserted alongside the presences, and both are
+  contractual, not omissions: `validation_detail` because no application
+  validator is configured for this backup set, so nothing else could have
+  set it, and `quarantine_reason` because this exact failure shape (a hash
+  mismatch found by an operator-triggered validate, not an application
+  validator rejection) is one core/service's own quarantine_reason field
+  cannot answer either (issue #308) -- `reason` below is what answers it,
+  read from the journal's transition log directly instead of reconstructed
+  from whatever else happens to be on the record.
+scenario: seeded-local
+mutate:
+  - "corrupt ${LOCAL}/production/app-uploads/uploads-2026-06-01.tar"
+setup_after_mutate:
+  - [validate, --config, "${CONFIG}", "production/app-uploads/uploads-2026-06-01.tar"]
+allow_setup_failure: true
+argv: [artifacts, --config, "${CONFIG}", "production/app-uploads/uploads-2026-06-01.tar"]
+exit: 0
+stdout:
+  - line: "id:                  production/app-uploads/uploads-2026-06-01.tar"
+  - line: "backup_set_id:       production/app-uploads"
+  - line: "source_name:         production"
+  - line: "set_name:            app-uploads"
+  - line: "name:                uploads-2026-06-01.tar"
+  - line: "state:               QUARANTINED_LOST"
+  - line: "remote_path:         uploads-2026-06-01.tar"
+  - line: "local_path:          ${LOCAL}/production/app-uploads/uploads-2026-06-01.tar"
+  - line: "discovered_at:       ${TS}"
+  - line: "updated_at:          ${TS}"
+  - line: "size_bytes:          8192"
+  - line: "checksum:            ${SHA}"
+  - line: "checksum_algorithm:  sha256"
+  - line: "validation:          pending"
+  - line: "remote_source_removed_at: ${TS}"
+  - line: "quarantined:         true"
+  - line: "quarantine_irrecoverable: true"
+  - line: "reason:              operator-triggered validate: local final file ${LOCAL}/production/app-uploads/uploads-2026-06-01.tar now hashes to ${SHA}, but the sha256 hash recorded at verification was ${SHA}"
+  - line: "reason_at:           ${TS}"
+  - absent: "validation_detail:"
+  - absent: "quarantine_reason:"
+  - absent: "retention_tier:"
+stderr: empty
+state: unchanged
+contract:
+  - "issue #284 (a CLI command prints the recorded reason for a failed or quarantined artifact, field by field against api/v1/openapi.json's Artifact schema)"
+  - "docs/EPIC.md FR-13 (verification)"
+  - "docs/EPIC.md FR-10 (QUARANTINED_LOST is an explicit exceptional state)"
+  - "the sibling case's control: validate/corrupted-local-copy.yaml proves the same corruption quarantines the artifact at all"
+tags: [smoke]
