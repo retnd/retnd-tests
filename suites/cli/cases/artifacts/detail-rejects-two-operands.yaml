@@ -1,0 +1,23 @@
+doc: >
+  Two operands is still an arity error, the other half of
+  detail-rejects-filters-and-extra-operands.yaml's control: that case
+  proves the operand cannot be combined with the list filters, this one
+  proves the command genuinely takes at most one operand rather than
+  silently accepting more.
+scenario: seeded-local
+argv:
+  [
+    artifacts,
+    --config,
+    "${CONFIG}",
+    "production/postgres-primary/pg-2026-06-01.dump",
+    "production/app-uploads/uploads-2026-06-01.tar",
+  ]
+exit: 2
+stdout: empty
+stderr:
+  - line: "backup-manager: artifacts takes at most one argument: <source/backup-set/name>"
+state: unchanged
+contract:
+  - "usage text: artifacts <source/backup-set/name> - print full detail for one artifact"
+tags: [smoke]
