@@ -158,10 +158,12 @@ test.describe("activity", () => {
     }
   });
 
-  test("offers exactly the four documented filters", async ({ page }) => {
+  test("offers the two real filters, and no longer the decorative Time range select (rclone-manager#299)", async ({ page }) => {
     await expect(page.getByLabel("Backup set")).toBeVisible();
     await expect(page.getByLabel("Severity")).toBeVisible();
-    await expect(page.getByLabel("Time range")).toBeVisible();
+    // Time range used to sit here, `defaultValue="24"` with no `onChange`
+    // and nothing reading it: listActivity() takes no window argument.
+    await expect(page.getByLabel("Time range")).toHaveCount(0);
   });
 
   test("severity filter narrows the list", async ({ page }) => {

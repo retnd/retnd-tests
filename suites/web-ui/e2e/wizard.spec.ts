@@ -10,7 +10,7 @@ test.describe("add backup set wizard", () => {
   test("groups the flow into exactly six steps", async ({ page }) => {
     const steps = page.getByRole("listitem");
     await expect(steps).toHaveCount(6);
-    for (const label of ["Source", "Authentication", "Verify server", "Discovery", "Storage & retention", "Review"]) {
+    for (const label of ["Source", "Authentication", "Verify server", "Discovery", "Storage & validation", "Review"]) {
       await expect(page.getByRole("button", { name: label })).toBeVisible();
     }
   });
@@ -40,12 +40,22 @@ test.describe("add backup set wizard", () => {
     }
   });
 
-  test("step 2 offers three key sources and shows only the public key", async ({ page }) => {
+  test("step 2 offers three key sources, and Generate says plainly it can't be saved yet (rclone-manager#299)", async ({ page }) => {
     await page.getByRole("button", { name: "Authentication" }).click();
     await expect(page.getByRole("radio")).toHaveCount(3);
     await expect(page.getByText("Generate dedicated SSH key")).toBeVisible();
     await expect(page.getByText(/never displayed/)).toBeVisible();
-    await expect(page.getByText(/^ssh-ed25519 AAAA/)).toBeVisible();
+    // Generate used to show a fixed sample public key (never actually
+    // generated per set) with a "Copy public key" button, and an
+    // authorized_keys instruction that always named "backup-agent"
+    // regardless of the username entered on step 1. Neither key source
+    // other than Import can be saved (handleSave/saveHint refuse both),
+    // so the panel now says that plainly instead of inventing detail for
+    // a path that can never be saved.
+    await expect(page.getByText(/Generating a key on save isn.t available yet/)).toBeVisible();
+    await expect(page.getByText(/^ssh-ed25519 AAAA/)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Copy public key" })).toHaveCount(0);
+    await expect(page.getByText(/authorized_keys/)).toHaveCount(0);
     // The step's own copy legitimately says "Private keys stay on this NAS
     // and are never shown" — a bare /PRIVATE KEY/i match flags that
     // sentence as a false positive. Match the actual PEM marker instead
@@ -53,9 +63,15 @@ test.describe("add backup set wizard", () => {
     expect(await page.locator("body").innerText()).not.toMatch(/BEGIN (OPENSSH|RSA|EC) PRIVATE KEY/i);
   });
 
-  test("step 2 copy button is present for the public key", async ({ page }) => {
+  test("step 2's Use managed key panel says plainly it can't be saved yet, with no fabricated in-use count (rclone-manager#299)", async ({ page }) => {
     await page.getByRole("button", { name: "Authentication" }).click();
-    await expect(page.getByRole("button", { name: "Copy public key" })).toBeEnabled();
+    await page.getByRole("radio", { name: /Use managed key/ }).click();
+    // Used to show a picklist of two hardcoded key names and a fabricated
+    // "Already installed on 2 other backup sets" count, with no
+    // managed-key store behind either.
+    await expect(page.getByLabel("Managed key")).toHaveCount(0);
+    await expect(page.getByText(/other backup sets/i)).toHaveCount(0);
+    await expect(page.getByText(/Reusing a managed key on save isn.t available yet/)).toBeVisible();
   });
 
   test("step 3 requires an explicit trust decision", async ({ page }) => {
@@ -94,21 +110,35 @@ test.describe("add backup set wizard", () => {
     ).toBeVisible();
   });
 
-  test("step 5 defaults retention and protects the known-good backup", async ({ page }) => {
-    await page.getByRole("button", { name: "Storage & retention" }).click();
-    // getByDisplayValue is a Testing Library method, not one Playwright's
-    // Locator API exposes — these are plain <input defaultValue=…> fields
-    // (BackupSetWizardPage's Field()), matched by their <label> text instead.
-    await expect(page.getByLabel("Daily")).toHaveValue("7 days");
-    await expect(page.getByLabel("Weekly")).toHaveValue("3 months");
-    await expect(page.getByLabel("Monthly")).toHaveValue("12 months");
-    await expect(page.getByRole("checkbox", { name: /Protect newest known-good/ })).toBeChecked();
+  test("step 5 no longer draws its own per-set retention fields (rclone-manager#299)", async ({ page }) => {
+    await page.getByRole("button", { name: "Storage & validation" }).click();
+    // Daily/Weekly/Monthly/Week-starts and their own always-checked
+    // "protect newest known-good" toggle used to sit here, drawing a
+    // per-set retention shape #111 already decided against: retention is
+    // one global policy, configured once on Settings
+    // (RetentionPolicyCard, #140), and #111 specifically warned this
+    // per-set shape must not be mistaken for a capability.
+    await expect(page.getByLabel("Daily")).toHaveCount(0);
+    await expect(page.getByLabel("Weekly")).toHaveCount(0);
+    await expect(page.getByLabel("Monthly")).toHaveCount(0);
+    await expect(page.getByLabel("Week starts")).toHaveCount(0);
+    await expect(page.getByRole("checkbox", { name: /Protect newest known-good/ })).toHaveCount(0);
   });
 
-  test("step 5 lists the three validation layers", async ({ page }) => {
-    await page.getByRole("button", { name: "Storage & retention" }).click();
-    await expect(page.getByRole("checkbox", { name: /Transfer verification/ })).toBeChecked();
-    await expect(page.getByRole("checkbox", { name: /Checksum verification/ })).toBeChecked();
+  test("step 5 lists the two validation layers that still exist, and no longer the fake Checksum toggle (rclone-manager#299)", async ({ page }) => {
+    await page.getByRole("button", { name: "Storage & validation" }).click();
+    const transferVerification = page.getByRole("checkbox", { name: /Transfer verification/ });
+    await expect(transferVerification).toBeChecked();
+    // Unconditional server-side (no field anywhere can turn it off), so
+    // it stays, but disabled now: an honest status, not a control.
+    await expect(transferVerification).toBeDisabled();
+    // newBackupSetFor (core/service/backupsets.go) sets Hash: ""
+    // unconditionally on every set this wizard creates — there was never
+    // a field for this toggle to write to, and wiring it would offer a
+    // choice that fails every artifact on the recommended, chrooted
+    // no-shell SFTP account shape (proven by TestSFTPHashCapability).
+    await expect(page.getByRole("checkbox", { name: /Checksum verification/ })).toHaveCount(0);
+    await expect(page.getByText("SHA-256")).toHaveCount(0);
 
     // The third layer stopped being a checkbox in #164, which replaced the
     // decorative "Application validation" toggle with a real picklist over
@@ -122,11 +152,15 @@ test.describe("add backup set wizard", () => {
     // instead of a sleep also means a catalog that never loads fails here
     // rather than passing on an empty list.
     await expect(validator).toBeEnabled();
-    // Off by default, same contract the removed toggle carried: transfer and
-    // checksum verification are on, application validation is opt-in.
+    // Off by default: transfer verification is on unconditionally,
+    // application validation is opt-in. "and checksum" dropped from this
+    // option's own text by rclone-manager#299, alongside the Checksum
+    // verification toggle above: Hash: "" means checksum verification
+    // never actually runs, so the old wording claimed a step that
+    // doesn't happen.
     await expect(validator).toHaveValue("");
     const options = validator.getByRole("option");
-    await expect(options.first()).toHaveText("None (transfer and checksum verification only)");
+    await expect(options.first()).toHaveText("None (transfer verification only)");
     // ...and the choices below it are the backend's catalog rather than a
     // hardcoded list. A count alone cannot show that: two literal <option>
     // elements satisfy `> 1` identically, which is exactly the shape #164
@@ -143,11 +177,21 @@ test.describe("add backup set wizard", () => {
     await expect(validator.getByRole("option", { name: "trailer-marker", exact: true })).toHaveCount(1);
   });
 
-  test("step 6 summarises source, destination, retention and validation", async ({ page }) => {
+  test("step 6 summarises source, destination and validation, and no longer a hardcoded retention card (rclone-manager#299)", async ({ page }) => {
     await page.getByRole("button", { name: "Review" }).click();
-    for (const label of ["Source", "Destination", "Retention", "Validation"]) {
+    for (const label of ["Source", "Destination", "Validation"]) {
       await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
     }
+    // This card used to show a hardcoded "7 daily / 13 weekly / 12
+    // monthly" summarizing fields step 5 no longer draws — retention is
+    // one global policy now (Settings), not something this wizard's
+    // Review step reports per set. "SHA-256" is gone from the Validation
+    // card for the same reason as the Checksum verification toggle.
+    await expect(page.getByText("Retention", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("7 daily")).toHaveCount(0);
+    await expect(page.getByText("13 weekly")).toHaveCount(0);
+    await expect(page.getByText("12 monthly")).toHaveCount(0);
+    await expect(page.getByText("SHA-256")).toHaveCount(0);
   });
 
   test("step 6 discloses remote-source handling in full", async ({ page }) => {
