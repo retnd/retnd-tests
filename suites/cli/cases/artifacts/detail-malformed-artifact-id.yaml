@@ -1,0 +1,17 @@
+doc: >
+  The new `artifacts <source/backup-set/name>` detail operand (issue #284)
+  refuses a well-formed-looking argument that is not an artifact id at all,
+  the same way validate/malformed-artifact-id.yaml already proves
+  `validate` does for the identical id shape.
+scenario: seeded-local
+argv: [artifacts, --config, "${CONFIG}", not-an-id]
+exit: 1
+stdout: ignored
+stderr:
+  - contains: "backup-manager: "
+  - contains: "source/backup-set/name"
+state: unchanged
+contract:
+  - "usage text: artifacts <source/backup-set/name> - print full detail for one artifact"
+  - "docs/EPIC.md FR-7 (identity is source plus set)"
+tags: [smoke]
