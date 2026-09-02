@@ -19,7 +19,13 @@ test.describe("the equivalence harness", () => {
       // browser has to sign in to drive it, and the CLI has no equivalent
       // to enrol one with. That asymmetry is setup, not a finding, and it
       // is named here rather than absorbed silently.
-      ignoreFiles: ["config.yaml", "local-auth.json"],
+      // local-auth.json.lock is named separately because the suffix match
+      // above does not reach it: it is the advisory flock apps/common/auth
+      // /local's Service.New takes for its whole process lifetime
+      // (rclone-manager#322), so whether it exists in a snapshot records
+      // which side still had a server running, not any backend state this
+      // suite compares.
+      ignoreFiles: ["config.yaml", "local-auth.json", "local-auth.json.lock"],
       maskVolatile: true
     });
     expect(result.report).toBeTruthy();

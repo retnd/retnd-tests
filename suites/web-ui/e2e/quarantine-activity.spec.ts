@@ -163,7 +163,7 @@ test.describe("activity", () => {
     await expect(page.getByLabel("Severity")).toBeVisible();
     // Time range used to sit here, `defaultValue="24"` with no `onChange`
     // and nothing reading it: listActivity() takes no window argument.
-    await expect(page.getByLabel("Time range")).toHaveCount(0);
+    await expect(page.getByLabel("Time range", { exact: true })).toHaveCount(0);
   });
 
   test("severity filter narrows the list", async ({ page }) => {

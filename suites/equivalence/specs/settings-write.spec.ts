@@ -66,7 +66,11 @@ test.describe("settings write: last-known-good protection", () => {
       // local-auth.json: only the UI side has an enrolled administrator,
       // because a browser has to sign in and the CLI has no equivalent to
       // enrol one with. Setup asymmetry, named rather than absorbed.
-      ignoreFiles: ["config.yaml", "local-auth.json"],
+      // local-auth.json.lock for the same reason harness.spec.ts names it:
+      // a process-lifetime advisory flock (rclone-manager#322), so its
+      // presence says which side still had a server up, not what either
+      // side wrote.
+      ignoreFiles: ["config.yaml", "local-auth.json", "local-auth.json.lock"],
       maskVolatile: true
     });
     expect(result.equal, "the Web UI and the CLI left different backend state:\n" + result.report).toBe(true);
