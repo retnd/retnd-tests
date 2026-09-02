@@ -25,6 +25,13 @@ all. Rows that did not change were re-checked the same way rather than
 assumed, and the ones still blocked are still blocked for the reason
 already written against them.
 
+**The CLI's registered command list has grown since, and the create rows
+below have been re-derived over that.**
+[#356](https://github.com/spdrman/rclone-manager/issues/356) added
+`backup-set`, so `main.go` now registers fifteen commands rather than
+twelve, and one of them does something this document recorded as having
+no CLI counterpart at all.
+
 One row this document still owes, unchanged by the move and predating it:
 [#195](https://github.com/spdrman/rclone-manager/pull/195) gave
 `client.ts` `GET /system/first-run` and `POST /system/first-run`, and the
@@ -60,13 +67,15 @@ instance). It has no row here yet.
 | Settings: retention policy | edit `config.yaml` per FR-5, then `check` | the resulting retention decisions, the filesystem, and the catalog, compared through `sources`, `artifacts`, `status`, `check` and `retention --dry-run` | **proved** (`specs/settings-write.spec.ts`, driving FR-19 last-known-good protection, which is the retention setting whose effect the read surface actually shows) |
 | Run backup manually | `fetch --source S --backup-set B` | catalog rows, local tree digests, sidecar manifests | **blocked**: `POST /api/v1/operations` returns 403 `DESTRUCTIVE_OPERATIONS_DISABLED`. `serve.NewEngine` never sets a destructive gate and `NotYetImplementedGate.Passed()` is a hardcoded false, pending [#92](https://github.com/spdrman/rclone-manager/issues/92). The CLI has no such gate, which is the asymmetry |
 | Retention apply | `retention` | the same artifacts deleted | **blocked twice over**: the API route is behind the same destructive gate, and FR-20 local deletion is not implemented on the CLI side either ([#21](https://github.com/spdrman/rclone-manager/issues/21), and Suite A's `retention/apply-is-not-implemented`) |
-| Add, edit or remove a backup set | edit `config.yaml` per FR-5, then `check` | the effective config plus a `sources` read-back | **blocked**: `POST /api/v1/backup-sets` requires `host`, `user`, `ssh_key_id` and `known_hosts_line`, so it cannot express a `remote.type: local` set at all, and every local-remote fixture in this repository is one. A fixture with a real SSH endpoint would be needed to prove this row, which is [#87](https://github.com/spdrman/rclone-manager/issues/87)-shaped work rather than this issue's |
+| Add a backup set | `backup-set create <source/backup-set>` | the persisted configuration, a `sources` read-back, and the rest of the work directory | **proved** (`specs/backup-set-create.spec.ts`) |
+| Edit a backup set | none yet | | **gap (UI only)**: the detail page can open an editor and no CLI verb changes a configured set. [#350](https://github.com/spdrman/rclone-manager/issues/350) is the issue and its pull request adds `backup-set patch`; this row stays a gap until that lands, and becomes a sibling of the create row above when it does |
+| Remove a backup set | none | | neither surface has one. There is no `DELETE /api/v1/backup-sets/{id}` in the contract and no CLI verb, so removing a set is still a `config.yaml` edit on both sides. Listed because the old combined row's title implied a capability that does not exist |
 | Enable or disable a backup set | none | | **gap (UI only)**: `POST /api/v1/backup-sets/{source}/{set}/enabled` is registered and declared now, so the route half is no longer a block, but the CLI still has no enable/disable command (checked against `main.go` at this pin), which is what keeps this a gap |
 | Quarantine: revalidate, retry ingestion | `validate <source/set/artifact>` for the revalidate half | the same resulting lifecycle state | **unproved**: `GET /api/v1/quarantine` answers 200 and the revalidate, retry and reinstate routes are registered and declared, all since [#214](https://github.com/spdrman/rclone-manager/pull/214). Proving the revalidate half means driving it in the browser and `validate` on the CLI over one fixture holding a quarantined artifact and comparing the resulting lifecycle state. Retry and reinstate have no CLI counterpart, so those stay UI-only whatever happens to the revalidate row |
 | Catalog rebuild (`/catalog-recovery`) | `catalog rebuild [--dry-run]` | a rebuilt catalog equal through the read surface | **unproved**: `POST /api/v1/catalog/rebuild` and `/catalog/scan` are registered and declared since [#214](https://github.com/spdrman/rclone-manager/pull/214). They answer 403 to `contract-gaps.spec.ts`, and that 403 is `requireCSRF` refusing a probe that sends no token, not a gate: both routes carry `requireCSRF` and, unlike `POST /operations`, not `requireDestructiveGate`. A browser driving the real page carries the token, so the route is reachable in the shape that matters. Proving it means rebuilding through the page and through `catalog rebuild` over one fixture and comparing the catalog through the read surface |
 | Local-auth enrolment | none | | **gap (UI only)**: there is no `backup-manager` command that enrols an administrator. This suite enrols over HTTP as setup, and names it as setup rather than comparing it |
 | Password rotation | none | | **gap (UI only)**: `POST /api/v1/auth/password` has no CLI counterpart |
-| SSH key import, host-key trust, connection test | none | | **gap (UI only)**: `POST /api/v1/ssh-keys`, `/ssh/host-key-probe`, `/backup-sets/test-connection`. The CLI has no key or trust management at all |
+| SSH key import, host-key trust, connection test | `backup-set create --ssh-key-file` and `--trust-host-key`, for the first two | | **gap (UI only), narrowed**: the CLI now imports a key and settles a host key, but only as inputs to a create ([#356](https://github.com/spdrman/rclone-manager/issues/356)), never as standalone verbs. So `POST /api/v1/ssh-keys` and `/ssh/host-key-probe` still have no CLI counterpart a caller can invoke on its own, and `/backup-sets/test-connection` has none at all. Not proved here either: an import mints a fresh uuid by design, so two independent imports of one key are correctly unequal and the create row places the key under one id instead |
 
 ## CLI functions with no UI equivalent
 
@@ -81,14 +90,14 @@ instance). It has no row here yet.
 
 ## What this matrix currently proves, honestly
 
-Still two rows out of twenty. That is the finding, not the scope, and it
+Three rows now, out of twenty-two. That is the finding, not the scope, and it
 is worth being exact about what changed and what did not.
 
 The suite that proves them is real: it boots the shipped engine over a
 materialised fixture, serves the production `vite build` bundle in front of
 it, signs in through the real login form, drives the real page, and
 compares resulting backend state through the same Go oracle Suite A uses.
-Nothing about the harness limits it to two rows.
+Nothing about the harness limits it to three rows.
 
 What limited it used to be two things: four of the six pages could not
 load, and two of the three mutating actions were refused before reaching
@@ -99,17 +108,32 @@ moved from **blocked** to **unproved**. The second is unchanged:
 `NotYetImplementedGate`, so `POST /operations` and retention apply are
 still refused, still pending [#92](https://github.com/spdrman/rclone-manager/issues/92).
 
-So the proved count did not move, and saying otherwise would be the rot
-this document is built to resist. Four rows stopped being blocked by a
-missing route and started being limited by a missing spec, which is real
-progress and a smaller claim than equivalence. Each of those rows names
-the spec that would close it.
+The proved count has moved by one, and only one, which is worth being
+precise about because the row it moved on is the one this document was
+most wrong about. Four rows stopped being blocked by a missing route and
+started being limited by a missing spec, and none of them has become
+proved: that is real progress and a smaller claim than equivalence, and
+each of those rows names the spec that would close it. Backup-set
+creation is the row that actually moved, and it moved because a CLI verb
+appeared and because the reason recorded against it did not survive being
+re-read (below).
 
 What remains blocked, re-derived at this pin rather than carried over:
 the Dashboard and build-provenance rows, because `GET /api/v1/version`
 and `GET /api/v1/health` are still in neither the router nor the contract
 (the client is calling the wrong paths: `/system/version`, and health
-lives outside `/api/v1`); the two destructive-gate rows above; and
-backup-set creation, because `CreateBackupSetRequest` still requires
-`host`, `port`, `user`, `ssh_key_id` and `known_hosts_line`, so it cannot
-express the `remote.type: local` sets every fixture here uses.
+lives outside `/api/v1`); and the two destructive-gate rows above.
+
+Backup-set creation used to be on that list and is not any more, and it
+is worth saying exactly what moved. Two things did. The CLI grew a verb
+([#356](https://github.com/spdrman/rclone-manager/issues/356)), so the
+row's CLI column stopped being "edit `config.yaml`", which was the
+absence of an equivalent written as though it were one. And the reason
+this suite recorded for the block turned out to be answerable rather than
+structural: it said `CreateBackupSetRequest` requires `host`, `user`,
+`ssh_key_id` and `known_hosts_line`, so the row needed a fixture with a
+real SSH endpoint. It does not. Creating a set never opens a connection
+to it, so the SSH-shaped fields can name a host nothing dials, and the
+comparison is about what the two surfaces persist. What genuinely needs
+an endpoint is the wizard's own path, whose Verify-server step probes the
+host, and that is a different row.
