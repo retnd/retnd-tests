@@ -69,7 +69,16 @@ test.describe("add backup set wizard", () => {
     // Used to show a picklist of two hardcoded key names and a fabricated
     // "Already installed on 2 other backup sets" count, with no
     // managed-key store behind either.
-    await expect(page.getByLabel("Managed key")).toHaveCount(0);
+    //
+    // exact: true (rclone-manager#329) — the radio just clicked above is a
+    // <label> wrapping title "Use managed key" and detail "Reuse an
+    // existing Backup Manager key" (Choice's own markup), so its full
+    // accessible label contains "managed key" as a case-insensitive
+    // substring. A non-exact getByLabel("Managed key") matches THAT label,
+    // not the absence of the removed picklist: deterministic every run,
+    // not the intermittent staleness #329 first suspected — the radio it
+    // matches was clicked one line above, every time.
+    await expect(page.getByLabel("Managed key", { exact: true })).toHaveCount(0);
     await expect(page.getByText(/other backup sets/i)).toHaveCount(0);
     await expect(page.getByText(/Reusing a managed key on save isn.t available yet/)).toBeVisible();
   });
@@ -118,10 +127,18 @@ test.describe("add backup set wizard", () => {
     // one global policy, configured once on Settings
     // (RetentionPolicyCard, #140), and #111 specifically warned this
     // per-set shape must not be mistaken for a capability.
-    await expect(page.getByLabel("Daily")).toHaveCount(0);
-    await expect(page.getByLabel("Weekly")).toHaveCount(0);
-    await expect(page.getByLabel("Monthly")).toHaveCount(0);
-    await expect(page.getByLabel("Week starts")).toHaveCount(0);
+    // exact, for the same reason the managed-key assertion above is: these
+    // are absence claims spelled with the shortest words this product's own
+    // vocabulary reuses everywhere. "Week starts" is already a live
+    // substring of RetentionPolicyCard's "Week starts on", so the moment
+    // anything renders that field into the same DOM these go red without a
+    // regression. Exact still catches what they exist to catch: the removed
+    // fields' labels were these strings whole, which is why the upstream
+    // unit test asserts their absence with getByLabelText, exact by default.
+    await expect(page.getByLabel("Daily", { exact: true })).toHaveCount(0);
+    await expect(page.getByLabel("Weekly", { exact: true })).toHaveCount(0);
+    await expect(page.getByLabel("Monthly", { exact: true })).toHaveCount(0);
+    await expect(page.getByLabel("Week starts", { exact: true })).toHaveCount(0);
     await expect(page.getByRole("checkbox", { name: /Protect newest known-good/ })).toHaveCount(0);
   });
 
@@ -138,7 +155,10 @@ test.describe("add backup set wizard", () => {
     // choice that fails every artifact on the recommended, chrooted
     // no-shell SFTP account shape (proven by TestSFTPHashCapability).
     await expect(page.getByRole("checkbox", { name: /Checksum verification/ })).toHaveCount(0);
-    await expect(page.getByText("SHA-256")).toHaveCount(0);
+    // exact: the string lived in Toggle's own note <span>, whose whole text
+    // was "SHA-256", so equality still catches it coming back. Substring
+    // would additionally match any longer hash copy this page grows later.
+    await expect(page.getByText("SHA-256", { exact: true })).toHaveCount(0);
 
     // The third layer stopped being a checkbox in #164, which replaced the
     // decorative "Application validation" toggle with a real picklist over
@@ -187,11 +207,15 @@ test.describe("add backup set wizard", () => {
     // one global policy now (Settings), not something this wizard's
     // Review step reports per set. "SHA-256" is gone from the Validation
     // card for the same reason as the Checksum verification toggle.
+    // All exact, matching "Retention" which already was: Summary renders
+    // each line in its own <div> whose whole text is the line, so equality
+    // catches every one of these coming back while substring would also
+    // match longer copy that merely mentions them.
     await expect(page.getByText("Retention", { exact: true })).toHaveCount(0);
-    await expect(page.getByText("7 daily")).toHaveCount(0);
-    await expect(page.getByText("13 weekly")).toHaveCount(0);
-    await expect(page.getByText("12 monthly")).toHaveCount(0);
-    await expect(page.getByText("SHA-256")).toHaveCount(0);
+    await expect(page.getByText("7 daily", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("13 weekly", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("12 monthly", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("SHA-256", { exact: true })).toHaveCount(0);
   });
 
   test("step 6 discloses remote-source handling in full", async ({ page }) => {

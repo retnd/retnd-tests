@@ -25,14 +25,22 @@ test.describe("local authentication", () => {
 
     const username = page.getByLabel("Username");
     await expect(username).toHaveAttribute("required", "");
-    await expect(page.getByLabel("Password")).toHaveAttribute("type", "password");
+    // exact, matching the enrolment test below: the sign-in form's own
+    // password label is exactly "Password" (LoginPage's HelpField puts
+    // nothing else inside that <label>), and spelling it as a substring is
+    // what lets a "Confirm password" landing here later resolve two
+    // elements and fail on strict mode rather than on the product.
+    await expect(page.getByLabel("Password", { exact: true })).toHaveAttribute("type", "password");
   });
 
   test("uses correct autocomplete hints for password managers", async ({ page, bm }) => {
     await bm.goto("/");
     await bm.signOut();
     await expect(page.getByLabel("Username")).toHaveAttribute("autocomplete", "username");
-    await expect(page.getByLabel("Password")).toHaveAttribute("autocomplete", "current-password");
+    await expect(page.getByLabel("Password", { exact: true })).toHaveAttribute(
+      "autocomplete",
+      "current-password"
+    );
   });
 
   test("first-run enrolment explains account scope", async ({ page, bm }) => {
