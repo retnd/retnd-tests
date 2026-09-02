@@ -14,33 +14,67 @@ import { expect, signIn, test } from "../harness/fixtures";
 // forces MATRIX.md to be updated rather than quietly outgrown.
 //
 // What these cases pin is a finding, not a design. The authoritative
-// /api/v1 contract (api/v1/openapi.json, issue #166) defines 19 paths.
-// ui/shared/src/api/client.ts calls thirteen more that are in neither the
-// contract nor the engine's router, so against a real backend the
-// Dashboard, Backups, Activity and Quarantine pages cannot load at all.
-// The contract-drift gate does not catch it because it compares the
-// GENERATED bindings, and client.ts is hand-written on top of them.
-// findings/DISC-007.md has the write-up.
+// /api/v1 contract (api/v1/openapi.json, issue #166) is what
+// ui/shared/src/api/client.ts is checked against here, because the
+// contract-drift gate cannot do it: that gate compares the GENERATED
+// bindings, and client.ts is hand-written on top of them, so its paths
+// are string literals nothing else reads. findings/DISC-007.md has the
+// write-up.
+//
+// Most of what this file was filed for is now closed. DISC-007 recorded
+// fourteen pairs the client called that neither the contract nor the
+// router had, which left the Dashboard, Backups, Activity and Quarantine
+// pages unable to load against a real backend. rclone-manager#214
+// (aba87b7) added them, and this repository saw it when the pin moved
+// from 612b48c to 6a93b96. Two pairs remain absent, and they are the
+// ones where the client is simply calling the wrong path: GET /version
+// and GET /health, which the contract spells /system/version and serves
+// outside /api/v1 respectively.
 
 /** Paths ui/shared/src/api/client.ts requests, and whether the engine
  *  actually serves them. Derived by reading both sides, then confirmed
- *  against a running engine by the cases below. */
-const UI_CALLS: { path: string; method: "GET" | "POST"; served: boolean; note: string }[] = [
-  { path: "/system/version", method: "GET", served: true, note: "the engine's version route" },
-  { path: "/system/capabilities", method: "GET", served: true, note: "platform capabilities" },
-  { path: "/backup-sets", method: "GET", served: true, note: "the one list the UI gets right" },
-  { path: "/settings", method: "GET", served: true, note: "read half of the settings row" },
-  { path: "/validators", method: "GET", served: true, note: "wizard picklist" },
-  { path: "/auth/session", method: "GET", served: true, note: "session probe" },
+ *  against a running engine by the cases below.
+ *
+ *  `status` is asserted exactly, not just through `served`, because 403
+ *  and 200 are different claims and collapsing them is how this table
+ *  would start hiding the thing it exists to show. A route that answers
+ *  403 because this probe sends no CSRF token is served; one that answers
+ *  403 because the destructive gate is closed is served and refused; one
+ *  that answers 404 is absent. Only the last is a gap. Pinning the number
+ *  means a catalog route quietly losing its CSRF requirement, or a
+ *  readable route regressing behind a gate, both fail here. */
+const UI_CALLS: {
+  path: string;
+  method: "GET" | "POST";
+  served: boolean;
+  status: number;
+  note: string;
+}[] = [
+  { path: "/system/version", method: "GET", served: true, status: 200, note: "the engine's version route" },
+  { path: "/system/capabilities", method: "GET", served: true, status: 200, note: "platform capabilities" },
+  { path: "/backup-sets", method: "GET", served: true, status: 200, note: "the one list the UI gets right" },
+  { path: "/settings", method: "GET", served: true, status: 200, note: "read half of the settings row" },
+  { path: "/validators", method: "GET", served: true, status: 200, note: "wizard picklist" },
+  { path: "/auth/session", method: "GET", served: true, status: 200, note: "session probe" },
 
-  { path: "/version", method: "GET", served: false, note: "the contract calls it /system/version" },
-  { path: "/health", method: "GET", served: false, note: "the engine serves /health/live outside /api/v1" },
-  { path: "/backups", method: "GET", served: false, note: "no route at all: the Backups page cannot load" },
-  { path: "/activity", method: "GET", served: false, note: "no route at all: the Activity page cannot load" },
-  { path: "/quarantine", method: "GET", served: false, note: "no route at all: the Quarantine page cannot load" },
-  { path: "/operations", method: "GET", served: false, note: "POST /operations exists, GET does not" },
-  { path: "/catalog/scan", method: "POST", served: false, note: "no route: catalog recovery cannot be driven" },
-  { path: "/catalog/rebuild", method: "POST", served: false, note: "no route: `catalog rebuild` has no UI equivalent" }
+  // Closed by rclone-manager#214 (aba87b7), which landed inside this
+  // repository's 612b48c -> 6a93b96 pin move: every one of these is now
+  // registered in apps/common/webhost/router.go AND declared in
+  // api/v1/openapi.json. MATRIX.md's rows moved with them.
+  { path: "/backups", method: "GET", served: true, status: 200, note: "closed by #214: the Backups page can load" },
+  { path: "/activity", method: "GET", served: true, status: 200, note: "closed by #214: the Activity page can load" },
+  { path: "/quarantine", method: "GET", served: true, status: 200, note: "closed by #214: the Quarantine page can load" },
+  { path: "/operations", method: "GET", served: true, status: 200, note: "closed by #214: GET is declared now, not POST only" },
+  // Served, and refused for a reason that is not absence: both carry
+  // requireCSRF and NOT requireDestructiveGate (router.go, and
+  // handlers_artifacts.go's own comment says so), so the 403 is this
+  // probe sending no CSRF token rather than anything about the product.
+  // A browser driving them through the real UI carries the token.
+  { path: "/catalog/scan", method: "POST", served: true, status: 403, note: "closed by #214; 403 here is CSRF, not a gate" },
+  { path: "/catalog/rebuild", method: "POST", served: true, status: 403, note: "closed by #214; 403 here is CSRF, not a gate" },
+
+  { path: "/version", method: "GET", served: false, status: 404, note: "the contract calls it /system/version" },
+  { path: "/health", method: "GET", served: false, status: 404, note: "the engine serves /health/live outside /api/v1" }
 ];
 
 /** The (method, path) pairs api/v1/openapi.json declares. Method matters:
@@ -74,6 +108,15 @@ test.describe("the matrix's gap rows", () => {
             (call.served ? "served" : "absent") +
             ` (${call.note})`
         );
+      } else if (res.status() !== call.status) {
+        // Same verdict on present-or-absent, different answer. Worth
+        // failing on its own: a route going 403 -> 200 means a gate or a
+        // CSRF requirement came off, and 200 -> 403 means one went on,
+        // and MATRIX.md states which of those each row is.
+        surprises.push(
+          `${call.method} ${call.path} returned ${res.status()}, and this matrix records ${call.status} ` +
+            `(${call.note})`
+        );
       }
     }
     expect(
@@ -102,11 +145,16 @@ test.describe("the matrix's gap rows", () => {
     // The control: an operation this matrix records as served must be in
     // the contract, or the checks above are reading an unrelated file.
     expect(declared.has("GET /system/version")).toBe(true);
-    // And the pair really is the unit: /operations is declared for POST
-    // while the UI client calls GET on it, so a path-only comparison would
-    // have called that agreement.
+    // And the pair really is the unit rather than the path. /operations
+    // used to make this point, declared for POST while the UI client
+    // called GET on it, but rclone-manager#214 declared the GET too and
+    // the example stopped being asymmetric. /backup-sets/test-connection
+    // still is: POST is declared, GET is not, so a path-only comparison
+    // would report agreement about a method nobody serves.
     expect(declared.has("POST /operations")).toBe(true);
-    expect(declared.has("GET /operations")).toBe(false);
+    expect(declared.has("GET /operations")).toBe(true);
+    expect(declared.has("POST /backup-sets/test-connection")).toBe(true);
+    expect(declared.has("GET /backup-sets/test-connection")).toBe(false);
   });
 
   test("the destructive gate, not a missing route, is what blocks the mutation rows", async ({ page, pair }) => {
