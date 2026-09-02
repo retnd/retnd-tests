@@ -33,7 +33,13 @@ proved today, the row says why and names the issue.
    goes over HTTP; the credential is generated per run, held in memory, and
    never written to disk or passed through argv.
 4. Perform the action through the browser on the first directory, and
-   through `backup-manager` on the second.
+   through `backup-manager` on the second. One row drives the API directly
+   instead of the browser, and says so in the spec: the wizard's own path
+   to creating a backup set goes through a live host-key probe, which
+   opens a real SSH connection to a machine no fixture here has. Driving
+   `POST /backup-sets`, which is what the wizard calls, is the honest
+   comparison this fixture can make; the wizard's own steps are a
+   different row and are still blocked.
 5. Compare the two with `tools/equivstate`.
 
 ## The comparison, and what it forgives
@@ -57,11 +63,25 @@ because two independent runs write different ingest timestamps into it.
 What it forgives is an argument, never a default:
 
 - `--ignore-file SUFFIX` drops a file from the filesystem half, and the
-  spec that passes it says in a comment why. Two suffixes are used today:
-  `config.yaml`, written by the engine's YAML writer on one side and by
-  hand on the other, textually different and semantically the same; and
-  `local-auth.json`, which only the UI side has, because a browser has to
-  sign in and the CLI has no way to enrol an administrator.
+  spec that passes it says in a comment why. Three suffixes are used
+  today: `config.yaml`, whose two copies differ in ways that are not a
+  divergence; `local-auth.json`, which only the UI side has, because a
+  browser has to sign in and the CLI has no way to enrol an
+  administrator; and `local-auth.json.lock` beside it, a
+  process-lifetime advisory flock whose presence says which side still
+  had a server up rather than what either side wrote.
+
+  `config.yaml` is worth one more sentence, because the two rows that
+  ignore it do so for different reasons and one of them compares it
+  anyway. In the settings row it is written by the engine's YAML writer
+  on one side and by hand on the other, so the two are textually
+  different and semantically the same, and the read surface is what
+  settles whether they agree. In the create row both surfaces reach the
+  same `core/service` method, so the two files come out of the same
+  writer and the only thing that differs is the work directory inside
+  their absolute paths: that spec compares them directly, path-normalised,
+  and passes the suffix only so the byte-digest half does not report the
+  paths as a difference.
 - `--mask-volatile` masks the four values that belong to the machine and
   the moment rather than to the backend: absolute timestamps, durations,
   relative times, and the host filesystem's free-space reading. It applies
@@ -78,10 +98,11 @@ a differ, and this one has been seen to fail on each dimension separately.
 
 ## What it proves today
 
-Two rows. `MATRIX.md` says which, and says plainly that the number is a
-finding rather than a scope decision: against a real backend, four of the
-six pages cannot load, because `ui/shared/src/api/client.ts` calls fourteen
-`/api/v1` operations neither the contract nor the engine has
+Three rows: the backup-set list read, the retention-policy write, and
+creating a backup set. `MATRIX.md` says which, and says plainly that the
+number is a finding rather than a scope decision: against a real backend,
+four of the six pages cannot load, because `ui/shared/src/api/client.ts`
+calls fourteen `/api/v1` operations neither the contract nor the engine has
 ([#211](https://github.com/spdrman/rclone-manager/issues/211),
 `findings/DISC-007.md`), and the two mutating actions that would matter
 most are refused by a destructive gate that is hardcoded shut pending
