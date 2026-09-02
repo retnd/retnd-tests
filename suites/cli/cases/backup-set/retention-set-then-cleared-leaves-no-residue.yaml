@@ -1,0 +1,37 @@
+doc: >
+  spdrman/rclone-manager#333's third Given/When/Then: a set whose
+  retention block is removed is retained under the deployment's chain
+  again, "with no residue of the chain it used to declare".
+
+  The sequence is the case. Setting a narrow chain of its own and then
+  clearing it has to leave the set indistinguishable from one that never
+  overrode, not merely resolved to the same numbers: a retention key left
+  behind as an empty block resolves to the same chain today and is refused
+  outright by the next config load, which is a daemon that will not start
+  after an ordinary operator action.
+
+  So the assertion is the full inherited answer, identical to
+  backup-set/retention-shows-the-inherited-policy's, produced by a work
+  directory that has been through both writes. The chain in between is
+  deliberately not the deployment's, so a build where --inherit did
+  nothing at all would print keep=3 here and fail on the first tier line.
+scenario: seeded-local
+setup:
+  - [backup-set, retention, --config, "${CONFIG}", "production/postgres-primary", --daily-days, "3", --weekly-months, "1", --monthly-months, "2"]
+  - [backup-set, retention, --config, "${CONFIG}", "production/postgres-primary", --inherit]
+argv: [backup-set, retention, --config, "${CONFIG}", "production/postgres-primary"]
+exit: 0
+stdout:
+  - line: "backup set: production/postgres-primary"
+  - line: "${SP}retained under: the deployment's policy (inherited)"
+  - line: "${SP}- name=daily granularity=day keep=7"
+  - line: "${SP}- name=weekly granularity=week keep=3 window_unit=month"
+  - line: "${SP}- name=monthly granularity=month keep=12"
+  - count: 9
+stderr: empty
+# The two setup commands did the writing; the asserted command is the read
+# that follows them, and it must touch nothing.
+state: unchanged
+contract:
+  - "README.md One backup set on its own retention policy (to go back to inheriting, remove the key)"
+tags: [smoke]

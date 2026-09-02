@@ -1,0 +1,39 @@
+doc: >
+  spdrman/rclone-manager#333. A backup set with no retention block of its
+  own is retained under the deployment's policy, and this command says so
+  in as many words rather than leaving absence to stand in for it.
+
+  That is worth pinning as its own case because the sibling surface does
+  the opposite: `retention --dry-run` prints a marker for a set that
+  decides for itself and nothing at all for one that inherits, so an
+  operator reading only that output has to already know the convention.
+  This command is the one that answers the question directly, and the
+  answer has to be present on both branches.
+
+  The chain is asserted as well as the attribution. "Inherited" beside
+  the wrong chain would still be wrong, and the fixture's own policy is
+  FR-18's documented 7/3/12 default resolved from a config file that
+  spells neither the tiers list nor the three scalars, which is the case
+  where a build that had lost the resolution step prints nothing at all.
+scenario: seeded-local
+argv: [backup-set, retention, --config, "${CONFIG}", "production/postgres-primary"]
+exit: 0
+stdout:
+  - line: "backup set: production/postgres-primary"
+  - line: "${SP}retained under: the deployment's policy (inherited)"
+  - line: "${SP}timezone: UTC"
+  - line: "${SP}week_starts_on: monday"
+  - line: "${SP}protect_last_known_good: true"
+  - line: "${SP}tiers:"
+  - line: "${SP}- name=daily granularity=day keep=7"
+  - line: "${SP}- name=weekly granularity=week keep=3 window_unit=month"
+  - line: "${SP}- name=monthly granularity=month keep=12"
+  # One header, one attribution line, three calendar lines, the tiers
+  # heading and three tiers.
+  - count: 9
+stderr: empty
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-18 (default chain: daily over 7 days, weekly over 3 calendar months, monthly over 12 calendar months)"
+  - "README.md One backup set on its own retention policy (a set inherits when it has no retention key at all)"
+tags: [smoke]

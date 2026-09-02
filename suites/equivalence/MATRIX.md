@@ -81,14 +81,22 @@ instance). It has no row here yet.
 
 ## What this matrix currently proves, honestly
 
-Still two rows out of twenty. That is the finding, not the scope, and it
+Three rows out of twenty-one. That is the finding, not the scope, and it
 is worth being exact about what changed and what did not.
+
+The third is per-set retention, added with
+[#333](https://github.com/spdrman/rclone-manager/issues/333). It is worth
+saying why that row could be proved when so many cannot: nothing about it
+needs an SSH endpoint, a destructive gate or a route that does not exist.
+It is a configuration write with a read-surface effect, which is exactly
+the shape the settings row already had, and #333 was written so the CLI
+and the API would reach it through one method rather than two.
 
 The suite that proves them is real: it boots the shipped engine over a
 materialised fixture, serves the production `vite build` bundle in front of
 it, signs in through the real login form, drives the real page, and
 compares resulting backend state through the same Go oracle Suite A uses.
-Nothing about the harness limits it to two rows.
+Nothing about the harness limits it to three rows.
 
 What limited it used to be two things: four of the six pages could not
 load, and two of the three mutating actions were refused before reaching

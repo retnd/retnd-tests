@@ -6,7 +6,10 @@ the matrix showing it and a gap cannot be hidden by leaving a row out.
 
 The command list was re-derived from `core/cmd/backup-manager/main.go` at
 the pinned commit rather than trusted from a snapshot. It registers
-twelve commands.
+fifteen commands. Three of them (`quarantine`, `settings` and
+`backup-set`) have no cases at all beyond the ones listed below for
+`backup-set retention`, which is a gap rather than a claim: this matrix
+covers the commands it covers.
 
 **Cases pin one claim each.** `artifacts/happy` checks that the listing
 lists, with lifecycle states drawn from FR-10's documented vocabulary; the
@@ -78,6 +81,7 @@ place that catches it per command is a case per command.
 | `reconcile` | `reconcile/clean`: exit 0, FR-23 startup, no unresolved findings | `reconcile/f1-config-missing` |
 | `validate` | `validate/happy`: exit 0, checked and passed; `validate/operand-after-flags` and `validate/double-dash-ends-flags` cover the other two orders the banner permits | `validate/corrupted-local-copy` (exit 1 and FR-10 QUARANTINED), `validate/wrong-argument-count` (exit 2), `validate/malformed-artifact-id`, `validate/unresolvable-artifact`, `validate/unknown-flag-after-operand` (exit 2), `validate/f1-config-missing` |
 | `catalog rebuild` | `catalog/rebuild-after-database-loss`, `catalog/rebuild-dry-run-writes-nothing` | `catalog/no-subcommand` (exit 2), `catalog/unknown-subcommand` (exit 2), `catalog/f1-config-missing` |
+| `backup-set retention` | `backup-set/retention-shows-the-inherited-policy` ([#333](https://github.com/spdrman/rclone-manager/issues/333)): a set with no policy of its own says so in as many words, and names the resolved chain it inherits, which is the answer `retention --dry-run` leaves to the absence of a marker; `backup-set/retention-set-then-cleared-leaves-no-residue`: the issue's own third Given/When/Then, driven as a sequence, so a set that overrode and then cleared is indistinguishable from one that never did | `backup-set/retention-refuses-half-a-chain`: naming two of the three scalars is refused with `config.Validate`'s own sentence and leaves the work directory untouched, because a merge would have resolved the third to a product default rather than to the deployment's policy |
 | `version` | `version/happy`: all four fields, shapes asserted, and this case doubles as the identity handshake | `version/no-config-flag` (exit 2 from the flag package), `version/rejects-an-operand` (exit 2 through usageError) |
 
 ## Multi-command sequences

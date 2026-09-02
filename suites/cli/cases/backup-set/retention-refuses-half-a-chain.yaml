@@ -1,0 +1,39 @@
+doc: >
+  spdrman/rclone-manager#333's central refusal, at the CLI.
+
+  A set-level policy replaces the deployment's WHOLE chain, so naming two
+  of the three scalars cannot be resolved honestly: the third would fall
+  back to the product default rather than to the deployment's policy,
+  which is how a set silently ends up retaining less than the operator who
+  wrote that policy believes. Under this fixture's own 7/3/12 the
+  arithmetic happens to agree, which is exactly why the refusal is
+  asserted on the MESSAGE rather than on the resulting chain: a build that
+  merged instead of refusing would look correct here and be wrong on every
+  deployment that had configured anything.
+
+  The message is config.Validate's own, word for word, and that is the
+  point of this case rather than a detail of it. A second wording living
+  in the CLI is the first step towards a second rule, and this is the rule
+  that decides whether restore points survive.
+
+  The work directory is asserted UNCHANGED, which is the other half: a
+  refusal that had already written the half-policy before validating it
+  would print this same message and leave a config file the daemon will
+  not start on.
+scenario: seeded-local
+argv: [backup-set, retention, --config, "${CONFIG}", "production/postgres-primary", --daily-days, "120"]
+exit: 1
+stdout:
+  # The FR-23 startup lines a write path emits before it does anything,
+  # exactly as `validate` and `fetch` do. The refusal itself is on stderr
+  # below; nothing else may reach stdout, because a refused write that
+  # printed a policy would read like one that had happened.
+  - ndjson: {event: startup}
+  - ndjson: {event: rclone_version}
+  - count: 2
+stderr:
+  - line: "backup-manager: service: invalid request: invalid config: sources[0].backup_sets[0].retention: a backup set's own policy replaces the deployment's whole chain, so it has to name a whole one: either a tiers list, or all three of daily_days, weekly_months and monthly_months (missing weekly_months, monthly_months). An unnamed tier here would fall back to the product default rather than to the deployment's policy, which is how a set ends up retaining less than the operator who wrote the deployment's policy believes. Remove the retention key from this backup set entirely to inherit the deployment's policy instead"
+state: unchanged
+contract:
+  - "README.md One backup set on its own retention policy (a set-level block replaces the deployment's whole chain; writing two of the three scalars is refused, not merged)"
+tags: [smoke]
