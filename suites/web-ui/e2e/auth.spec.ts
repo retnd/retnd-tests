@@ -72,17 +72,29 @@ test.describe("local authentication", () => {
     // too-short value is typed. A leading-anchored prefix still can't
     // collide with "Confirm password", which starts with "Confirm".
     const password = page.getByLabel(/^Password/);
+    // Same treatment, and for a sharper version of the same reason. The
+    // "Passwords do not match." warning renders inside THIS field's own
+    // <label> too, so the moment a mismatching value is typed the accessible
+    // name grows from "Confirm password" to
+    // "Confirm passwordPasswords do not match.". An { exact: true } locator
+    // would resolve to zero elements from that point on, which is the second
+    // fill below: it would fail, not silently pass, but it would fail for a
+    // reason that has nothing to do with what the test is checking. A
+    // leading-anchored prefix survives the name growing and still cannot
+    // collide with a "Show confirm password" toggle button, which starts
+    // with "Show" (rclone-manager#344).
+    const confirm = page.getByLabel(/^Confirm password/);
     await page.getByLabel("Username").fill("bm-admin");
     await password.fill("short");
     await expect(page.getByText(/Minimum 12 characters/).first()).toBeVisible();
     await expect(submit).toBeDisabled();
 
     await password.fill("a-long-enough-passphrase");
-    await page.getByLabel("Confirm password").fill("different-passphrase");
+    await confirm.fill("different-passphrase");
     await expect(page.getByText("Passwords do not match")).toBeVisible();
     await expect(submit).toBeDisabled();
 
-    await page.getByLabel("Confirm password").fill("a-long-enough-passphrase");
+    await confirm.fill("a-long-enough-passphrase");
     await expect(page.getByText("Passwords do not match")).toHaveCount(0);
     await expect(submit).toBeEnabled();
   });

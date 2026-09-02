@@ -21,7 +21,12 @@ export interface Pair {
 export async function signIn(page: Page, stack: Stack): Promise<void> {
   await page.goto(stack.uiUrl + "/");
   await page.getByLabel("Username").fill(stack.username);
-  await page.getByLabel("Password").fill(stack.password);
+  // Exact, because the login form's password field is about to gain a
+  // "Show password" toggle button beside it (rclone-manager#344) and an
+  // unanchored substring match would resolve to both. The login page has no
+  // validation text growing into this field's label the way enrolment's
+  // does, so exact is safe here where a prefix regex is needed there.
+  await page.getByLabel("Password", { exact: true }).fill(stack.password);
 
   // Wait on the login response, not on the form disappearing. The form is
   // gone the moment React re-renders, which is before the Set-Cookie has
