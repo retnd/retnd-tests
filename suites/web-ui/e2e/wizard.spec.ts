@@ -69,7 +69,16 @@ test.describe("add backup set wizard", () => {
     // Used to show a picklist of two hardcoded key names and a fabricated
     // "Already installed on 2 other backup sets" count, with no
     // managed-key store behind either.
-    await expect(page.getByLabel("Managed key")).toHaveCount(0);
+    //
+    // exact: true (rclone-manager#329) — the radio just clicked above is a
+    // <label> wrapping title "Use managed key" and detail "Reuse an
+    // existing Backup Manager key" (Choice's own markup), so its full
+    // accessible label contains "managed key" as a case-insensitive
+    // substring. A non-exact getByLabel("Managed key") matches THAT label,
+    // not the absence of the removed picklist: deterministic every run,
+    // not the intermittent staleness #329 first suspected — the radio it
+    // matches was clicked one line above, every time.
+    await expect(page.getByLabel("Managed key", { exact: true })).toHaveCount(0);
     await expect(page.getByText(/other backup sets/i)).toHaveCount(0);
     await expect(page.getByText(/Reusing a managed key on save isn.t available yet/)).toBeVisible();
   });
