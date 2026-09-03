@@ -210,6 +210,26 @@ func maskVolatile(s string) string {
 	return s
 }
 
+// maskRoot rewrites one run's own working directory out of a piece of text.
+//
+// The sidecar manifests record an artifact's location as an ABSOLUTE path,
+// and the two sides of a comparison run in two different temporary
+// directories, so every manifest differs in the one field that is a
+// property of where the run happened rather than of what it did. Worse, the
+// two directory names are not the same length, so the difference shows up
+// as a size difference too and reads like a content change.
+//
+// Only the root is replaced, never the tail. A manifest that genuinely
+// records a different path UNDER the root still differs after masking,
+// which is the whole point: this forgives where the run happened and
+// nothing about what it wrote.
+func maskRoot(s, root string) string {
+	if root == "" {
+		return s
+	}
+	return strings.ReplaceAll(s, root, "${ROOT}")
+}
+
 // forgiveVolatileFiles drops the entries of a changed-file list whose two
 // sides are byte-different but identical once volatile values are masked,
 // and returns what it dropped so the caller can report it.
@@ -227,7 +247,7 @@ func forgiveVolatileFiles(changed []string, aRoot, bRoot string) (kept, masked [
 		}
 		aText, aOK := readText(filepath.Join(aRoot, path))
 		bText, bOK := readText(filepath.Join(bRoot, path))
-		if aOK && bOK && maskVolatile(aText) == maskVolatile(bText) {
+		if aOK && bOK && maskRoot(maskVolatile(aText), aRoot) == maskRoot(maskVolatile(bText), bRoot) {
 			masked = append(masked, path)
 			continue
 		}

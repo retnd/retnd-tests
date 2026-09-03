@@ -1,8 +1,8 @@
 {
   "mode": "source",
-  "commit": "6a93b968bff52fc78cbaacaa7250a4d73d12499d",
-  "version": "6a93b96",
+  "commit": "2b93c4a1ed402633d4e045a5f09e062b227bcac1",
+  "version": "2b93c4a",
   "source_builder": "go",
   "image": "",
-  "notes": "mode: source | registry | local. See docs/pinning.md. registry mode stays unusable until something is actually pushed to ghcr.io/spdrman/backup-manager, so source is the only honest default today."
+  "notes": "mode: source | registry | local. See docs/pinning.md. registry mode stays unusable until something is actually pushed to ghcr.io/spdrman/backup-manager, so source is the only honest default today. Moved from 6a93b96 to 2b93c4a because the old pin predated the whole backup-set command: MATRIX.md records the create row as proved by specs/backup-set-create.spec.ts, and that spec cannot run against a build whose answer to `backup-set create` is `unknown command`. A matrix row is only as true as the build the suite resolves, so the pin has to move with the row."
 }
