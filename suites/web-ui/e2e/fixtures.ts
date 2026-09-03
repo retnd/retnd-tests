@@ -6,7 +6,14 @@ export type Scenario =
   | "empty"
   | "storage-critical"
   | "catalog-recovery"
-  | "version-mismatch";
+  | "version-mismatch"
+  // A FULLY populated deployment that never heard of storage mediums: no
+  // medium declared, no tier naming one, and one local copy per backup,
+  // which is the shape migration 0007's backfill leaves every pre-EPIC-E
+  // installation in. It is not a variant of "empty": what it exists to
+  // show is that a busy instance which never adopted the feature has no
+  // trace of it on any page (rclone-manager FR-35).
+  | "no-medium";
 
 export const PROVIDERS = [
   "generic",
