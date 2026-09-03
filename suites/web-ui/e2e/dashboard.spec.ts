@@ -177,3 +177,59 @@ test.describe("dashboard", () => {
     await expect(page.getByText(/Storage critical/)).toBeVisible();
   });
 });
+
+/**
+ * rclone-manager#240: what the last finished run cycle actually got done.
+ *
+ * rclone-manager#361 was a cycle that backed nothing up and told its cron
+ * job it had succeeded. #368 recorded the two counts that tell a barren
+ * cycle from a good one, and nothing rendered them, so the same
+ * indistinguishability survived on this page: a cycle completes when it
+ * ran to the end, and an artifact's own quarantine is a business outcome
+ * rather than an operation failure, so "completed" is the same word for
+ * both outcomes.
+ */
+test.describe("the last run cycle", () => {
+  test("says how many backups it walked and how many got through", async ({ bm, page }) => {
+    await bm.goto("/");
+
+    const panel = page.getByRole("region", { name: "Last run cycle" });
+    await expect(panel).toBeVisible();
+    // The two counts, each labelled. `exact` because "got through" is
+    // also inside the badge below, and a loose matcher would resolve to
+    // both and prove neither.
+    await expect(panel.getByText("walked", { exact: true })).toBeVisible();
+    await expect(panel.getByText("got through", { exact: true })).toBeVisible();
+    await expect(panel.getByText("12", { exact: true })).toBeVisible();
+    await expect(panel.getByText("0", { exact: true })).toBeVisible();
+    // The dev fixture's most recent finished cycle walked twelve backups
+    // and got none of them through, which is the reading this panel
+    // exists for.
+    await expect(panel.getByText("Nothing got through")).toBeVisible();
+    await expect(panel.getByText(/none of them ended it with their bytes on durable storage/i)).toBeVisible();
+  });
+
+  test("puts no percentage or rate on it", async ({ bm, page }) => {
+    await bm.goto("/");
+
+    // A cycle discovers what it will find as it goes, so there is no
+    // honest denominator for the whole until it ends. rclone-manager#211
+    // removed nine invented figures from this UI; a success rate here
+    // would be the tenth.
+    const words = await page.getByRole("region", { name: "Last run cycle" }).innerText();
+    expect(words).not.toMatch(/\d+\s*%/);
+    expect(words).not.toMatch(/per\s+(second|minute|hour)/i);
+  });
+
+  test("shows nothing at all on an installation that has run no cycle", async ({ bm, page }) => {
+    await bm.goto("/", "empty");
+
+    // Absent, not a pair of zeroes. "Nothing got through" is the loudest
+    // thing this panel can say, and saying it about an instance that has
+    // never run would raise an alarm about a deployment that is fine.
+    await expect(page.getByRole("region", { name: "Last run cycle" })).toHaveCount(0);
+    // The positive control: the page rendered, so the absence above is
+    // the absence of the panel rather than of the dashboard.
+    await expect(page.getByText("No backup sets yet")).toBeVisible();
+  });
+});

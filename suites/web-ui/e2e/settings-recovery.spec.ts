@@ -261,3 +261,96 @@ test.describe("retention policy", () => {
     await expect(page.getByLabel(/Protect the newest known-good backup/)).toBeDisabled();
   });
 });
+
+/**
+ * rclone-manager#240 (EPIC E, FR-27): the consent in front of the first
+ * save that sends a retention tier's backups off local disk.
+ *
+ * What is being consented to is the deletion of the copy on the operator's
+ * own machine, after a verified upload. The product refuses that write
+ * server-side without an acknowledgment; the form's job is to put the
+ * words in front of a human first, and these are about the words.
+ */
+test.describe("mapping a retention tier to a storage medium", () => {
+  const tier = (page: import("@playwright/test").Page, n: number) =>
+    page.getByRole("group", { name: "Tier " + n });
+
+  test.beforeEach(async ({ bm, page }) => {
+    await bm.goto("/settings");
+    await expect(tier(page, 1)).toBeVisible();
+  });
+
+  test("names each medium's storage class, and which one needs a restore", async ({ page }) => {
+    const picker = tier(page, 1).getByLabel("Storage medium for tier 1");
+    await expect(picker).toBeVisible();
+
+    const options: string[] = await picker.locator("option").allTextContents();
+    expect(options).toContain("Local backup root");
+    expect(options.some((o: string) => /offsite_s3 \(STANDARD_IA\)/.test(o))).toBe(true);
+    // The archive medium is labelled as one BEFORE it is chosen. An
+    // operator who picks it blind finds out hours later, holding a
+    // restore request they did not know they needed.
+    expect(options.some((o: string) => /offsite_cold \(DEEP_ARCHIVE, needs a restore to read\)/.test(o))).toBe(true);
+  });
+
+  test("shows the deletion consequence, and keeps Save disabled until it is acknowledged", async ({ page }) => {
+    const save = page.getByRole("button", { name: "Save retention policy" });
+    await expect(save).toBeDisabled();
+
+    await tier(page, 1).getByLabel("Storage medium for tier 1").selectOption("offsite_s3");
+
+    const panel = page.getByRole("group", { name: "Storage medium disclosure" });
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText(/I delete the copy on this machine/i);
+    await expect(panel).toContainText(/billed by your provider/i);
+    // No figure comes with it: this product holds no price list, so a
+    // number here could only be one it invented (rclone-manager#211).
+    const words = await panel.innerText();
+    expect(words).not.toMatch(/\$\s?\d/);
+    expect(words).not.toMatch(/per\s+(GB|TB|gigabyte)/i);
+
+    // The chain is edited and valid, and Save is still refused. The only
+    // thing missing is that somebody has read the paragraph.
+    await expect(save).toBeDisabled();
+
+    await panel.getByRole("checkbox").check();
+    await expect(save).toBeEnabled();
+    await save.click();
+    await expect(page.getByText(/Retention policy saved/)).toBeVisible();
+  });
+
+  test("says an archive class cannot be read at all, on top of the deletion", async ({ page }) => {
+    await tier(page, 1).getByLabel("Storage medium for tier 1").selectOption("offsite_cold");
+
+    const panel = page.getByRole("group", { name: "Storage medium disclosure" });
+    await expect(panel).toContainText(/cannot be read on demand at all/i);
+    // And no wait is estimated. The provider reports none.
+    expect(await panel.innerText()).not.toMatch(/\b\d+\s*(hours|minutes)\b/);
+  });
+
+  test("forgets an acknowledgment given for a different destination", async ({ page }) => {
+    const picker = tier(page, 1).getByLabel("Storage medium for tier 1");
+    const save = page.getByRole("button", { name: "Save retention policy" });
+
+    await picker.selectOption("offsite_s3");
+    await page.getByRole("group", { name: "Storage medium disclosure" }).getByRole("checkbox").check();
+    await expect(save).toBeEnabled();
+
+    // Somewhere materially different: an archive class nothing can read
+    // without a restore. The tick was given for the other place.
+    await picker.selectOption("offsite_cold");
+    await expect(save).toBeDisabled();
+  });
+
+  test("does not ask again for a mapping the configuration already has", async ({ page }) => {
+    // The dev fixture's monthly tier already lives on offsite_s3, so
+    // editing an unrelated number is not a decision about where backups
+    // live and must not raise the panel. A product that asked every time
+    // would train an operator to tick the box without reading it.
+    await expect(tier(page, 3).getByLabel("Storage medium for tier 3")).toHaveValue("offsite_s3");
+
+    await tier(page, 1).getByLabel("Keep").fill("9");
+    await expect(page.getByRole("group", { name: "Storage medium disclosure" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Save retention policy" })).toBeEnabled();
+  });
+});
