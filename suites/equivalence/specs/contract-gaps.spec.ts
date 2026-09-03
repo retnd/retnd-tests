@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -77,6 +78,75 @@ const UI_CALLS: {
   { path: "/health", method: "GET", served: false, status: 404, note: "the engine serves /health/live outside /api/v1" }
 ];
 
+/** The CLI verbs this matrix's rows depend on, and whether the product has
+ *  them.
+ *
+ *  This table exists because the one above could not have caught the drift
+ *  that made it necessary. UI_CALLS pins the routes ui/shared's client
+ *  requests, so it notices a UI-side gap opening or closing and it is blind
+ *  to the CLI half entirely. Both rows that went stale (edit a backup set,
+ *  and a backup set's own retention policy) were CLI-side gaps: the verb
+ *  landed, the matrix went on saying it had not, and nothing anywhere went
+ *  red. A coverage matrix that can quietly stop being true is worse than no
+ *  matrix, because people believe it.
+ *
+ *  Read black-box, out of the binary's own usage text, rather than by
+ *  grepping the Go source for a registration. The usage block is what an
+ *  operator is told the product can do, so pinning that is pinning the
+ *  claim rather than the implementation, and it does not break every time
+ *  somebody refactors how commands dispatch.
+ *
+ *  `present: false` rows are the load-bearing ones. They are the matrix's
+ *  gap claims, and each goes red the day someone lands the verb, which is
+ *  the signal that a row needs rewriting. */
+const CLI_VERBS: { verb: string; present: boolean; note: string }[] = [
+  { verb: "backup-set create", present: true, note: "the create row's CLI half" },
+  {
+    verb: "backup-set patch",
+    present: true,
+    note: "landed in rclone-manager#350; the edit row moved from gap to unproved with it"
+  },
+  {
+    verb: "backup-set retention",
+    present: true,
+    note: "landed in rclone-manager#333; the per-set retention row was added for it"
+  },
+  { verb: "settings patch", present: true, note: "the settings row's CLI half" },
+  { verb: "quarantine", present: true, note: "the revalidate half of the quarantine row" },
+  { verb: "catalog rebuild", present: true, note: "the catalog recovery row's CLI half" },
+  {
+    verb: "backup-set delete",
+    present: false,
+    note: "the remove row: rclone-manager#391 says the UI dialog does nothing and no CLI verb exists either"
+  },
+  {
+    verb: "backup-set enable",
+    present: false,
+    note: "the enable/disable row stays a gap on this side; POST .../enabled is served"
+  },
+  {
+    verb: "activity",
+    present: false,
+    note: "the activity feed row: no CLI command exposes an event log"
+  }
+];
+
+/** The binary's whole usage block, which it prints on an unknown command.
+ *
+ *  Square brackets are stripped and whitespace is collapsed before anything
+ *  is matched against it. The usage text wraps and marks optional operands,
+ *  so `settings patch` is printed as `settings [patch [--timezone T]` and a
+ *  plain substring search misses it. I found that by running this table
+ *  against the real binary and watching it claim `settings patch` had been
+ *  removed from a product that has it, which is the failure mode this whole
+ *  case exists to prevent, so it seemed worth fixing rather than working
+ *  around by picking a looser verb string. */
+function cliUsage(cliPath: string): string {
+  const res = spawnSync(cliPath, ["--help"], { encoding: "utf8" });
+  const raw = (res.stdout ?? "") + (res.stderr ?? "");
+  return raw.replace(/[[\]]/g, " ").replace(/\s+/g, " ");
+}
+
 /** The (method, path) pairs api/v1/openapi.json declares. Method matters:
  *  /operations is in the contract for POST only, and the UI client calls
  *  GET on it, so comparing paths alone would report agreement where there
@@ -155,6 +225,43 @@ test.describe("the matrix's gap rows", () => {
     expect(declared.has("GET /operations")).toBe(true);
     expect(declared.has("POST /backup-sets/test-connection")).toBe(true);
     expect(declared.has("GET /backup-sets/test-connection")).toBe(false);
+  });
+
+
+  test("the CLI verbs this matrix claims, and the ones it claims are missing", async ({ pair }) => {
+    // The check the matrix was missing. Both stale rows were CLI-side, and
+    // UI_CALLS above cannot see the CLI at all, so the matrix drifted for
+    // weeks with every suite green.
+    const usage = cliUsage(pair.build.cli);
+
+    // Anti-vacuity first. An empty read, or a binary that failed to start,
+    // would let every assertion below pass by finding nothing.
+    expect(
+      usage.length,
+      "backup-manager printed no usage at all, so this case compared nothing"
+    ).toBeGreaterThan(200);
+    expect(
+      usage,
+      "the usage block does not mention `version`, so this is not the usage text this case thinks it is reading"
+    ).toContain("version");
+
+    const wrong: string[] = [];
+    for (const v of CLI_VERBS) {
+      const found = usage.includes(v.verb);
+      if (found && !v.present) {
+        wrong.push(
+          `${v.verb} EXISTS now and this matrix records it as absent (${v.note}). ` +
+            `A row is claiming a gap that has closed, so rewrite the row and flip this entry.`
+        );
+      }
+      if (!found && v.present) {
+        wrong.push(
+          `${v.verb} is GONE and this matrix records it as present (${v.note}). ` +
+            `Either the verb was renamed or a row is claiming coverage that no longer exists.`
+        );
+      }
+    }
+    expect(wrong.join("\n"), "the matrix and the CLI disagree:\n" + wrong.join("\n")).toEqual("");
   });
 
   test("the destructive gate, not a missing route, is what blocks the mutation rows", async ({ page, pair }) => {

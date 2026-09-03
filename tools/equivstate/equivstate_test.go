@@ -136,6 +136,41 @@ func TestCompare_VolatileOnlyFileDifferencesAreForgivenAndNamed(t *testing.T) {
 	}
 }
 
+func TestCompare_TheRunsOwnDirectoryIsForgivenButThePathUnderItIsNot(t *testing.T) {
+	a, b := pair(t, nil)
+	// The shape that made specs/backup-set-create.spec.ts unpassable. A
+	// sidecar records its artifact's location as an ABSOLUTE path, so the
+	// two sides record the two temporary directories they each ran in.
+	// Those names are not the same length either, so it also reads as a
+	// size change, which is how it came to look like a real difference in
+	// what the API and the CLI wrote.
+	write(t, filepath.Join(a, "local", "set", "artifact.dump.manifest.json"),
+		`{"sha256":"abc","copies":[{"location":"`+a+`/local/set/artifact.dump"}]}`)
+	write(t, filepath.Join(b, "local", "set", "artifact.dump.manifest.json"),
+		`{"sha256":"abc","copies":[{"location":"`+b+`/local/set/artifact.dump"}]}`)
+
+	unmasked := compare(t, a, b, equivstate.Options{CLI: stubCLI(t, "same")})
+	if unmasked.Equal() {
+		t.Fatal("two sidecars recording different absolute locations compared equal without masking, so the mask below proves nothing")
+	}
+
+	masked := compare(t, a, b, equivstate.Options{CLI: stubCLI(t, "same"), MaskVolatile: true})
+	if !masked.Equal() {
+		t.Fatalf("a location difference that is only the run's own directory was not forgiven:\n%s", equivstate.Render(masked))
+	}
+
+	// The control, and the reason this masks the root rather than the
+	// whole path: a location that differs BENEATH the root is a real
+	// difference in where the product put the file, and forgiving that
+	// would turn this comparison into a formality.
+	write(t, filepath.Join(b, "local", "set", "artifact.dump.manifest.json"),
+		`{"sha256":"abc","copies":[{"location":"`+b+`/local/SOMEWHERE-ELSE/artifact.dump"}]}`)
+	real := compare(t, a, b, equivstate.Options{CLI: stubCLI(t, "same"), MaskVolatile: true})
+	if real.Equal() {
+		t.Fatal("masking the run's own directory also hid a path difference under it, so a product that filed an artifact somewhere else would compare equal")
+	}
+}
+
 func TestCompare_FreeSpaceIsMaskedButSizesAreNot(t *testing.T) {
 	a, b := pair(t, nil)
 
