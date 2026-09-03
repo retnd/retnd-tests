@@ -1,8 +1,8 @@
 {
   "mode": "source",
-  "commit": "2b93c4a1ed402633d4e045a5f09e062b227bcac1",
-  "version": "2b93c4a",
+  "commit": "3a489d2d5468be0b18c305fb291d2ee94d161cc8",
+  "version": "3a489d2",
   "source_builder": "go",
   "image": "",
-  "notes": "mode: source | registry | local. See docs/pinning.md. registry mode stays unusable until something is actually pushed to ghcr.io/spdrman/backup-manager, so source is the only honest default today. Moved from 6a93b96 to 2b93c4a because the old pin predated the whole backup-set command: MATRIX.md records the create row as proved by specs/backup-set-create.spec.ts, and that spec cannot run against a build whose answer to `backup-set create` is `unknown command`. A matrix row is only as true as the build the suite resolves, so the pin has to move with the row."
+  "notes": "mode: source | registry | local. See docs/pinning.md. registry mode stays unusable until something is actually pushed to ghcr.io/spdrman/backup-manager, so source is the only honest default today. Moved to 3a489d2 because rclone-manager#391 landed `backup-set remove`, and this suite's CLI guard reads verbs black box out of the binary's usage block. A row claiming a verb exists is only as true as the build the suite resolves, so the pin moves with the row every time."
 }

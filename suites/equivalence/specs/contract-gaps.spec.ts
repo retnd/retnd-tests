@@ -115,9 +115,9 @@ const CLI_VERBS: { verb: string; present: boolean; note: string }[] = [
   { verb: "quarantine", present: true, note: "the revalidate half of the quarantine row" },
   { verb: "catalog rebuild", present: true, note: "the catalog recovery row's CLI half" },
   {
-    verb: "backup-set delete",
-    present: false,
-    note: "the remove row: rclone-manager#391 says the UI dialog does nothing and no CLI verb exists either"
+    verb: "backup-set remove",
+    present: true,
+    note: "the remove row's CLI half, landed by rclone-manager#391. This entry used to read `backup-set delete` and `present: false`, which is the mistake the exhaustiveness case below exists to stop repeating"
   },
   {
     verb: "backup-set enable",
@@ -142,9 +142,36 @@ const CLI_VERBS: { verb: string; present: boolean; note: string }[] = [
  *  case exists to prevent, so it seemed worth fixing rather than working
  *  around by picking a looser verb string. */
 function cliUsage(cliPath: string): string {
+  return normaliseUsage(rawCliUsage(cliPath));
+}
+
+/** The usage block exactly as the binary prints it, lines intact. */
+function rawCliUsage(cliPath: string): string {
   const res = spawnSync(cliPath, ["--help"], { encoding: "utf8" });
-  const raw = (res.stdout ?? "") + (res.stderr ?? "");
+  return (res.stdout ?? "") + (res.stderr ?? "");
+}
+
+function normaliseUsage(raw: string): string {
   return raw.replace(/[[\]]/g, " ").replace(/\s+/g, " ");
+}
+
+/** Every subverb the binary offers under one command, read off the usage
+ *  block's own indented entries.
+ *
+ *  This exists because CLI_VERBS was a spot-check and a spot-check cannot
+ *  see a verb that shipped under a name nobody pinned. The table asserted
+ *  `backup-set delete` was absent, which was true and useless: the product
+ *  had shipped `backup-set remove`, the matrix row still said neither
+ *  surface had one, and nothing anywhere went red. Enumerating what the
+ *  binary actually offers turns "I pinned the wrong string" from invisible
+ *  into a failure. */
+function cliSubverbs(raw: string, family: string): string[] {
+  const found = new Set<string>();
+  for (const line of raw.split("\n")) {
+    const m = /^ {2}([a-z][a-z-]*) ([a-z][a-z-]*)/.exec(line);
+    if (m && m[1] === family) found.add(m[2]);
+  }
+  return [...found].sort();
 }
 
 /** The (method, path) pairs api/v1/openapi.json declares. Method matters:
@@ -262,6 +289,43 @@ test.describe("the matrix's gap rows", () => {
       }
     }
     expect(wrong.join("\n"), "the matrix and the CLI disagree:\n" + wrong.join("\n")).toEqual("");
+  });
+
+
+  test("every subverb the binary offers under a covered command has an entry", async ({ pair }) => {
+    // The case that would have caught the mistake this table just made.
+    //
+    // The case above asks "is each verb I pinned where I said it is", which
+    // is only ever as good as the strings somebody thought to pin. This one
+    // asks the opposite question, "is there anything here I did not pin",
+    // and that is the one that notices a verb shipping under a name the
+    // matrix never considered.
+    const raw = rawCliUsage(pair.build.cli);
+    const covered = ["backup-set"];
+
+    for (const family of covered) {
+      const offered = cliSubverbs(raw, family);
+
+      // Anti-vacuity: a family that parses to nothing would let this pass
+      // by finding nothing to check, which is exactly the shape of failure
+      // this whole file is about.
+      expect(
+        offered.length,
+        `parsed no subverbs at all under "${family}", so this case compared nothing. ` +
+          `Either the usage block's shape changed or cliSubverbs is reading it wrong`
+      ).toBeGreaterThan(1);
+
+      const pinned = new Set(
+        CLI_VERBS.filter((v) => v.verb.startsWith(family + " ")).map((v) => v.verb.slice(family.length + 1))
+      );
+      const unpinned = offered.filter((sub) => !pinned.has(sub));
+      expect(
+        unpinned.join(", "),
+        `${family} offers ${unpinned.map((s) => `"${family} ${s}"`).join(", ")} and this matrix has no entry for it. ` +
+          `A verb can ship under a name nobody pinned, which is how the remove row stayed a gap after ` +
+          `rclone-manager#391 closed it. Add an entry and check the MATRIX.md row that verb belongs to`
+      ).toEqual("");
+    }
   });
 
   test("the destructive gate, not a missing route, is what blocks the mutation rows", async ({ page, pair }) => {
