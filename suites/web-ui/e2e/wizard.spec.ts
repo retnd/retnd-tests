@@ -333,7 +333,14 @@ test.describe("add backup set wizard", () => {
     // page reload — the shared setsNode refresh (appNodes.ts/
     // resource.ts's fetchResource) this wizard triggers on success.
     await expect(bm.heading("Backup sets")).toBeVisible();
-    await expect(page.getByText(uniqueName)).toBeVisible();
+    // Exact, because rclone-manager#97 gave each row more than one place the
+    // set's name appears: the card title, a mono line carrying the full
+    // source/set identity that the typed removal confirmation asks you to
+    // retype, and the visually-hidden continuations that give the per-row
+    // Disable and Remove buttons distinct accessible names. A substring match
+    // now resolves to four elements and fails Playwright's strict mode, which
+    // is the check working rather than the product breaking.
+    await expect(page.getByText(uniqueName, { exact: true })).toBeVisible();
   });
 
   test("Save stays disabled without an imported key or a trusted host, even after acknowledging", async ({ page }) => {
