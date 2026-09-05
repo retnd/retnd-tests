@@ -1,0 +1,37 @@
+doc: >
+  Plain `retention`, with no --dry-run, is a preview and says so. FR-20
+  deletion exists (rclone-manager#21 landed it in
+  core/internal/retention/prune.go, and #239 extended it to a storage
+  medium), but the only surface that runs it is the API's retention
+  preview/apply pair, which will not delete without the plan_id of a plan
+  an administrator reviewed. The CLI deliberately has no apply mode, so
+  the note on this invocation is what tells an operator that the missing
+  --dry-run did not make this a destructive run.
+
+  This case replaced two: a control asserting the old note ("local
+  deletion (FR-20) is not implemented anywhere in this codebase yet
+  (issue #21 is open)") and retention/apply-is-not-implemented, a strict
+  expected failure marked against #21 which asserted that plain retention
+  applies. Both premises are gone. #21 is closed, deletion is real, and
+  the CLI not being the surface that runs it is a decision rather than a
+  gap: an apply here would be a second, weaker authorisation path beside
+  the plan_id one (rclone-manager#431). See findings/README.md, resolved
+  table, DISC-005.
+
+  The state dimension is the load-bearing half. The note is a claim about
+  what this invocation did, and `unchanged` is what makes the claim
+  checkable rather than taken on trust.
+scenario: seeded-local
+argv: [retention, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - contains: "only previews"
+  - contains: "deletes nothing in either mode"
+  - contains: "plan_id"
+stderr: empty
+state: unchanged
+contract:
+  - "docs/EPIC.md FR-20 (local deletion safety), which authorises a deletion against a reviewed plan"
+  - "docs/EPIC-B-multi-nas.md 29.3: an apply names a plan_id and is refused if the plan is stale"
+  - "usage text: retention previews GFS/last-known-good decisions, deletes nothing in either mode, and --dry-run is accepted and inert"
+tags: [smoke]
