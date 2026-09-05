@@ -34,7 +34,6 @@ observed behaviour, and links its filed issue and its pinned case.
 
 | Finding | Issue | Summary |
 |---|---|---|
-| DISC-005 | [#21](https://github.com/spdrman/rclone-manager/issues/21) | plain `retention` is a preview: FR-20 local deletion is not implemented |
 | DISC-007 | [#211](https://github.com/spdrman/rclone-manager/issues/211) | the Web UI's API client calls fourteen `/api/v1` operations neither the contract nor the engine has, so four pages cannot load against a real backend |
 
 ## Resolved
@@ -52,7 +51,24 @@ went out together with
 [#209](https://github.com/spdrman/rclone-manager/pull/209) and the pin
 moved to `defa0a6`. DISC-006 went out with
 [#215](https://github.com/spdrman/rclone-manager/pull/215) and the pin
-moved to `612b48c`.
+moved to `612b48c`. DISC-005 went out with
+[#465](https://github.com/spdrman/rclone-manager/pull/465), whose own
+branch carries `scripts/e2e/tests-repo.pin` forward to this repository's
+side of it; `build-under-test.json` still has to follow it here.
+
+DISC-005 resolved the other way round from the rest of this table, and
+that is worth writing down rather than smoothing over. The product did
+not come round to the expectation; the document the expectation was
+derived from turned out to be the wrong one to derive it from. The usage
+line offered `retention [--dry-run]`, so a case was written asserting
+that plain `retention` applies, and it never could: FR-20's deletion is
+real, but it is authorised against a `plan_id` an administrator reviewed,
+and a CLI apply would be a second, weaker path to the same act. So the
+usage line moved to say the flag is inert there and the case moved with
+it. The rule the rest of this file describes is intact. An expectation
+still never moves to match a binary; this one moved because the contract
+it came from was corrected, which is a different thing and has to stay a
+different thing.
 
 | Finding | Issue | What it was | The case that now asserts the contract |
 |---|---|---|---|
@@ -60,6 +76,7 @@ moved to `612b48c`.
 | DISC-002 | [#188](https://github.com/spdrman/rclone-manager/issues/188) | `validate` blamed the argument count when the real problem was flag ordering | `validate/operand-after-flags`, with `validate/unknown-flag-after-operand` and `validate/double-dash-ends-flags` bounding the accommodation |
 | DISC-003 | [#189](https://github.com/spdrman/rclone-manager/issues/189) | `version` silently accepted unknown flags where every other command exits 2 | `version/no-config-flag`, plus `version/rejects-an-operand` for the other way it says no |
 | DISC-004 | [#190](https://github.com/spdrman/rclone-manager/issues/190) | `daemon` exited 143 after handling SIGTERM, so a normal stop looked like a crash | `daemon/sigterm-stops-cleanly`, which now also asserts the shutdown log that used to be a race |
+| DISC-005 | [#21](https://github.com/spdrman/rclone-manager/issues/21), settled by [#431](https://github.com/spdrman/rclone-manager/issues/431) | plain `retention` printed that FR-20 local deletion is not implemented anywhere in this codebase and that #21 is open, months after #21 landed it; the usage line implied an apply mode the CLI deliberately does not have | `retention/plain-retention-is-a-preview`, which asserts the note that replaced it and, on the state dimension, that the invocation which looks destructive changes nothing |
 | DISC-006 | [#192](https://github.com/spdrman/rclone-manager/issues/192) | FR-18 defined the retention buckets and never said which timestamp put an artifact in one, so an ingested backlog collapsed into a single daily, weekly and monthly bucket and five artifacts out of six were delete candidates on the very first pass | `retention/gfs-tiers-from-one-ingest`, with `retention/override-flags-narrow-the-itemisation` showing the same fixture under a narrower chain and `retention/every-artifact-is-kept-or-deleted` still holding the partition |
 
 ## Open contract questions

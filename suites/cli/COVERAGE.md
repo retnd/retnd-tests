@@ -74,7 +74,7 @@ place that catches it per command is a case per command.
 | `sources` | `sources/happy`: exactly the configured ids, their remote type, paths and stale threshold | `sources/f1-config-missing`, and `check/f3-zero-sources` covers the empty-config question |
 | `artifacts` | `artifacts/happy`: both seeded artifacts, each with a state from FR-10's vocabulary and nothing else, and the count line; `artifacts/filters-narrow` asserts both the included and the excluded id; `artifacts/detail-shows-the-recorded-reason` ([#284](https://github.com/spdrman/rclone-manager/issues/284)): the new `<source/backup-set/name>` operand's full field-by-field detail view for a QUARANTINED_LOST artifact, every field api/v1/openapi.json's `Artifact` schema names asserted present or contractually absent, plus the `reason`/`reason_at` fields that schema does not have at all, read from the journal's transition log directly | `artifacts/nonexistent-backup-set` (exit 1, with `fetch/nonexistent-backup-set` as the control that both commands refuse the same name the same way), `artifacts/f1-config-missing`, `artifacts/detail-malformed-artifact-id` and `artifacts/detail-unresolvable-artifact` (the detail operand's own id-shape and not-found refusals, mirroring `validate`'s), `artifacts/detail-rejects-filters-and-extra-operands` and `artifacts/detail-rejects-two-operands` (exit 2 arity errors) |
 | `fetch` | `fetch/happy`: FR-23 events, FR-10 transitions, the durable commit, and the incomplete artifact untouched; `fetch/stable-strategy-holds-the-remote-copy`: FR-8 plus FR-15, with the rename-strategy set as its positive control | `fetch/dry-run-changes-nothing`, `fetch/missing-required-flags` (exit 2), `fetch/nonexistent-backup-set` (exit 1), `fetch/unreachable-remote`, `fetch/f1-config-missing` |
-| `retention` | `retention/preview-keeps-the-only-restore-point` (FR-18 tiers and FR-19 protection, hand-derived), `retention/every-artifact-is-kept-or-deleted` (FR-18's KEEP/DELETE partition over six artifacts), `retention/gfs-tiers-from-one-ingest` (the daily, weekly and monthly windows against each other over a 500-day backlog ingested in one cycle, with typed tier lists per artifact and FR-19's resolved date and provenance), `retention/override-flags-do-not-touch-config` and `retention/override-flags-narrow-the-itemisation`, which are each other's other half: accepted and inert against config, and actually deciding the preview | `retention/invalid-timezone`, `retention/invalid-negative-tier`, `retention/apply-is-not-implemented` marked against [#21](https://github.com/spdrman/rclone-manager/issues/21) with `retention/apply-announces-it-is-preview-only` as its control, `retention/f1-config-missing` |
+| `retention` | `retention/preview-keeps-the-only-restore-point` (FR-18 tiers and FR-19 protection, hand-derived), `retention/every-artifact-is-kept-or-deleted` (FR-18's KEEP/DELETE partition over six artifacts), `retention/gfs-tiers-from-one-ingest` (the daily, weekly and monthly windows against each other over a 500-day backlog ingested in one cycle, with typed tier lists per artifact and FR-19's resolved date and provenance), `retention/override-flags-do-not-touch-config` and `retention/override-flags-narrow-the-itemisation`, which are each other's other half: accepted and inert against config, and actually deciding the preview | `retention/invalid-timezone`, `retention/invalid-negative-tier`, `retention/plain-retention-is-a-preview` (no --dry-run is not an apply: the note says so and `state: unchanged` proves it), `retention/f1-config-missing` |
 | `reconcile` | `reconcile/clean`: exit 0, FR-23 startup, no unresolved findings | `reconcile/f1-config-missing` |
 | `validate` | `validate/happy`: exit 0, checked and passed; `validate/operand-after-flags` and `validate/double-dash-ends-flags` cover the other two orders the banner permits | `validate/corrupted-local-copy` (exit 1 and FR-10 QUARANTINED), `validate/wrong-argument-count` (exit 2), `validate/malformed-artifact-id`, `validate/unresolvable-artifact`, `validate/unknown-flag-after-operand` (exit 2), `validate/f1-config-missing` |
 | `catalog rebuild` | `catalog/rebuild-after-database-loss`, `catalog/rebuild-dry-run-writes-nothing` | `catalog/no-subcommand` (exit 2), `catalog/unknown-subcommand` (exit 2), `catalog/f1-config-missing` |
@@ -108,8 +108,18 @@ Stated rather than implied.
   single-instance journal lock, its behaviour when a second daemon
   attaches to the same state database, and multi-cycle scheduling are not
   covered.
-- **`--dry-run` for `retention` is covered; the apply path cannot be**,
-  because FR-20 deletion does not exist yet ([#21](https://github.com/spdrman/rclone-manager/issues/21)).
+- **`retention` is covered in both its modes; the apply path is not
+  reachable from the CLI at all.** FR-20 deletion exists
+  ([#21](https://github.com/spdrman/rclone-manager/issues/21) landed it,
+  and [#239](https://github.com/spdrman/rclone-manager/issues/239)
+  extended it to a storage medium), but the only surface that runs it is
+  the API's retention preview/apply pair, behind a reviewed `plan_id`.
+  That is deliberate rather than unfinished
+  ([#431](https://github.com/spdrman/rclone-manager/issues/431)), so
+  there is no CLI apply for this suite to cover, and covering the real
+  one belongs to a suite that speaks HTTP. What this suite pins instead
+  is that the CLI does not delete: `retention/plain-retention-is-a-preview`
+  runs the mode that looks destructive and asserts `state: unchanged`.
 - **GFS tier boundaries are covered for the default chain only.** The
   daily, weekly and monthly windows are now exercised against each other
   over one ingested backlog, in `retention/gfs-tiers-from-one-ingest` and
