@@ -287,10 +287,18 @@ test.describe("mapping a retention tier to a storage medium", () => {
     const options: string[] = await picker.locator("option").allTextContents();
     expect(options).toContain("Local backup root");
     expect(options.some((o: string) => /offsite_s3 \(STANDARD_IA\)/.test(o))).toBe(true);
-    // The archive medium is labelled as one BEFORE it is chosen. An
-    // operator who picks it blind finds out hours later, holding a
-    // restore request they did not know they needed.
-    expect(options.some((o: string) => /offsite_cold \(DEEP_ARCHIVE, needs a restore to read\)/.test(o))).toBe(true);
+    // The archive medium is labelled as one BEFORE it is chosen, and the
+    // label now says the stronger thing: it cannot take delivery at all.
+    // rclone-manager#442 made config.Validate refuse a retention tier
+    // bound to an archive class, because the move can never reach VERIFIED
+    // (an archived copy's ceiling is existence) and FR-30 needs a content
+    // -class ACTIVE placement it can never hold. So "needs a restore to
+    // read" understated it: an operator picking it blind used to find out
+    // hours later holding a restore request; now the config would not have
+    // loaded. The option stays listed and disabled rather than vanishing,
+    // because a medium that exists and cannot serve this purpose is a
+    // different thing from one nobody declared.
+    expect(options.some((o: string) => /offsite_cold \(DEEP_ARCHIVE, cannot receive backups: reads need a restore\)/.test(o))).toBe(true);
   });
 
   test("shows the deletion consequence, and keeps Save disabled until it is acknowledged", async ({ page }) => {
