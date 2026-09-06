@@ -35,6 +35,7 @@ lives. `harness/selftest` proves each of the four can actually fail.
 | `global/g2-unknown-command` | exit 2, the unrecognised name quoted, then the usage banner |
 | `global/g3-usage-lists-every-command` | the banner lists all twelve commands, so one added or removed without documenting it fails here |
 | `global/g4-config-default-is-the-packaged-directory` | the banner's `--config` default is `/etc/backup-manager/config/config.yaml`, and a directory there resolves to `config.yaml` inside it (#196) |
+| `global/g5-usage-explains-the-mode-line` | the banner says which commands announce a `mode:` line and what `engine-attached`, `direct` and `unconfirmed` each mean ([#536](https://github.com/spdrman/rclone-manager/issues/536), [#544](https://github.com/spdrman/rclone-manager/issues/544)); doubles as the positive control for every `absent: "mode: engine-attached"` in the matrix |
 | `global/f6-unknown-flag` | exit 2 on a flag the command does not define |
 
 ## The shared failure family

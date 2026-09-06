@@ -13,9 +13,13 @@ exit: 0
 stdout:
   - line: "0 artifact(s)"
   - count: 1
-stderr: empty
+stderr:
+  - line: "mode: direct. No process has announced itself as serving this deployment, so this command answered from ${CONFIG} itself."
+  - absent: "mode: engine-attached"
+  - count: 1
 state: unchanged
 contract:
   - "docs/EPIC.md FR-10 (lifecycle transitions are durable; a cycle that failed records no success)"
   - "docs/EPIC.md FR-22 (retry and error classification)"
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
 tags: [smoke]

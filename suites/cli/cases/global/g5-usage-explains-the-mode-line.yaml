@@ -1,0 +1,42 @@
+doc: >
+  Every read command now opens with a `mode:` line on stderr saying which
+  world its answer came from, and the usage banner is where an operator
+  learns that. This case pins the banner's own account of it: which
+  commands announce a mode, what each of the three modes means, and that a
+  read refuses (printing nothing at all) only when a serving process holds
+  a different configuration or answers differently.
+
+  It is also the positive control the seventeen `absent: "mode:
+  engine-attached"` assertions need. Those cases run with nothing serving
+  the deployment, so they can only ever show that the harness did not find
+  the string, and "did not find it" and "cannot see it" look identical
+  from there. This case puts the same string on the same stream, in the
+  same tokenised form, and requires the harness to see it, which is the
+  only thing that makes the other seventeen mean anything.
+
+  Split from g3 rather than added to it, on g4's reasoning: g3 claims the
+  banner lists every command, and this claims the banner explains what the
+  mode line is. Either can change on purpose without the other being
+  wrong.
+
+  Asserted with `contains:` rather than `line:` because this is a wrapped
+  prose paragraph. Pinning whole lines here would pin the column the
+  paragraph happens to break at, and a reflow that changed no word would
+  read as a contract break.
+scenario: no-fixture
+argv: []
+no_arguments: true
+exit: 2
+stdout: empty
+stderr:
+  - contains: "they announce which world the answer is about instead."
+  - contains: '"mode: engine-attached"'
+  - contains: '"mode: direct" is nothing serving'
+  - contains: '"mode: unconfirmed"'
+  - contains: "A read refuses only when that process holds a DIFFERENT configuration or"
+state: unchanged
+contract:
+  - "usage text: the binary's own usage banner, the paragraph on what status, sources, artifacts and retention announce"
+  - "rclone-manager#544 (a read says which world its answer came from, and refuses when a serving engine disagrees)"
+  - "rclone-manager#536 (one engine per deployment, announced by the process that is serving it)"
+tags: [smoke]

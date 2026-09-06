@@ -3,6 +3,14 @@ doc: >
   which commands exist. This case pins the command list, so a command
   added or removed without documenting it fails here rather than being
   discovered by an operator.
+
+  An entry whose description runs past one line ends in ${ANY} rather than
+  pinning where it wraps. `daemon` gained a second sentence about being
+  refused while another process serves the same state database
+  (rclone-manager#536, #538), and the column its first line breaks at is a
+  rendering detail of the same kind ${SP} exists for. What this case
+  claims is that the command is listed and described, not how wide the
+  terminal was when somebody captured it.
 scenario: no-fixture
 argv: []
 no_arguments: true
@@ -10,7 +18,7 @@ exit: 2
 stdout: empty
 stderr:
   - line: "  run${SP}perform one processing cycle and exit"
-  - line: "  daemon${SP}repeat the processing cycle at poll_interval"
+  - line: "  daemon${SP}repeat the processing cycle at poll_interval${ANY}"
   - line: "  check${SP}validate config and the state database, then exit"
   - line: "  status${SP}report process and backup-set health (FR-24)"
   - line: "  sources${SP}list configured sources and backup sets"

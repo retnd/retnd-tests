@@ -46,11 +46,15 @@ stdout:
   - absent: "validation_detail:"
   - absent: "quarantine_reason:"
   - absent: "retention_tier:"
-stderr: empty
+stderr:
+  - line: "mode: direct. No process has announced itself as serving this deployment, so this command answered from ${CONFIG} itself."
+  - absent: "mode: engine-attached"
+  - count: 1
 state: unchanged
 contract:
   - "issue #284 (a CLI command prints the recorded reason for a failed or quarantined artifact, field by field against api/v1/openapi.json's Artifact schema)"
   - "docs/EPIC.md FR-13 (verification)"
   - "docs/EPIC.md FR-10 (QUARANTINED_LOST is an explicit exceptional state)"
   - "the sibling case's control: validate/corrupted-local-copy.yaml proves the same corruption quarantines the artifact at all"
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
 tags: [smoke]

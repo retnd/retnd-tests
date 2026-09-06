@@ -15,9 +15,13 @@ argv: [artifacts, --config, "${CONFIG}"]
 exit: 0
 stdout:
   - line: "1 artifact(s)"
-stderr: empty
+stderr:
+  - line: "mode: direct. No process has announced itself as serving this deployment, so this command answered from ${CONFIG} itself."
+  - absent: "mode: engine-attached"
+  - count: 1
 state: ignored
 contract:
   - "docs/EPIC-B-multi-nas.md 19.3 (catalog reconstruction from sidecar recovery manifests)"
   - "docs/recovery.md (state-loss recovery)"
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
 tags: [smoke]
