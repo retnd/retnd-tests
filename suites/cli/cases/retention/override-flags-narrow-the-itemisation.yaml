@@ -86,7 +86,10 @@ stdout:
   # is unaffected by the narrowed chain: protection is not a tier and a
   # window cannot take it away.
   - count: 8
-stderr: empty
+stderr:
+  - line: "mode: direct. No process has announced itself as serving this deployment, so this command answered from ${CONFIG} itself."
+  - absent: "mode: engine-attached"
+  - count: 1
 state: unchanged
 contract:
   - "usage text: each retention flag overrides the loaded config's own resolved value for this preview only"
@@ -94,4 +97,5 @@ contract:
   - "docs/EPIC.md FR-18 (the weekly tier buckets by week and measures its look-back in calendar months)"
   - "docs/EPIC.md FR-19 (the newest eligible restore point is protected whatever the chain selects)"
   - "rclone-manager#270 (a narrowed tier's placement attribution on the artifact sitting on its own boundary is not this case's claim)"
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
 tags: [smoke]

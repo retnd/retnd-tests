@@ -21,9 +21,13 @@ exit: 0
 stdout:
   - line: "production/postgres-primary:"
   - re: "\\s*KEEP\\s+pg-2026-06-01\\.dump\\s+tiers=\\[.*LAST_KNOWN_GOOD\\]"
-stderr: empty
+stderr:
+  - line: "mode: direct. No process has announced itself as serving this deployment, so this command answered from ${CONFIG} itself."
+  - absent: "mode: engine-attached"
+  - count: 1
 state: unchanged
 contract:
   - "usage text: each retention flag overrides the loaded config's own resolved value for this preview only"
   - "docs/EPIC.md FR-18 (timezone, week_starts_on and the three tier windows are the GFS inputs)"
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
 tags: [smoke]

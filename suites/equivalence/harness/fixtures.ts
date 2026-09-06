@@ -10,7 +10,37 @@ export interface Pair {
   /** The side an action is performed on through the browser. */
   ui: Stack;
   /** The side the same action is performed on through the CLI. Starts
-   *  bit-identical to the UI side, and no server ever touches it. */
+   *  bit-identical to the UI side, and nothing serves it.
+   *
+   *  "Nothing serves it" used to be a description of the setup and is now
+   *  a claim worth defending, because the CLI can put its questions to a
+   *  running engine (rclone-manager#543, #544) and would give a different
+   *  answer if one were serving this directory. Two things keep it in the
+   *  no-engine case, and both are structural rather than lucky.
+   *
+   *  The first is that this is its own deployment. A serving process
+   *  announces itself by taking a lock beside the state database its
+   *  configuration names, and `bootStack` boots over `ui.work`, whose
+   *  database is a different file. So a CLI command against `cli.work`
+   *  finds nothing serving it and answers `mode: direct` from the file, on
+   *  stderr, which is exactly what Suite A pins.
+   *
+   *  The second is that this harness names no route. Reaching an engine
+   *  needs BACKUP_MANAGER_API_URL and the administrator credentials in the
+   *  environment, and nothing here sets them. That matters for the two
+   *  specs that run a read against `ui.work` as a shared observation
+   *  surface (`backup-set-create` calls `sources`, `settings-write` calls
+   *  `retention --dry-run`): those DO find the engine, and without a route
+   *  they land on `mode: unconfirmed` rather than `engine-attached`. They
+   *  compare `.stdout` and a read announces on stderr, so nothing they
+   *  measure moves either way.
+   *
+   *  I left this as one shape rather than adding a second. An
+   *  engine-attached lane would have to hand the CLI a real route, which
+   *  is a whole matrix of its own about what a routed write and a
+   *  cross-checked read do, not a variant of this fixture. The pieces are
+   *  here if somebody wants it: `bootStack` already enrols an
+   *  administrator and keeps the credentials in memory. */
   cli: Manifest;
 }
 

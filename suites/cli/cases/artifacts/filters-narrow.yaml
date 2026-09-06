@@ -10,8 +10,12 @@ stdout:
   - line: "production/app-uploads/uploads-2026-06-01.tar${SP}COMPLETE${SP}remote=uploads-2026-06-01.tar${SP}local=${LOCAL}/production/app-uploads/uploads-2026-06-01.tar"
   - line: "1 artifact(s)"
   - absent: "postgres-primary"
-stderr: empty
+stderr:
+  - line: "mode: direct. No process has announced itself as serving this deployment, so this command answered from ${CONFIG} itself."
+  - absent: "mode: engine-attached"
+  - count: 1
 state: unchanged
 contract:
   - "usage text: artifacts [--source S] [--backup-set B] - list journal artifacts"
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
 tags: [smoke]

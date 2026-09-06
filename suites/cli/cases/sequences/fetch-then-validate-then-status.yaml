@@ -17,10 +17,14 @@ stdout:
   - line: "production/app-uploads: HEALTHY"
   - line: "  current transfers: 0, pending deletes: 0, failures: 0"
   - line: "  quarantined: 0 (of which unrecoverable: 0)"
-stderr: empty
+stderr:
+  - line: "mode: direct. No process has announced itself as serving this deployment, so this command answered from ${CONFIG} itself."
+  - absent: "mode: engine-attached"
+  - count: 1
 state: unchanged
 contract:
   - "docs/EPIC.md FR-24 (health)"
   - "docs/EPIC.md FR-13 (verification)"
   - "docs/EPIC.md FR-10 (lifecycle transitions are durable and idempotent)"
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
 tags: [smoke]

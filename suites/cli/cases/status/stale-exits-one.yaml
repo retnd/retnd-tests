@@ -12,9 +12,13 @@ exit: 1
 stdout:
   - line: "production/postgres-primary: STALE"
   - line: "  stale threshold: 1s"
-stderr: empty
+stderr:
+  - line: "mode: direct. No process has announced itself as serving this deployment, so this command answered from ${CONFIG} itself."
+  - absent: "mode: engine-attached"
+  - count: 1
 state: unchanged
 contract:
   - "docs/EPIC.md FR-24 (backup-set states HEALTHY/DEGRADED/STALE/FAILING; stale threshold exposed)"
   - "container/Dockerfile HEALTHCHECK: status exits 0 only when every set is healthy"
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
 tags: [slow]

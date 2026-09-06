@@ -83,7 +83,10 @@ stdout:
   - line: "${SP}last-known-good: artifact \"pg-06-age-000d.dump\" is the newest eligible restore point in this backup set, dated ${TS} by the producer's own timestamp on the remote object, and holds FR-19 last-known-good protection"
   # One header, six itemised artifacts, one last-known-good note.
   - count: 8
-stderr: empty
+stderr:
+  - line: "mode: direct. No process has announced itself as serving this deployment, so this command answered from ${CONFIG} itself."
+  - absent: "mode: engine-attached"
+  - count: 1
 state: unchanged
 contract:
   - "docs/EPIC.md FR-18 (each tier is evaluated twice over the same artifacts, once per placement, and KEEP is the union)"
@@ -91,4 +94,5 @@ contract:
   - "docs/EPIC.md FR-18 (an ingested backlog keeps its real shape; an artifact older than the longest configured window is still a DELETE candidate)"
   - "docs/EPIC.md FR-18 (default chain: daily over 7 days, weekly over 3 calendar months, monthly over 12 calendar months)"
   - "docs/EPIC.md FR-19 (newest means newest by the artifact's own retention date, and the reason carries the resolved date and says which timestamp produced it)"
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
 tags: [smoke]
