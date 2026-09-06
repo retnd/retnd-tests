@@ -28,10 +28,14 @@ stdout:
   - contains: "only previews"
   - contains: "deletes nothing in either mode"
   - contains: "plan_id"
-stderr: empty
+stderr:
+  - line: "mode: direct. No process has announced itself as serving this deployment, so this command answered from ${CONFIG} itself."
+  - absent: "mode: engine-attached"
+  - count: 1
 state: unchanged
 contract:
   - "docs/EPIC.md FR-20 (local deletion safety), which authorises a deletion against a reviewed plan"
   - "docs/EPIC-B-multi-nas.md 29.3: an apply names a plan_id and is refused if the plan is stale"
   - "usage text: retention previews GFS/last-known-good decisions, deletes nothing in either mode, and --dry-run is accepted and inert"
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
 tags: [smoke]

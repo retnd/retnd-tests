@@ -10,10 +10,14 @@ stdout:
   - line: "${SP}production/postgres-primary${SP}remote=local${SP}remote_path=${REMOTE}/production/postgres-primary${SP}local_path=${LOCAL}/production/postgres-primary${SP}stale_after=30h0m0s${ANY}"
   - line: "${SP}production/app-uploads${SP}remote=local${SP}remote_path=${REMOTE}/production/app-uploads${SP}local_path=${LOCAL}/production/app-uploads${SP}stale_after=30h0m0s${ANY}"
   - absent: "no-such-source"
-stderr: empty
+stderr:
+  - line: "mode: direct. No process has announced itself as serving this deployment, so this command answered from ${CONFIG} itself."
+  - absent: "mode: engine-attached"
+  - count: 1
 state: unchanged
 contract:
   - "usage text: sources - list configured sources and backup sets"
   - "docs/EPIC.md FR-7 (backup-set isolation: identity is source plus set)"
   - "docs/EPIC.md FR-5 (remote, remote_path, local_path, stale_after per backup set)"
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
 tags: [smoke]
