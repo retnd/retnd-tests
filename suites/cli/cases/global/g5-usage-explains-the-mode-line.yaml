@@ -3,8 +3,10 @@ doc: >
   world its answer came from, and the usage banner is where an operator
   learns that. This case pins the banner's own account of it: which
   commands announce a mode, what each of the three modes means, and that a
-  read refuses (printing nothing at all) only when a serving process holds
-  a different configuration or answers differently.
+  read refuses (printing nothing at all), which is three cases now rather
+  than two: a serving process holding a different configuration, an engine
+  at the address this host was given that turns out to serve a different
+  deployment, and one that answers this command's own question differently.
 
   It is also the positive control the seventeen `absent: "mode:
   engine-attached"` assertions need. Those cases run with nothing serving
@@ -33,7 +35,7 @@ stderr:
   - contains: '"mode: engine-attached"'
   - contains: '"mode: direct" is nothing serving'
   - contains: '"mode: unconfirmed"'
-  - contains: "A read refuses only when that process holds a DIFFERENT configuration or"
+  - contains: "A read refuses in three cases, and then nothing at all is printed"
 state: unchanged
 contract:
   - "usage text: the binary's own usage banner, the paragraph on what status, sources, artifacts and retention announce"
