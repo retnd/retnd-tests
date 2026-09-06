@@ -1,8 +1,8 @@
 {
   "mode": "source",
-  "commit": "3a489d2d5468be0b18c305fb291d2ee94d161cc8",
-  "version": "3a489d2",
+  "commit": "1bed795ad1cdecb2ee6ceee8cc769eb2f1073653",
+  "version": "1bed795",
   "source_builder": "go",
   "image": "",
-  "notes": "mode: source | registry | local. See docs/pinning.md. registry mode stays unusable until something is actually pushed to ghcr.io/spdrman/backup-manager, so source is the only honest default today. Moved to 3a489d2 because rclone-manager#391 landed `backup-set remove`, and this suite's CLI guard reads verbs black box out of the binary's usage block. A row claiming a verb exists is only as true as the build the suite resolves, so the pin moves with the row every time."
+  "notes": "mode: source | registry | local. See docs/pinning.md. registry mode stays unusable until something is actually pushed to ghcr.io/spdrman/backup-manager, so source is the only honest default today. Moved to 1bed795 because rclone-manager#536 landed, which gives every configuration read and write a \"mode:\" line on stderr saying which world its answer came from. The seventeen cases #36 rewrote to pin that sentence, and g5 which is their positive control, cannot go green against any build that predates it. This is the other half of the lockstep the product repo's tests-repo.pin describes, and the half with no automation: their pin moved to this repo's b3fe0f8 in the same merge, and this line has to move to that merge commit by hand or the specs stay red."
 }
