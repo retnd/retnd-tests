@@ -215,19 +215,17 @@ that exists is not a backup.
 | Spec | The claim |
 |---|---|
 | `enrolment.spec.ts` | an administrator is enrolled through the browser on a fresh deployment, with the tokenless attempt refused before it and the second attempt refused after it, and the resulting record read off the manager's state volume rather than believed from the page |
-| `backup-set-wizard.spec.ts` | a backup set is created through the wizard against the source container, and the set that comes out is the set that was typed in (compared against `config.yaml` on the config volume, not against the wizard's own echo); the fingerprint an operator was asked to trust is the source machine's real host key, and the `known_hosts` line the engine pinned holds that same key; a set whose host was never trusted cannot be saved and writes nothing |
+| `backup-set-wizard.spec.ts` | a backup set is created through the wizard against the source container, and the set that comes out is the set that was typed in (compared against `config.yaml` on the config volume, not against the wizard's own echo); the fingerprint an operator was asked to trust is the source machine's real host key, and the `known_hosts` line the engine pinned holds that same key; a set whose host was never trusted cannot be saved and writes nothing; and a source declared read-only in the wizard reaches the deployment that way, with the same walk minus the declaration as its control |
 | `backup-set-edit.spec.ts` | every field the edit surface offers is changed, and each change is verified as having taken effect on the deployment rather than merely accepted by the form |
 | `backup-run.spec.ts` | a deployment nobody had configured pulls all three files off the source machine, and each one's sha256 on the manager's backup volume is the digest the source machine itself reported for that name; the source comes out untouched |
 
-Two of those specs also pin a discrepancy each, in the shape
+`backup-run.spec.ts` also pins a discrepancy, in the shape
 `findings/README.md` describes: the case asserts the behaviour that is
-actually there, so the suite stays green while it stands, and goes red the
-moment it is fixed. `backup-set-wizard.spec.ts` pins the wizard's
-read-only declaration being dropped by the first-run save, and
-`backup-run.spec.ts` pins the sets page's run control being refused by the
-destructive gate (rclone-manager#92), which is why nothing here presses it
-to start a cycle. The cycle these specs are about is the one the engine
-starts for itself the moment a configuration is activated.
+actually there, so the suite stays green while it stands and goes red the
+moment it is fixed. What it pins is the sets page's run control being
+refused by the destructive gate (rclone-manager#92), which is why nothing
+here presses it to start a cycle. The cycle these specs are about is the
+one the engine starts for itself the moment a configuration is activated.
 
 ### Reading a volume must not change it
 
@@ -241,3 +239,23 @@ every transfer then died on `mkdir /data/backups/<set>: permission denied`,
 minutes after the read that caused it, and an SSH-key import against a
 config volume that had been read while empty died the same way. `READ_MOUNT`
 is a path the image does not have for exactly that reason.
+
+## One pair is red on purpose
+
+`backup-set-wizard.spec.ts` ends with two tests over one walk and one
+variable: a source declared read-only in the wizard, and the same walk with
+the box left off. The pair is the assertion rather than either half, because
+one test on its own cannot tell "read-only reached the deployment" apart
+from "this deployment says read-only about everything".
+
+The read-only half is RED against the pin this repository currently carries,
+and that is deliberate. It asserts the behaviour
+[rclone-manager#581](https://github.com/spdrman/rclone-manager/pull/581)
+restores: `completeFirstRun` was building its request field by field beside
+a decoder that fills in the whole spec, and `read_only` never made the
+crossing, so a source declared read-only on a fresh install was saved
+deletable. Red rather than skipped, and rather than a marker that would keep
+the suite green: a skip is invisible in a pass count, and a green suite here
+would be saying the deployment under test has a fix it does not have. It
+turns green when `build-under-test.json` moves past #581, with nothing else
+to change.

@@ -259,57 +259,131 @@ test("the wizard refuses to save a set whose host was never trusted", async ({ p
   await expect(page.getByRole("button", { name: "Finish setup" })).toBeEnabled();
 });
 
-// A discrepancy, pinned the way findings/README.md pins one: the case
-// asserts the behaviour that is actually there, so the suite stays green
-// while it stands, and goes red the moment it is fixed, so a note about a
-// bug that has been closed cannot sit here looking true.
+// The Review step's read-only declaration, and the control that makes it
+// mean something.
 //
-// The wizard's Review step offers "This source is read-only: pull backups
-// from here, but never delete the remote original", changes its own copy
-// to promise every backup is kept "for good", and sends read_only true in
-// the body. The FIRST-RUN save path then drops the field:
-// apps/common/webhost/firstrun.go's completeFirstRun builds a
-// service.CreateBackupSetRequest field by field and does not carry
-// ReadOnly across, where handlers_backupsets.go's ordinary create does
-// (`ReadOnly: body.ReadOnly`). So the first backup set on a fresh install
-// deletes the remote originals after a successful cycle, which is the
-// opposite of what the operator was shown and agreed to, and it is the one
-// setting where being wrong destroys the thing being protected.
+// # This is RED until rclone-manager#581 is merged and the pin moves
 //
-// When it is fixed: change `read_only: "false"` below to `"true"`, rename
-// this test after what it then proves, and drop this comment.
-test("the wizard's read-only declaration is dropped by the first-run save (unfixed)", async ({ page, deployment }) => {
-  await enrolAdministrator(page, deployment);
-  await openApp(page, deployment);
+// It was a discrepancy here until the lane that fixed it reported back:
+// `completeFirstRun` built its CreateBackupSetRequest field by field beside
+// a decoder that fills in the whole spec, and `read_only` never made the
+// crossing, so a source an operator declared read-only on a fresh install
+// was saved deletable. The browser half was already right, and #581 also
+// adds a guard that walks the spec reflectively and fails on any field with
+// no carriage row, so the next field added to the contract has to be
+// carried or argued about rather than quietly dropped.
+//
+// So this asserts the fixed behaviour, and against the build
+// `build-under-test.json` currently pins it fails. Red rather than skipped,
+// and rather than a strict-expected-failure marker, for the reason this
+// repository gives everywhere else: a skip is invisible in a pass count,
+// and a marker that made the suite green would be saying the deployment
+// under test has a fix it does not have. It turns green when the pin moves
+// past #581, and nothing else needs to change with it.
+//
+// # Why there are two of these
+//
+// One test on its own could not tell "read-only reached the deployment"
+// apart from "this deployment says read-only about everything", and a fix
+// to a dropped boolean is exactly the change that invites that mistake. So
+// the pair IS the assertion: one walk, one variable, and the two runs have
+// to disagree. They are separate tests because first-run happens once per
+// deployment and this suite gives each test its own.
+for (const declaredReadOnly of [true, false] as const) {
+  test(`a source the wizard declares ${declaredReadOnly ? "read-only" : "deletable"} reaches the deployment that way`, async ({
+    page,
+    deployment
+  }) => {
+    await enrolAdministrator(page, deployment);
+    await openApp(page, deployment);
 
-  const answers = answersFor(deployment, { readOnlySource: true });
-  const key = newKeyPair();
+    const answers = answersFor(deployment, { readOnlySource: declaredReadOnly });
+    const key = newKeyPair();
 
-  await openWizard(page);
-  await fillSource(page, answers);
-  await importPrivateKey(page, key.privateKeyPem);
-  await trustProbedHost(page);
-  await fillDiscovery(page, answers);
-  await fillStorage(page, answers);
-  await reviewAnswers(page, answers);
+    await openWizard(page);
+    await fillSource(page, answers);
+    await importPrivateKey(page, key.privateKeyPem);
+    await trustProbedHost(page);
+    await fillDiscovery(page, answers);
+    await fillStorage(page, answers);
+    await reviewAnswers(page, answers);
 
-  // What the operator is shown, and agrees to, before the save. Asserted
-  // here rather than after, because it is gone from the page once the
-  // wizard closes for the uninteresting reason.
-  await expect(page.getByText(/keep every backup from this source's remote copy for good/)).toBeVisible();
-  // The deletion acknowledgement is not even offered, because on this path
-  // the page believes there is nothing left to delete.
-  await expect(page.getByRole("checkbox", { name: /remote backup will be removed only after/i })).toHaveCount(0);
+    // The two runs really are different on screen before they are
+    // different anywhere else. Checking the box replaces the deletion
+    // sequence and its acknowledgement with a promise to keep everything,
+    // because there is then nothing left to acknowledge deleting.
+    if (declaredReadOnly) {
+      await expect(page.getByText(/keep every backup from this source's remote copy for good/)).toBeVisible();
+      await expect(page.getByRole("checkbox", { name: /remote backup will be removed only after/i })).toHaveCount(0);
+    } else {
+      await expect(page.getByText(/delete the original backup artifact from the remote server/)).toBeVisible();
+      await expect(page.getByRole("checkbox", { name: /remote backup will be removed only after/i })).toBeChecked();
+    }
 
-  await finishSetup(page, deployment);
+    await finishSetup(page, deployment);
 
-  const config = await deployment.manager.configFile("config.yaml");
-  expect(config, "no config.yaml after a save the wizard reported as done").not.toBeNull();
-  // Every other answer survived, so this is one field being dropped rather
-  // than a save that went somewhere else entirely.
-  expect(scalarFields(config ?? "")).toMatchObject({
-    host: answers.host,
-    remote_path: answers.remotePath,
-    read_only: "false"
+    // ------------------------------------------- what the operator sees
+    //
+    // The set's own page, reached from the list the way an operator
+    // reaches it, with no page load and no container restart in between.
+    // The page fetches the set from the engine rather than reading back
+    // the form that was just submitted, which is the distinction this
+    // whole assertion is about.
+    await page.getByRole("button", { name: "Open" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: answers.name })).toBeVisible();
+    // The value beside the label, which is what a description list means by
+    // "beside": find the label and take the element after it.
+    //
+    // By text rather than by role, and that is not a slip. A <dt> is role
+    // `term`, and `term` takes its name from the author rather than from
+    // its content, so getByRole("term", { name }) matches nothing here even
+    // though the label is right there on screen. The row has no other
+    // handle, which is a missing label rather than a missing selector:
+    // suites/web-ui is where that gets raised.
+    const readOnlyCell = page
+      .getByText("Read-only source", { exact: true })
+      .locator("xpath=following-sibling::*[1]");
+    await expect(readOnlyCell, "the set's own page disagrees with what the wizard was told").toHaveText(
+      declaredReadOnly ? /^Yes/ : "No"
+    );
+    // And the control offered next to it, which is the other half of the
+    // same statement: a set that is already read-only is offered the way
+    // back, not the way in.
+    await expect(
+      page.getByRole("button", { name: declaredReadOnly ? "Allow remote deletion again" : "Declare source read-only" })
+    ).toBeVisible();
+
+    // ------------------------------------------- what the engine holds
+    //
+    // The same request the page just made, asked directly, so the claim is
+    // about what this running instance is serving rather than about what a
+    // component chose to render. Nothing has been reloaded or restarted: a
+    // configuration that only becomes true after a restart is a different,
+    // weaker thing than one the instance adopted when it was written.
+    const listed = await page.request.get(`${deployment.uiUrl}/api/v1/backup-sets`);
+    expect(listed.status(), await listed.text()).toBe(200);
+    const sets = ((await listed.json()) as { backup_sets: { name: string; read_only: boolean }[] }).backup_sets;
+    const created = sets.find((set) => set.name === answers.name);
+    expect(created, `the engine lists no backup set called ${answers.name}: ${JSON.stringify(sets)}`).toBeTruthy();
+    expect(
+      created?.read_only,
+      "the engine's own listing disagrees with the read-only answer the wizard was given. " +
+        "Against a build older than rclone-manager#581 this is expected and is what that PR fixes: " +
+        "completeFirstRun dropped read_only on its way into the service request."
+    ).toBe(declaredReadOnly);
+
+    // ------------------------------------------- and what survives a restart
+    //
+    // The file, which is the half the instance comes back up on. An
+    // in-memory answer that is not on disk would be the same bug one
+    // restart later.
+    const config = await deployment.manager.configFile("config.yaml");
+    expect(config, "no config.yaml after a save the wizard reported as done").not.toBeNull();
+    expect(scalarFields(config ?? ""), `config.yaml after declaring read-only ${declaredReadOnly}:\n${config}`)
+      .toMatchObject({
+        host: answers.host,
+        remote_path: answers.remotePath,
+        read_only: String(declaredReadOnly)
+      });
   });
-});
+}
