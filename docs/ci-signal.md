@@ -122,7 +122,24 @@ browser, and takes a couple of seconds.
 The mirror of the same pattern: `.husky/pre-commit` runs
 `scripts/gate-local.sh`, which runs `go vet`, the tool and fixture unit
 tests, the harness self-tests, Suite A in full against the pinned build,
-`tsc --noEmit` over Suites B and C, and Suite B's unit tests.
+`tsc --noEmit` over Suites B, C and D, and the unit tests of Suite B's and
+Suite D's own harnesses.
+
+Suite D itself is not in that gate and is not meant to be. It deploys the
+image in three containers and drives a browser between them, so it needs
+Docker as well as a Chromium, and it builds the image from the pinned
+checkout the first time it sees a commit. That is not a per-commit hook's
+work. What IS in the gate is the part of it that can be wrong silently:
+the three pure functions deciding whether the image matches the pin,
+whether the one-time enrolment token is found, and whether it is scrubbed
+out of a failure message. A green Suite D run never takes the branch any
+of the three exists for, so a unit test is the only thing that reads
+them.
+
+Suite D also refuses rather than skips when Docker is missing, which is
+the same rule everything else here follows and matters more for this one:
+a browser suite that quietly reports green on a machine where it stood
+nothing up has answered a question nobody asked.
 
 The two type checks are there because Playwright transpiles types away
 without checking them, and the ESLint config that used to read this code

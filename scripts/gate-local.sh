@@ -34,18 +34,21 @@ go test ./suites/cli/harness/... -count=1
 echo "==> Suite A: the CLI contract"
 go test ./suites/cli -count=1
 
-# Suite B's own unit tests, which need no browser: the port helper's
-# E2E_PORT validation and the seven-provider spawner's argv. Suites B and C
-# themselves are not in this gate, because they need a Chromium and this
-# repository is cloned onto machines that have none; rclone-manager's gate
-# runs Suite B on every commit, which is where the browser signal belongs.
+# The unit tests that need no browser: Suite B's port helper and
+# seven-provider spawner, and Suite D's redaction, log-token and
+# commit-comparison helpers. The browser suites themselves are not in this
+# gate, because they need a Chromium and this repository is cloned onto
+# machines that have none; rclone-manager's gate runs Suite B on every
+# commit, which is where the browser signal belongs. Suite D needs Docker on
+# top of that, and a per-commit hook is not where a three-container
+# deployment belongs either.
 #
 # Refused rather than skipped when the dependencies are missing. A gate that
 # prints a skip and carries on is the shape rclone-manager's #160 was about,
 # and importing it here would be a strange thing to do in the repository
 # whose whole argument is that a check nobody notices stopping is worse than
 # no check.
-for suite in suites/web-ui suites/equivalence; do
+for suite in suites/web-ui suites/equivalence suites/live-deployment; do
   if [ ! -d "$suite/node_modules" ]; then
     echo "$suite has no installed dependencies, so its unit tests and type check cannot run." >&2
     echo "  fix: cd $suite && npm ci" >&2
@@ -69,11 +72,20 @@ done
 # fixture) is now this repository's to fix and these two options are this
 # repository's to turn on. Still open, in a change of its own: see
 # suites/web-ui/README.md.
-echo "==> Suite B and Suite C type checks"
+echo "==> Suite B, Suite C and Suite D type checks"
 (cd suites/web-ui && npm run --silent typecheck)
 (cd suites/equivalence && npm run --silent typecheck)
+(cd suites/live-deployment && npm run --silent typecheck)
 
 echo "==> Suite B unit tests"
 (cd suites/web-ui && npm run --silent unit)
+
+# Suite D's harness unit tests. Small, and the ones worth having: they cover
+# the three pure functions that decide whether a run is honest (does the
+# image match the pin, is the one-time token found, is it scrubbed out of a
+# failure), and a green suite run never takes the branch any of them exists
+# for.
+echo "==> Suite D harness unit tests"
+(cd suites/live-deployment && npm run --silent unit)
 
 echo "gate: green"
