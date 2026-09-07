@@ -1,6 +1,6 @@
 import { generateKeyPairSync } from "node:crypto";
 
-import type { Page } from "@playwright/test";
+import type { Page, Request } from "@playwright/test";
 
 import { enrolAdministrator, expect, signIn, test } from "../harness/fixtures";
 import type { Deployment } from "../harness/fixtures";
@@ -9,41 +9,60 @@ import type { Deployment } from "../harness/fixtures";
 // running, and proving each change where it can be checked rather than
 // where it was typed.
 //
+// # This spec is written against rclone-manager#580, which is not merged
+//
+// So it is RED until build-under-test.json moves to the commit that
+// carries it, and that is deliberate rather than an oversight. It is the
+// half of this repository's lockstep that goes first (docs/pinning.md):
+// the spec lands describing the behaviour the product PR produces, and
+// the pin moves in the same merge that ships it. A reader who hits this
+// red should move the pin, not weaken the spec.
+//
+// What #580 changed, and what this file therefore pins:
+//
+//   - The completion method and its window are now one setting the server
+//     takes as two fields, and `withCompanions` makes every save carry the
+//     pair. Before it, the method's own Save could only fail and the
+//     window's own Save answered 200 for a value the file threw away. Both
+//     of those were pinned here as findings, and both are now gone; what
+//     replaces them is an assertion that the pair CANNOT BE SPLIT, which
+//     is the property that would break again if anyone re-split them.
+//   - The SSH key and the trusted host key are editable. They were the
+//     two things the page used to say were not, so the walk below is ten
+//     boxes rather than eight.
+//
 // # The distinction this whole spec is built on
 //
 // A form that accepts a value and drops it looks exactly like a form that
 // accepts a value and saves it, from the browser. Suite B cannot tell them
 // apart, because the thing on the other end of its requests is a mock that
 // agrees with whatever it is told. So every assertion below about a change
-// having happened reads config.yaml off the manager's own config volume,
-// through a container this run starts, rather than reading the page back
-// to itself.
+// having happened reads the manager's own config volume, through a
+// container this run starts, rather than reading the page back to itself.
 //
 // The file is only half of it though. A configuration that is on disk and
 // not in the running process is a change an operator has to restart to
 // get, and this product's own claim is the opposite: an edit goes through
 // the engine that is serving, and is live when the save returns. So the
-// engine is asked too, and once in a way it cannot fake: the set starts
-// out pointed at a remote directory that does not exist, the connection
+// engine is asked too, and twice in a way it cannot fake. The set starts
+// out pointed at a remote directory that does not exist, so the connection
 // test refuses, one edit fixes the path, and the same test succeeds with
-// nothing restarted in between. That is the engine acting on the new
-// value, not echoing it back.
+// nothing restarted in between. Then the SSH key is rotated to one the
+// engine has never used, and the connection still succeeds, which it can
+// only do by authenticating with the key that was just pasted.
 //
-// # What the edit surface offers today
+// # What the edit surface offers
 //
 // ui/shared/src/pages/backupSetEditFields.ts is the list, and this spec
 // walks it: host, port, user, remote folder, local destination, include
-// patterns, completion method, and the stable-size window that appears
-// with it. Every one of them is changed here.
+// patterns, completion method, the stable-size window that appears with
+// it, the SSH key and the trusted host key. Every one of them is changed
+// here.
 //
-// Not on that list, deliberately (the page says so under the form): the
-// set's name and source, which are its identity, and its SSH key and
-// trusted host key, which are trust decisions the wizard's verify step
-// owns. rclone-manager#572 is adding the second pair to the edit surface
-// and is not merged at the pin this run resolves, so there is nothing to
-// drive for it yet. When it lands the walk below extends by two rows and
-// the control at the end loses two of its unchanged fields; nothing else
-// about the shape of this test has to change.
+// Not on that list, deliberately, and the control at the end is about
+// them: the set's name and source, which are its identity and key every
+// artifact it has ever produced, and the freshness budget, which the API
+// can write and this surface does not offer.
 //
 // # Why the set is created over the API rather than through the wizard
 //
@@ -54,12 +73,20 @@ import type { Deployment } from "../harness/fixtures";
 // created the way suites/equivalence creates one, through the same
 // endpoints the wizard calls, with a real imported key and a real probed
 // host key, because a set that could not connect could not be used for
-// the liveness proof above.
+// the liveness proofs above.
 
 /** The one backup set this spec creates, edits and checks. */
 const SOURCE = "live";
 const SET = "vault";
 const SET_ID = `${SOURCE}/${SET}`;
+
+/** The manager's configuration directory inside its container: the
+ *  directory config.yaml sits in, which is also the root
+ *  `Manager.configFile` reads relative to. compose mounts a directory
+ *  rather than a file here for issue #196's reason, and the imported key
+ *  store and the per-set trusted-host-key files are its siblings, which is
+ *  what makes both of the new boxes checkable on disk at all. */
+const CONFIG_DIR = "/etc/backup-manager/config";
 
 /** What the set is created with.
  *
@@ -67,10 +94,10 @@ const SET_ID = `${SOURCE}/${SET}`;
  *  it became" are readable side by side and nothing below can compare a
  *  value against itself by accident.
  *
- *  The remote path is wrong ON PURPOSE:
- *  /nowhere does not exist on the source machine, so the connection test
- *  refuses before the edit and can succeed after it, which is what makes
- *  the "this is live" proof a proof rather than a re-read. */
+ *  The remote path is wrong ON PURPOSE: /nowhere does not exist on the
+ *  source machine, so the connection test refuses before the edit and can
+ *  succeed after it, which is what makes the "this is live" proof a proof
+ *  rather than a re-read. */
 const BEFORE = {
   host: "source",
   port: 22,
@@ -98,8 +125,22 @@ const AFTER = {
   include: ["*.bin", "*.sql.gz"],
   completionLabel: "Stable file size / timestamp",
   completionStrategy: "stable",
-  stableForSeconds: 45
+  /** The window the completion method arrives with, and then what it is
+   *  widened to. Two values because the second edit is made on a set that
+   *  is ALREADY on stable-size, where the strategy does not change at all
+   *  and the request still has to carry it. That is the sharpest place to
+   *  hold the pair together: there is no functional need for the strategy
+   *  to be in that body, so it is only there because the two boxes are one
+   *  setting, which is exactly the property that would rot. */
+  stableForSeconds: 30,
+  widenedStableForSeconds: 45
 };
+
+/** Sent as a raw PATCH, on its own, to reach the server's own half of the
+ *  same rule. The value is never persisted, so it is deliberately neither
+ *  of the two above: a config.yaml holding 20 seconds would mean the
+ *  refusal did not happen. */
+const NEVER_PERSISTED_WINDOW = 20;
 
 test("an operator changes every editable field of a backup set, and every change lands on the deployment", async ({
   page,
@@ -108,9 +149,9 @@ test("an operator changes every editable field of a backup set, and every change
   await enrolAdministrator(page, deployment);
 
   // ------------------------------------------------- a set worth editing
-  const { privateKeyPem, publicKeyLine } = newKeyPair();
-  await deployment.source.authorizeKey(publicKeyLine);
-  const setUp = await createBackupSet(page, deployment, privateKeyPem);
+  const first = newKeyPair();
+  await deployment.source.authorizeKey(first.publicKeyLine);
+  const setUp = await createBackupSet(page, deployment, first.privateKeyPem);
   if (setUp.restartRequired) await deployment.manager.restartEngine();
 
   // The premise, read off the manager's own volume rather than believed
@@ -123,11 +164,16 @@ test("an operator changes every editable field of a backup set, and every change
   );
   expect(yamlValue(created, "remote_path")).toBe(BEFORE.remotePath);
   expect(yamlValue(created, "stale_after")).toBe("48h0m0s");
-  // Captured now because it is one of the controls at the end: the trusted
-  // host key is not on the edit surface, and a save that rewrote the whole
-  // set from a stale form would move it.
-  const knownHostsBefore = yamlValue(created, "known_hosts");
-  expect(knownHostsBefore, "the created set has no trusted host key on file").not.toBe("");
+  expect(created, "the set was not created with the key this test rotates away from").toContain(
+    `ssh_keys/${setUp.keyId}`
+  );
+  // The per-set trusted-host-key file, which is where the last of the ten
+  // boxes has to land. Its PATH does not move when the trusted key
+  // changes, by design, so the file's contents are the only place that
+  // edit is visible; captured here so the change is a change.
+  const trustPath = underConfigDir(yamlValue(created, "known_hosts"));
+  const trustedBefore = await deployment.manager.configFile(trustPath);
+  expect(trustedBefore, `the created set has no trusted host key at ${trustPath}`).not.toBeNull();
 
   // --------------------------------------------- the connection, refused
   //
@@ -141,6 +187,29 @@ test("an operator changes every editable field of a backup set, and every change
       "engine reported the connection fine anyway. Nothing below can then show an edit taking effect."
   ).toBe(false);
 
+  // ------------------------ the pair, from the side the browser cannot see
+  //
+  // The completion method and its window are one setting the server takes
+  // as two fields, and the page is about to be held to that. This is the
+  // other end of the same rule, reached the only way a browser cannot: a
+  // request that names the window alone, against a set that stays on
+  // "rename".
+  //
+  // It matters because the page's own coupling could be removed without
+  // anything else noticing. If it were, and the service had gone back to
+  // answering 200 here, every UI assertion below would still pass while
+  // an operator's typed window was being discarded again, which is the
+  // defect #580 exists to end. It is done BEFORE edit mode opens so that
+  // nothing in this request can be confused with something the page sent.
+  const refused = await patch(page, deployment, { stable_for_seconds: NEVER_PERSISTED_WINDOW });
+  expect(refused.status, `a window sent alone against a "rename" set: ${refused.text}`).toBe(400);
+  expect(refused.text).toContain("would not be kept");
+  expect(refused.text).toContain(`completion_strategy as "${BEFORE.completionStrategy}"`);
+  expect(
+    await configYaml(deployment),
+    "the refused request rewrote the configuration file, so a refusal is not free after all"
+  ).toBe(created);
+
   // ---------------------------------------------------------- edit mode
   //
   // Edit is a mode the detail page enters rather than a dialog it opens
@@ -151,6 +220,24 @@ test("an operator changes every editable field of a backup set, and every change
   await expect(page.getByRole("heading", { name: SET })).toBeVisible();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Edit this backup set" })).toBeVisible();
+
+  // Every PATCH the PAGE sends from here on, in order, with its body.
+  //
+  // This is what makes the two negatives below rigorous. "No request was
+  // issued" is a claim about a moment, and a moment is the one thing a
+  // browser test cannot sample honestly: an assertion made too early
+  // passes for a request that was about to happen. Recording the whole
+  // session and checking the list once at the end has no such window, and
+  // it proves more besides, because the list also says that every save
+  // carried its own box and nothing else.
+  //
+  // Installed after the request above deliberately: that one is this
+  // spec's, not the page's, and the list is a statement about the page.
+  const sent: Record<string, unknown>[] = [];
+  page.on("request", (r: Request) => {
+    if (r.method() !== "PATCH" || !r.url().endsWith(`/api/v1/backup-sets/${SET_ID}`)) return;
+    sent.push(JSON.parse(r.postData() ?? "{}") as Record<string, unknown>);
+  });
 
   // ------------------------------------------------- the remote folder
   //
@@ -169,12 +256,78 @@ test("an operator changes every editable field of a backup set, and every change
   //
   // So this is not "the engine can read back what it wrote". It is the
   // engine doing work against the new value.
-  const after = await testConnection(page, deployment);
+  const reachable = await testConnection(page, deployment);
   expect(
-    after.ok,
+    reachable.ok,
     "the edit reached config.yaml but the running engine is still using the old remote path, so an operator " +
-      `would have to restart the deployment to get an edit it told them was saved. The engine said: ${after.message}`
+      `would have to restart the deployment to get an edit it told them was saved. The engine said: ${reachable.message}`
   ).toBe(true);
+
+  // ------------------------------------------------------- the SSH key
+  //
+  // One of #572's two write-only boxes. It shows nothing, because there is
+  // nothing to show: the set holds a reference to a key, and a reference
+  // is not a value an operator typed or can act on. So the box takes the
+  // id of a key this deployment has already imported, and an empty box
+  // means "leave the key alone" rather than "clear the key".
+  //
+  // A second real key, imported through the same endpoint the wizard uses
+  // and authorised on the source machine, so this is a rotation an
+  // operator could actually survive rather than a string swap.
+  const second = newKeyPair();
+  await deployment.source.authorizeKey(second.publicKeyLine);
+  const rotated = await importKey(page, deployment, second.privateKeyPem);
+  await saveField(page, "SSH key", rotated);
+
+  const afterRotation = await configYaml(deployment);
+  expect(afterRotation, "the set is not using the key that was just pasted").toContain(`ssh_keys/${rotated}`);
+  expect(afterRotation, "the set is still carrying the key it was rotated away from").not.toContain(
+    `ssh_keys/${setUp.keyId}`
+  );
+  // And live, which is the half a file cannot show: the engine logs in
+  // again, and the only key it can be logging in with is the one this box
+  // just named.
+  const rotatedReachable = await testConnection(page, deployment);
+  expect(
+    rotatedReachable.ok,
+    "the rotated key is in config.yaml but the running engine cannot authenticate with it. The engine said: " +
+      rotatedReachable.message
+  ).toBe(true);
+
+  // ----------------------------------------------- the trusted host key
+  //
+  // The other write-only box, and the one edit on this form that is
+  // refused for what it MEANS rather than for how it is spelled. The
+  // source machine serves two host keys; the set was created trusting the
+  // one the probe negotiated, and this pins the other. To the deployment
+  // that is indistinguishable from a host whose key changed, which is what
+  // a rebuild looks like and also what an impersonation looks like, so it
+  // says so and asks.
+  const otherHostKey = `${deployment.source.host} ${(await deployment.source.hostKey()).line.split(/\s+/).slice(0, 2).join(" ")}`;
+  await page.getByLabel("Trusted host key", { exact: true }).fill(otherHostKey);
+  const saveTrust = page.getByRole("button", { name: "Save trusted host key" });
+  await expect(saveTrust, "typing a known_hosts line did not arm its Save").toBeEnabled();
+  const [challenged] = await Promise.all([waitForPatch(page), saveTrust.click()]);
+  expect(challenged.status(), await challenged.text()).toBe(409);
+  await expect(page.getByText("This change trusts a different host key for the same host")).toBeVisible();
+  expect(
+    await deployment.manager.configFile(trustPath),
+    "the refused save changed the trusted host key anyway, so the confirmation guards nothing"
+  ).toBe(trustedBefore);
+
+  // Confirming re-sends the same keys with the one acknowledgement that
+  // refusal asked for, which is visible in the recorded body at the end:
+  // it carries acknowledge_host_key_change and not the repoint's flag.
+  const [acknowledged] = await Promise.all([
+    waitForPatch(page),
+    page.getByRole("button", { name: "Save anyway" }).click()
+  ]);
+  expect(acknowledged.status(), await acknowledged.text()).toBe(200);
+  const trustedAfter = await deployment.manager.configFile(trustPath);
+  expect(trustedAfter, "the acknowledged save did not change the trusted host key").not.toBe(trustedBefore);
+  expect(trustedAfter?.trim()).toBe(otherHostKey);
+  // The path did not move, which is why the file had to be read at all.
+  expect(yamlValue(await configYaml(deployment), "known_hosts")).toBe(`${CONFIG_DIR}/${trustPath}`);
 
   // ------------------------------------------------ the rest of the walk
   //
@@ -204,70 +357,100 @@ test("an operator changes every editable field of a backup set, and every change
 
   // ------------------------------- the completion method and its window
   //
-  // These two travel together, and the deployment is what says so: core
-  // refuses a set whose strategy is "stable" and whose window is zero,
-  // exactly as it refuses one at creation. So the completion box's own
-  // Save cannot succeed on its own here, and asserting that is worth more
-  // than avoiding it: a form that accepted this one and wrote a set the
-  // engine would refuse to load is the failure this refusal prevents.
+  // Two boxes, one setting. Core refuses a set whose strategy is "stable"
+  // and whose window is zero, and it clears the window of any set that is
+  // not on "stable", so either box sent alone is a save that cannot work.
+  // #580 made every save carry the pair, and the three attempts below are
+  // the three ways an operator can reach it.
   //
   // By role rather than by label: a <select>'s accessible name picks up
   // the option currently showing, so "Completion method" is a prefix of
   // its name rather than the whole of it, and a bare label lookup also
   // matches the "Save completion method" button beside it.
+  const beforeCompletion = await configYaml(deployment);
   await page.getByRole("combobox", { name: "Completion method" }).selectOption({ label: AFTER.completionLabel });
-  const saveCompletion = page.getByRole("button", { name: "Save completion method" });
-  await expect(saveCompletion).toBeEnabled();
-  await saveCompletion.click();
-  await expect(page.getByRole("alert")).toContainText("stable_for");
+
+  // The method's own Save, with the window still at the zero the set was
+  // created with. Nothing goes to the deployment at all: the window rides
+  // with the method, the window does not parse, and the refusal is the
+  // form's own. That is the visible difference #580 made here, and it is
+  // an improvement rather than a regression: the operator is told which
+  // box needs an answer, under that box, instead of being handed a
+  // sentence about stable_for under the method.
+  await page.getByRole("button", { name: "Save completion method" }).click();
+  // Filtered rather than a bare role lookup: WarningBanner takes role
+  // "alert" too, so "the one alert on the page" is a locator that starts
+  // matching something else the moment any banner is up.
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Stable for must be a whole number of seconds greater than zero." })
+  ).toBeVisible();
   expect(
-    yamlValue(await configYaml(deployment), "strategy"),
-    "the refused save changed the completion strategy on disk anyway"
-  ).toBe(BEFORE.completionStrategy);
+    await configYaml(deployment),
+    "a save the form refused locally still reached the configuration file"
+  ).toBe(beforeCompletion);
 
-  // Selecting the method revealed its window, which is the whole reason
-  // the field is conditional.
+  // And SAVE ALL in the same state, which is the route that used to be
+  // the only way to save the pair at all. It has to refuse identically,
+  // because the expansion happens inside the one function every save goes
+  // through rather than on the button that asked. Edit mode stays open,
+  // which is how an operator knows nothing was written.
+  await page.getByRole("button", { name: "SAVE ALL & EXIT EDIT" }).click();
+  await expect(page.getByRole("heading", { name: "Edit this backup set" })).toBeVisible();
+  expect(
+    await configYaml(deployment),
+    "SAVE ALL wrote a pair the per-box Save had just refused, so the two paths do not agree"
+  ).toBe(beforeCompletion);
+
+  // Now the window has an answer, and the WINDOW's own Save is what
+  // sends it. This is the direction that used to answer 200 and discard
+  // the value; it now carries the method with it, so both land.
   const stableWindow = page.getByLabel("Stable for (seconds)", { exact: true });
-  await stableWindow.fill(String(AFTER.stableForSeconds));
+  await saveField(page, "Stable for (seconds)", String(AFTER.stableForSeconds));
 
-  // And the same pairing from the other side, which is the one place in
-  // this walk where a save is ACCEPTED and the value does not land. Saving
-  // the window on its own sends only the window, so the strategy on disk
-  // is still "rename", and core clears the window of any set that is not
-  // on "stable" rather than leaving a number in an operator's file that
-  // nothing reads. The request succeeds and the value is gone.
-  //
-  // It is not a silent drop, and that is the part worth pinning: the page
-  // re-reads the server's answer for the box it just saved, so the window
-  // comes back showing the zero that was actually written rather than the
-  // 45 that was typed. An operator sees their value refuse to stick. That
-  // is the difference between this and a form that lies, and it is only
-  // checkable from the file plus the box together.
-  const saveWindow = page.getByRole("button", { name: "Save stable for (seconds)" });
-  const [alone] = await Promise.all([waitForPatch(page), saveWindow.click()]);
-  expect(alone.status(), await alone.text()).toBe(200);
-  const halfSaved = await configYaml(deployment);
-  expect(yamlValue(halfSaved, "strategy"), "saving the window alone moved the strategy too").toBe(
-    BEFORE.completionStrategy
+  const paired = await configYaml(deployment);
+  expect(yamlValue(paired, "strategy")).toBe(AFTER.completionStrategy);
+  expect(yamlValue(paired, "stable_for")).toBe(`${AFTER.stableForSeconds}s`);
+  // The box keeps what was typed. The page re-reads the server's answer
+  // for whatever it just saved, so a window that came back as 0 would show
+  // as 0, which is precisely how the old defect announced itself.
+  await expect(stableWindow, "the window did not survive its own save").toHaveValue(
+    String(AFTER.stableForSeconds)
   );
-  expect(yamlValue(halfSaved, "stable_for"), "the window landed on a set that is not on the stable strategy").toBe(
-    "0s"
-  );
-  await expect(stableWindow, "the form kept showing a window the deployment did not keep").toHaveValue("0");
 
-  // So the pair goes together, which is what SAVE ALL is for: it sends
-  // whatever is still dirty, which is both boxes.
-  await stableWindow.fill(String(AFTER.stableForSeconds));
-  const [saved] = await Promise.all([
-    waitForPatch(page),
-    page.getByRole("button", { name: "SAVE ALL & EXIT EDIT" }).click()
-  ]);
-  expect(saved.status(), await saved.text()).toBe(200);
+  // And the sharpest form of the same claim: widening the window on a set
+  // that is ALREADY on stable-size. The strategy does not change, so
+  // nothing about this edit needs it in the body, and the recorded body at
+  // the end says it is there anyway. That is what stops the pair being
+  // quietly re-split later by someone who reasons that the companion is
+  // only needed when the method moves.
+  await saveField(page, "Stable for (seconds)", String(AFTER.widenedStableForSeconds));
+  expect(yamlValue(await configYaml(deployment), "stable_for")).toBe(`${AFTER.widenedStableForSeconds}s`);
+
+  // Nothing is dirty now, so this exits without writing anything, which
+  // the recorded list at the end is what actually confirms.
+  await page.getByRole("button", { name: "SAVE ALL & EXIT EDIT" }).click();
   await expect(page.getByRole("heading", { name: "Edit this backup set" })).toBeHidden();
 
-  const edited = await configYaml(deployment);
-  expect(yamlValue(edited, "strategy")).toBe(AFTER.completionStrategy);
-  expect(yamlValue(edited, "stable_for")).toBe("45s");
+  // ------------------------------------------- what the page actually sent
+  //
+  // The whole session, in order. Two things it settles that no assertion
+  // above can: that the two refused attempts sent nothing at all, and that
+  // every save carried exactly its own box, with the completion pair
+  // travelling together every single time including when it did not have
+  // to.
+  expect(sent).toEqual([
+    { remote_path: AFTER.remotePath },
+    { ssh_key_id: rotated },
+    { known_hosts_line: otherHostKey },
+    { known_hosts_line: otherHostKey, acknowledge_host_key_change: true },
+    { host: AFTER.host },
+    { port: AFTER.port },
+    { user: AFTER.user },
+    { local_path: AFTER.localPath },
+    { include: AFTER.include },
+    { completion_strategy: AFTER.completionStrategy, stable_for_seconds: AFTER.stableForSeconds },
+    { completion_strategy: AFTER.completionStrategy, stable_for_seconds: AFTER.widenedStableForSeconds }
+  ]);
 
   // ---------------------------------------------------------- the control
   //
@@ -275,14 +458,10 @@ test("an operator changes every editable field of a backup set, and every change
   // would pass every assertion above and still be wrong, because it would
   // also carry the fields the form never showed. These are those fields:
   // the freshness budget, which the API can write and this surface does
-  // not offer; the trusted host key and the imported key reference, which
-  // are trust decisions the wizard owns; and whether the set is collected
-  // at all.
+  // not offer, and whether the set is collected at all.
+  const edited = await configYaml(deployment);
   expect(yamlValue(edited, "stale_after"), "a save moved the freshness budget, which no box on the form offers").toBe(
     "48h0m0s"
-  );
-  expect(yamlValue(edited, "known_hosts"), "a save moved the trusted host key, which no box on the form offers").toBe(
-    knownHostsBefore
   );
   expect(yamlValue(edited, "disabled"), "a save re-enabled a set the form has no control for").toBe("true");
   // Identity is the other half of the same control: the name and source
@@ -307,7 +486,7 @@ test("an operator changes every editable field of a backup set, and every change
     local_path: AFTER.localPath,
     include: AFTER.include,
     completion_strategy: AFTER.completionStrategy,
-    stable_for_seconds: AFTER.stableForSeconds,
+    stable_for_seconds: AFTER.widenedStableForSeconds,
     stale_after_seconds: BEFORE.staleAfterSeconds
   });
 
@@ -363,6 +542,19 @@ async function configYaml(deployment: Deployment): Promise<string> {
     );
   }
   return text;
+}
+
+/** Turns an absolute path the engine wrote into config.yaml into one
+ *  `Manager.configFile` can read, and refuses anything that is not under
+ *  the configuration directory rather than guessing at a relative path. */
+function underConfigDir(absolute: string): string {
+  if (!absolute.startsWith(`${CONFIG_DIR}/`)) {
+    throw new Error(
+      `config.yaml points at ${absolute}, which is not under ${CONFIG_DIR}, so this suite cannot read it off the ` +
+        "config volume. The engine's own layout for per-set files has moved."
+    );
+  }
+  return absolute.slice(CONFIG_DIR.length + 1);
 }
 
 /** The one value config.yaml writes for `key`.
@@ -425,6 +617,18 @@ function lengthPrefix(part: Buffer): Buffer {
   return out;
 }
 
+/** Imports one private key and hands back the id the deployment filed it
+ *  under. The id is a reference and the only thing that comes back: the
+ *  server-side path it resolves to never reaches a client, which is why
+ *  the box on the form takes an id rather than a path. */
+async function importKey(page: Page, deployment: Deployment, privateKeyPem: string): Promise<string> {
+  const key = await post(page, deployment, "/api/v1/ssh-keys", { private_key_pem: privateKeyPem });
+  expect(key.status, `importing an SSH key: ${key.text}`).toBe(201);
+  const id = String(key.body.id ?? "");
+  expect(id, "the import answered without an id, so there is nothing to name the key by").not.toBe("");
+  return id;
+}
+
 /** Imports the key, trusts the source machine's host key by probing it,
  *  and writes this deployment's first configuration: the three endpoints
  *  the wizard's own steps call, in the order it calls them.
@@ -439,9 +643,8 @@ async function createBackupSet(
   page: Page,
   deployment: Deployment,
   privateKeyPem: string
-): Promise<{ restartRequired: boolean }> {
-  const key = await post(page, deployment, "/api/v1/ssh-keys", { private_key_pem: privateKeyPem });
-  expect(key.status, `importing an SSH key: ${key.text}`).toBe(201);
+): Promise<{ restartRequired: boolean; keyId: string }> {
+  const keyId = await importKey(page, deployment, privateKeyPem);
 
   const probe = await post(page, deployment, "/api/v1/ssh/host-key-probe", {
     host: deployment.source.host,
@@ -453,7 +656,12 @@ async function createBackupSet(
   // takes whatever algorithm the server offers first, and the source
   // machine's entrypoint generates an RSA host key beside the ed25519 one,
   // so a run picks up either. What proves the anchor is the RIGHT one is
-  // the connection succeeding later, which it cannot with a wrong one.
+  // the connection succeeding later.
+  //
+  // It is also what makes the trusted-host-key box testable at all. The
+  // machine serves two keys, so there is always a second, genuinely
+  // different one to re-trust it with, and that is a real host-key change
+  // rather than a re-paste of the same line.
   const trusted = String(probe.body.known_hosts_line).trim().split(/\s+/);
   expect(trusted[0], "the probe trusted a line about some other host").toBe(deployment.source.host);
   expect(trusted, `the probe answered with something that is not a known_hosts line: ${probe.text}`).toHaveLength(3);
@@ -464,7 +672,7 @@ async function createBackupSet(
     host: BEFORE.host,
     port: BEFORE.port,
     user: BEFORE.user,
-    ssh_key_id: key.body.id,
+    ssh_key_id: keyId,
     known_hosts_line: probe.body.known_hosts_line,
     remote_path: BEFORE.remotePath,
     local_path: BEFORE.localPath,
@@ -482,7 +690,7 @@ async function createBackupSet(
     disabled: true
   });
   expect(created.status, `writing this deployment's first configuration: ${created.text}`).toBe(201);
-  return { restartRequired: created.body.restart_required === true };
+  return { restartRequired: created.body.restart_required === true, keyId };
 }
 
 /** Asks the running engine to open a real connection for the PERSISTED
@@ -510,11 +718,31 @@ async function post(
   path: string,
   data: Record<string, unknown>
 ): Promise<{ status: number; text: string; body: Record<string, unknown> }> {
+  return send(page, deployment, "post", path, data);
+}
+
+/** The same, as a PATCH of the backup set. One caller: reaching the
+ *  server's own half of a rule the page is separately held to. */
+async function patch(
+  page: Page,
+  deployment: Deployment,
+  data: Record<string, unknown>
+): Promise<{ status: number; text: string; body: Record<string, unknown> }> {
+  return send(page, deployment, "patch", `/api/v1/backup-sets/${SET_ID}`, data);
+}
+
+async function send(
+  page: Page,
+  deployment: Deployment,
+  method: "post" | "patch",
+  path: string,
+  data: Record<string, unknown>
+): Promise<{ status: number; text: string; body: Record<string, unknown> }> {
   const csrf = (await page.context().cookies()).find((c) => c.name === "bm_csrf");
   if (!csrf) {
     throw new Error("there is no bm_csrf cookie on this context, so a CSRF-gated request cannot be made at all");
   }
-  const res = await page.request.post(`${deployment.uiUrl}${path}`, {
+  const res = await page.request[method](`${deployment.uiUrl}${path}`, {
     headers: { "X-CSRF-Token": csrf.value },
     data
   });
