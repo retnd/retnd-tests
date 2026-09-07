@@ -158,17 +158,18 @@ that a check nobody notices stopping is worse than no check.
 One fixture, `deployment`, per test:
 
 ```ts
-import { enrolAdministrator, expect, signIn, test } from "../harness/fixtures";
+import { enrolAdministrator, expect, openApp, signIn, test } from "../harness/fixtures";
 
 test("...", async ({ page, deployment }) => {
   await enrolAdministrator(page, deployment);   // or signIn, once enrolled
+  await openApp(page, deployment);              // and then load the app afresh
   deployment.uiUrl;                             // where the browser goes
   deployment.source.host;                       // "source", on the run's network
   deployment.source.remotePath;                 // "/upload"
   deployment.source.user;                       // "backupuser"
   deployment.source.files;                      // [{ name, bytes, sha256 }, ...]
   await deployment.source.authorizeKey(pub);    // authorise the manager's key
-  await deployment.source.hostKey();            // { line, fingerprint }
+  await deployment.source.hostKey("rsa");       // { line, fingerprint }
   await deployment.source.digest("payload.bin");// re-read, to prove read-only
   await deployment.manager.backupsListing();    // what is on /data/backups
   await deployment.manager.backupDigest(path);  // sha256, read from the volume
@@ -177,6 +178,27 @@ test("...", async ({ page, deployment }) => {
   await deployment.manager.restartEngine();
 });
 ```
+
+`openApp` is a full page load, and it is needed rather than tidy: the app
+fetches its backup sets, health, operations and quarantine on its first
+render, above its own authenticated/unauthenticated branch, so on a browser
+with no session yet all four come back 401. Enrolling does not re-run them
+and, on an instance with no configuration, neither does the poll, which is
+switched off until a deployment is configured. Without the reload the
+Backup sets page shows "authentication required" from a fetch that happened
+before there was an administrator, and never offers "Add backup set".
+`openApp`'s own doc has the detail.
+
+`hostKey` takes an algorithm because the source machine serves two and the
+manager does not pick the obvious one: `x/crypto/ssh`'s default client
+preference puts ed25519 last, so the engine's probe negotiates `ssh-rsa`
+and that is the key it pins. A spec checking what was pinned should read
+the algorithm the page reports and ask for that one, rather than assume.
+
+Walking the wizard is `harness/wizard.ts`: a step per wizard step, plus
+`createBackupSet` for a spec whose subject is what happens afterwards. It
+also mints the ed25519 keypair the wizard imports, in memory, since the
+suite deliberately mounts no key.
 
 A deployment per test, so every spec starts from a fresh install, which is
 the only state in which enrolment, the first-run banner and an empty
@@ -190,14 +212,32 @@ that exists is not a backup.
 
 ## What is proved today
 
-One spec: an administrator is enrolled through the browser on a fresh
-deployment, with the tokenless attempt refused before it and the
-second attempt refused after it, and the resulting record read off the
-manager's state volume rather than believed from the page.
+| Spec | The claim |
+|---|---|
+| `enrolment.spec.ts` | an administrator is enrolled through the browser on a fresh deployment, with the tokenless attempt refused before it and the second attempt refused after it, and the resulting record read off the manager's state volume rather than believed from the page |
+| `backup-set-wizard.spec.ts` | a backup set is created through the wizard against the source container, and the set that comes out is the set that was typed in (compared against `config.yaml` on the config volume, not against the wizard's own echo); the fingerprint an operator was asked to trust is the source machine's real host key, and the `known_hosts` line the engine pinned holds that same key; a set whose host was never trusted cannot be saved and writes nothing |
+| `backup-set-edit.spec.ts` | every field the edit surface offers is changed, and each change is verified as having taken effect on the deployment rather than merely accepted by the form |
+| `backup-run.spec.ts` | a deployment nobody had configured pulls all three files off the source machine, and each one's sha256 on the manager's backup volume is the digest the source machine itself reported for that name; the source comes out untouched |
 
-Issue [#43](https://github.com/spdrman/rclone-manager-tests/issues/43) asks
-for three more on top of this harness: a backup set created through the
-wizard against the source container, every field the edit surface offers
-changed and verified as having taken effect, and a cycle run with what the
-UI reports checked against what landed, by digest. They are not here yet.
-The fixtures above are shaped for them.
+Two of those specs also pin a discrepancy each, in the shape
+`findings/README.md` describes: the case asserts the behaviour that is
+actually there, so the suite stays green while it stands, and goes red the
+moment it is fixed. `backup-set-wizard.spec.ts` pins the wizard's
+read-only declaration being dropped by the first-run save, and
+`backup-run.spec.ts` pins the sets page's run control being refused by the
+destructive gate (rclone-manager#92), which is why nothing here presses it
+to start a cycle. The cycle these specs are about is the one the engine
+starts for itself the moment a configuration is activated.
+
+### Reading a volume must not change it
+
+Worth knowing before adding a read to `Manager`. Docker populates an EMPTY
+named volume from whatever the image has at the mount point the first time
+something mounts it, and that includes stamping the mount point's own
+ownership onto the volume. Read-only does not stop it. So reading a
+still-empty volume at `/mnt`, which the tool image has and root owns,
+handed the whole backup volume to root, and the engine runs as uid 1000:
+every transfer then died on `mkdir /data/backups/<set>: permission denied`,
+minutes after the read that caused it, and an SSH-key import against a
+config volume that had been read while empty died the same way. `READ_MOUNT`
+is a path the image does not have for exactly that reason.
