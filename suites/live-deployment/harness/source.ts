@@ -1,0 +1,314 @@
+// The machine being backed up: a real SSH endpoint holding known content.
+//
+// The image comes from `scripts/e2e/source-machine.Dockerfile` in the
+// rclone-manager checkout the pin resolved, and that is the whole point of
+// this file existing rather than a Dockerfile of its own. That file's own
+// header says it is the ONE definition of the simulated VPS, and that two
+// copies of it is exactly the failure it was created to end: the Go machine
+// tier reads it through core/tests/machines, scripts/e2e/two-machine-backup.sh
+// reads it through `docker build -f`, and this suite is its third consumer.
+//
+// So what stands up here is genuine OpenSSH, chrooted and forced into
+// internal-sftp, with real host-key verification and real chroot and
+// permission semantics. Not a mock, not a local directory pretending to be
+// a remote: the wizard's own "verify server" step opens an actual SSH
+// connection, and there has to be something on the other end of it.
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+
+import { docker, dockerOrThrow, type Run } from "./docker";
+
+/** The account the manager logs in as, and where its files live. atmoz/sftp
+ *  chroots the user to its home, so `/upload` is what the remote side of a
+ *  backup set names, while `/home/backupuser/upload` is where the same
+ *  bytes are from inside the container. */
+export const SFTP_USER = "backupuser";
+export const SFTP_UID = 1001;
+export const REMOTE_PATH = "/upload";
+const HOME_PATH = `/home/${SFTP_USER}`;
+const UPLOAD_PATH = `${HOME_PATH}/upload`;
+
+/** One file the source machine is serving, digested by the source machine
+ *  itself rather than by whatever wrote it. That distinction is the
+ *  two-machine script's, and it is the right one: what a backup has to
+ *  match is the bytes the machine being backed up is actually serving. */
+/** Which of the machine's host keys to read. Named the way the key files
+ *  and `ssh-keygen -t` name them, not the way the wire does
+ *  ("ssh-ed25519"), because the file is what this reads. */
+export type HostKeyAlgorithm = "ed25519" | "rsa";
+
+export interface SourceFile {
+  /** Name inside the remote path, which is also the name it should land
+   *  under on the manager. */
+  name: string;
+  bytes: number;
+  /** Read out of the container with sha256sum, at seeding time. */
+  sha256: string;
+}
+
+export interface SourceMachine {
+  container: string;
+  /** The name the manager reaches it by, on this run's own network. There
+   *  is no host port: nothing outside the run's network can talk to it. */
+  host: string;
+  port: number;
+  user: string;
+  /** What a backup set's remote path should be. */
+  remotePath: string;
+  /** What it is serving, in the order it was seeded. */
+  files: SourceFile[];
+  /** Authorises a public key for the SFTP account. The wizard generates or
+   *  imports a key on the manager and prints the public half; this is the
+   *  operator's next step, and it is the whole reason the manager can log
+   *  in at all. */
+  authorizeKey(publicKey: string): Promise<void>;
+  /** One of the machine's own host keys, as the line and as the SHA256
+   *  fingerprint an operator is shown when asked to trust a server.
+   *
+   *  It takes an algorithm because the machine serves two (sshd_config
+   *  lists ed25519 and RSA) and the manager does not pick the one you
+   *  would expect: x/crypto/ssh's default client preference puts
+   *  ssh-ed25519 LAST, so the engine's own probe negotiates ssh-rsa and
+   *  that is the key it ends up pinning. A spec checking what the wizard
+   *  pinned has to read the key for the algorithm the wizard says it
+   *  saw, rather than assume one. */
+  hostKey(algorithm?: HostKeyAlgorithm): Promise<{ line: string; fingerprint: string }>;
+  /** Re-reads one file's digest now. What makes a read-only backup set's
+   *  claim checkable: the source has to come out of a cycle untouched. */
+  digest(name: string): Promise<string>;
+}
+
+/** Builds the simulated VPS image out of the pinned checkout.
+ *
+ *  Tagged by the commit whose Dockerfile it came from, so a pin bump that
+ *  changes the definition of the simulated VPS produces a different image
+ *  instead of silently reusing the old one. */
+export async function buildSourceImage(checkout: string, commit: string): Promise<string> {
+  const dockerfile = resolve(checkout, "scripts/e2e/source-machine.Dockerfile");
+  if (!existsSync(dockerfile)) {
+    throw new Error(
+      `the source machine Dockerfile is missing at ${dockerfile}. It is the one definition of the simulated VPS, ` +
+        "shared with the Go machine tier and scripts/e2e/two-machine-backup.sh, so there is nothing to build a " +
+        "source machine from without it."
+    );
+  }
+  const reference = `rclone-manager-tests/source-machine:${commit.slice(0, 12)}`;
+  const present = await docker(["image", "inspect", reference]);
+  if (present.code === 0) return reference;
+  await dockerOrThrow(
+    `building the source machine from ${dockerfile}`,
+    ["build", "-q", "-t", reference, "-f", dockerfile, resolve(dockerfile, "..")]
+  );
+  return reference;
+}
+
+/** Starts the source machine on this run's network and seeds it.
+ *
+ *  Its host keys are generated by the container on first start (atmoz/sftp
+ *  does that itself) rather than mounted in from here. That is one fewer
+ *  piece of key material on this machine's disk, and it also makes the host
+ *  key genuinely unknown to the manager until something trusts it, which is
+ *  the state the wizard's verify step is written for. */
+export async function startSource(run: Run, network: string, image: string): Promise<SourceMachine> {
+  const container = await run.claimContainer("source");
+  const alias = "source";
+
+  await dockerOrThrow("starting the source machine", [
+    "run",
+    "-d",
+    "--name",
+    container,
+    "--network",
+    network,
+    "--network-alias",
+    alias,
+    ...run.labelArgs(),
+    // No published port at all. The manager reaches it over the run's own
+    // network, which is what a real deployment looks like and also means
+    // two runs on one machine cannot collide over a port here.
+    image,
+    // atmoz/sftp's own user spec: name, no password (so key authentication
+    // is the only way in), uid, gid, and one directory to create.
+    `${SFTP_USER}::${SFTP_UID}:${SFTP_UID}:upload`
+  ]);
+
+  await waitForSshd(run, container);
+  const files = await seed(container);
+
+  return {
+    container,
+    host: alias,
+    port: 22,
+    user: SFTP_USER,
+    remotePath: REMOTE_PATH,
+    files,
+    authorizeKey: (publicKey) => authorizeKey(container, publicKey),
+    hostKey: (algorithm = "ed25519") => hostKey(container, algorithm),
+    digest: (name) => digestOf(container, `${UPLOAD_PATH}/${name}`)
+  };
+}
+
+/** Waits for the real thing, not for a proxy for it: a TCP connection to
+ *  port 22 that answers with an SSH banner. A container that is "running"
+ *  is not a machine that is serving SSH, and the gap between the two is
+ *  several seconds on a cold host because sshd generates its host keys
+ *  first. */
+async function waitForSshd(run: Run, container: string): Promise<void> {
+  const deadline = Date.now() + 120_000;
+  for (;;) {
+    const probe = await docker([
+      "exec",
+      container,
+      "sh",
+      "-c",
+      // The `! -i lo` shape the two-machine script's connection cap needs
+      // is not here because this suite installs no cap, but the probe
+      // itself is the same one: dial the port and require an SSH banner.
+      "nc -w 2 127.0.0.1 22 </dev/null 2>/dev/null | grep -q '^SSH-'"
+    ]);
+    if (probe.code === 0) return;
+    if (Date.now() > deadline) {
+      const logs = await docker(["logs", "--tail", "40", container]);
+      throw new Error(
+        `the source machine never started serving SSH within 120s.\nits log:\n${logs.stdout}${logs.stderr}`
+      );
+    }
+    await sleep(500);
+  }
+}
+
+/** Three files of known content, seeded through stdin rather than through a
+ *  mounted host directory.
+ *
+ *  Through stdin because nothing this suite writes should need a path on
+ *  the host: the two-machine script mounts a directory it then has to
+ *  remove by name at teardown, and a container this run deletes takes its
+ *  own filesystem with it.
+ *
+ *  Deterministic bytes rather than /dev/urandom, for the reason that script
+ *  gives: a digest mismatch has to be something you can reason about and
+ *  reproduce, and random content makes a failure a one-off story. The three
+ *  names are its names too, so the two proofs of the same claim are
+ *  recognisably about the same payload. */
+async function seed(container: string): Promise<SourceFile[]> {
+  const contents: { name: string; bytes: Buffer }[] = [
+    // A megabyte rather than the two-machine script's three: that size is
+    // there so one case can reach a connection ceiling over several
+    // operations, and nothing here models that. This is big enough that a
+    // truncated or half-written transfer cannot produce a matching digest.
+    { name: "payload.bin", bytes: deterministicBytes(1024 * 1024) },
+    { name: "schema.sql", bytes: Buffer.from("CREATE TABLE artifacts (id text primary key);\n") },
+    { name: "notes.txt", bytes: Buffer.from("issue 43: one deployment, one browser, one real backup.\n") }
+  ];
+
+  const files: SourceFile[] = [];
+  for (const file of contents) {
+    await dockerOrThrow(`seeding ${file.name} on the source machine`, [
+      "exec",
+      "-i",
+      container,
+      "sh",
+      "-c",
+      `cat > ${UPLOAD_PATH}/${file.name}`
+    ], { input: file.bytes });
+    files.push({ name: file.name, bytes: file.bytes.length, sha256: "" });
+  }
+
+  // The upload directory belongs to the SFTP account, and the files written
+  // above went in as root. Without this the manager can list them and not
+  // read them, which fails much later and much less clearly.
+  await dockerOrThrow("giving the seeded files to the SFTP account", [
+    "exec",
+    container,
+    "sh",
+    "-c",
+    `chown -R ${SFTP_UID}:users ${UPLOAD_PATH} && chmod 644 ${UPLOAD_PATH}/*`
+  ]);
+
+  for (const file of files) file.sha256 = await digestOf(container, `${UPLOAD_PATH}/${file.name}`);
+  return files;
+}
+
+/** A megabyte of bytes that are the same every run and not all the same as
+ *  each other. An xorshift rather than a repeated character, so a transfer
+ *  that drops or reorders a block cannot still produce the right digest. */
+function deterministicBytes(size: number): Buffer {
+  const out = Buffer.allocUnsafe(size);
+  let state = 0x9e3779b9;
+  for (let i = 0; i < size; i++) {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    out[i] = (state >>> 24) & 0xff;
+  }
+  return out;
+}
+
+async function digestOf(container: string, path: string): Promise<string> {
+  const out = await dockerOrThrow(`reading the sha256 of ${path} on the source machine`, [
+    "exec",
+    container,
+    "sha256sum",
+    path
+  ]);
+  const digest = out.trim().split(/\s+/)[0];
+  if (!/^[0-9a-f]{64}$/.test(digest)) {
+    throw new Error(`sha256sum ${path} answered something that is not a digest: ${out.trim()}`);
+  }
+  return digest;
+}
+
+/** Adds one public key to the SFTP account's authorized_keys.
+ *
+ *  Straight into authorized_keys rather than into the image's own
+ *  `.ssh/keys` staging directory, because that directory is only read once,
+ *  by create-sftp-user, at first start. A key authorised after the machine
+ *  is up has to go where sshd reads on every connection.
+ *
+ *  The key travels on stdin. It is a public key, so it is not a secret, and
+ *  it goes that way anyway: an argument list is world-readable through
+ *  `ps`, and having one path for "material going into a container" beats
+ *  having two and remembering which is which. */
+async function authorizeKey(container: string, publicKey: string): Promise<void> {
+  const line = publicKey.trim();
+  if (!/^(ssh-ed25519|ssh-rsa|ecdsa-sha2-\S+)\s+\S+/.test(line)) {
+    throw new Error(
+      "that does not look like an OpenSSH public key line, so authorising it would make the next failure a " +
+        "login refusal with no obvious cause."
+    );
+  }
+  await dockerOrThrow(`authorising a key for ${SFTP_USER} on the source machine`, [
+    "exec",
+    "-i",
+    container,
+    "sh",
+    "-c",
+    `mkdir -p ${HOME_PATH}/.ssh && cat >> ${HOME_PATH}/.ssh/authorized_keys && ` +
+      `chown -R ${SFTP_UID} ${HOME_PATH}/.ssh && chmod 700 ${HOME_PATH}/.ssh && ` +
+      `chmod 600 ${HOME_PATH}/.ssh/authorized_keys`
+  ], { input: line + "\n" });
+}
+
+async function hostKey(
+  container: string,
+  algorithm: HostKeyAlgorithm
+): Promise<{ line: string; fingerprint: string }> {
+  const path = `/etc/ssh/ssh_host_${algorithm}_key.pub`;
+  const line = (
+    await dockerOrThrow(`reading the source machine's ${algorithm} host key`, ["exec", container, "cat", path])
+  ).trim();
+  const fingerprint = (
+    await dockerOrThrow(`fingerprinting the source machine's ${algorithm} host key`, [
+      "exec",
+      container,
+      "ssh-keygen",
+      "-lf",
+      path
+    ])
+  ).trim();
+  return { line, fingerprint };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((res) => setTimeout(res, ms));
+}
