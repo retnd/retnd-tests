@@ -452,8 +452,25 @@ async function freePort(): Promise<number> {
  *  Read-only, and that is the contract rather than caution: nothing in this
  *  suite is allowed to reach into a volume and change what the engine
  *  wrote. A harness that can edit the thing it is measuring is not
- *  measuring it. */
-const READ_MOUNT = "/mnt";
+ *  measuring it.
+ *
+ *  The mount path is a name nothing else has, and that is load-bearing
+ *  rather than tidy. Docker populates an EMPTY named volume from whatever
+ *  the image has at the mount point the first time something mounts it,
+ *  and "populates" includes stamping the mount point's own ownership onto
+ *  the volume. Read-only does not stop it: the copy happens before the
+ *  flag applies. So reading a still-empty volume at `/mnt`, which exists
+ *  in the tool image owned by root, handed the volume to root, and the
+ *  engine runs as uid 1000. Every transfer after that died on
+ *  "mkdir /data/backups/<set>: permission denied", and an SSH-key import
+ *  against a config volume that had been read while empty died the same
+ *  way, both several steps downstream of the read that caused it.
+ *
+ *  A path the image does not have has nothing to copy and nothing to
+ *  stamp, so the chown above survives. This is the one place in the
+ *  harness where reading really could change what it was measuring, which
+ *  is exactly what the paragraph above says must not happen. */
+const READ_MOUNT = "/rmlive-volume";
 
 async function volumeRead(run: Run, image: string, volume: string, argv: string[]) {
   const [binary, ...args] = argv;

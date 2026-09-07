@@ -127,3 +127,33 @@ export async function signIn(page: Page, deployment: Deployment): Promise<void> 
     await page.waitForResponse((r) => r.url().endsWith("/api/v1/auth/session") && r.status() === 200);
   });
 }
+
+/** Loads the application afresh, with the session this run already has.
+ *
+ *  Needed after `enrolAdministrator`, and the reason is a defect on the
+ *  path this suite exists to walk rather than a convenience.
+ *
+ *  App.tsx calls `useResource` for backup sets, health, operations and
+ *  quarantine unconditionally, above its own `if (!auth?.authenticated)`
+ *  early return, so those four fetches go out on the FIRST render of a
+ *  browser that has no session yet and every one of them comes back 401.
+ *  Enrolling does not re-run them: their dependency list is `[api]`, which
+ *  does not change when authentication arrives, and the 30-second poll
+ *  that would otherwise refresh them is switched off while an instance is
+ *  unconfigured (App.tsx's usePolling is gated on `configured === true`,
+ *  deliberately, so a fresh install is not looping through refusals). So
+ *  on a fresh install the Backup sets page renders "authentication
+ *  required" from a fetch that happened before there was an
+ *  administrator, with no "Add backup set" on it, and stays that way.
+ *
+ *  A full page load is what an operator does about it, and it is what
+ *  makes the difference: the same request answers 503 NOT_CONFIGURED with
+ *  a session attached, which the page handles properly and turns into the
+ *  empty state that offers the wizard.
+ *
+ *  This is a workaround with a note on it, not a fix, and it is
+ *  deliberately not folded into `enrolAdministrator`: a spec that walks
+ *  the operator's path should be able to see where the path is broken. */
+export async function openApp(page: Page, deployment: Deployment, path = "/"): Promise<void> {
+  await page.goto(`${deployment.uiUrl}${path}`);
+}

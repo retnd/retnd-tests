@@ -32,6 +32,11 @@ const UPLOAD_PATH = `${HOME_PATH}/upload`;
  *  itself rather than by whatever wrote it. That distinction is the
  *  two-machine script's, and it is the right one: what a backup has to
  *  match is the bytes the machine being backed up is actually serving. */
+/** Which of the machine's host keys to read. Named the way the key files
+ *  and `ssh-keygen -t` name them, not the way the wire does
+ *  ("ssh-ed25519"), because the file is what this reads. */
+export type HostKeyAlgorithm = "ed25519" | "rsa";
+
 export interface SourceFile {
   /** Name inside the remote path, which is also the name it should land
    *  under on the manager. */
@@ -57,9 +62,17 @@ export interface SourceMachine {
    *  operator's next step, and it is the whole reason the manager can log
    *  in at all. */
   authorizeKey(publicKey: string): Promise<void>;
-  /** The machine's own ed25519 host key, as the line and as the SHA256
-   *  fingerprint an operator is shown when asked to trust a server. */
-  hostKey(): Promise<{ line: string; fingerprint: string }>;
+  /** One of the machine's own host keys, as the line and as the SHA256
+   *  fingerprint an operator is shown when asked to trust a server.
+   *
+   *  It takes an algorithm because the machine serves two (sshd_config
+   *  lists ed25519 and RSA) and the manager does not pick the one you
+   *  would expect: x/crypto/ssh's default client preference puts
+   *  ssh-ed25519 LAST, so the engine's own probe negotiates ssh-rsa and
+   *  that is the key it ends up pinning. A spec checking what the wizard
+   *  pinned has to read the key for the algorithm the wizard says it
+   *  saw, rather than assume one. */
+  hostKey(algorithm?: HostKeyAlgorithm): Promise<{ line: string; fingerprint: string }>;
   /** Re-reads one file's digest now. What makes a read-only backup set's
    *  claim checkable: the source has to come out of a cycle untouched. */
   digest(name: string): Promise<string>;
@@ -130,7 +143,7 @@ export async function startSource(run: Run, network: string, image: string): Pro
     remotePath: REMOTE_PATH,
     files,
     authorizeKey: (publicKey) => authorizeKey(container, publicKey),
-    hostKey: () => hostKey(container),
+    hostKey: (algorithm = "ed25519") => hostKey(container, algorithm),
     digest: (name) => digestOf(container, `${UPLOAD_PATH}/${name}`)
   };
 }
@@ -276,22 +289,21 @@ async function authorizeKey(container: string, publicKey: string): Promise<void>
   ], { input: line + "\n" });
 }
 
-async function hostKey(container: string): Promise<{ line: string; fingerprint: string }> {
+async function hostKey(
+  container: string,
+  algorithm: HostKeyAlgorithm
+): Promise<{ line: string; fingerprint: string }> {
+  const path = `/etc/ssh/ssh_host_${algorithm}_key.pub`;
   const line = (
-    await dockerOrThrow("reading the source machine's host key", [
-      "exec",
-      container,
-      "cat",
-      "/etc/ssh/ssh_host_ed25519_key.pub"
-    ])
+    await dockerOrThrow(`reading the source machine's ${algorithm} host key`, ["exec", container, "cat", path])
   ).trim();
   const fingerprint = (
-    await dockerOrThrow("fingerprinting the source machine's host key", [
+    await dockerOrThrow(`fingerprinting the source machine's ${algorithm} host key`, [
       "exec",
       container,
       "ssh-keygen",
       "-lf",
-      "/etc/ssh/ssh_host_ed25519_key.pub"
+      path
     ])
   ).trim();
   return { line, fingerprint };
