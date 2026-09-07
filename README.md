@@ -3,19 +3,23 @@
 End-to-end test suites for [`rclone-manager`](https://github.com/spdrman/rclone-manager),
 run from outside it, against a build it has already released.
 
-Three suites live here:
+Four suites live here:
 
 | Suite | What it is | Status |
 |---|---|---|
 | **A. CLI contract** | `backup-manager` driven black-box: argv in, exit code plus stdout plus stderr plus resulting on-disk state out | built, `make suite-a` |
 | **B. Web UI** | the Playwright suite, migrated out of `rclone-manager`'s `ui/shared/e2e/` | migrated, `make suite-b`, see [`suites/web-ui/README.md`](suites/web-ui/README.md) |
 | **C. UI to CLI equivalence** | every backend-affecting UI action proved equal to its CLI equivalent by comparing resulting backend state | built, `make suite-c`, with the matrix in [`suites/equivalence/MATRIX.md`](suites/equivalence/MATRIX.md) |
+| **D. Live deployment** | the shipped image deployed in containers, a real SFTP machine behind it, and a browser driving the operator's path between them | the harness plus enrolment, `make suite-d`, see [`suites/live-deployment/README.md`](suites/live-deployment/README.md) |
 
-All three share one fixture layer, which is the main reason they share a
-repository. A Web UI test that exercises retention or quarantine needs a
-backend seeded with the same artifacts, states and config that the
+The first three share one fixture layer, which is the main reason they
+share a repository. A Web UI test that exercises retention or quarantine
+needs a backend seeded with the same artifacts, states and config that the
 equivalent CLI test needs, and maintaining that twice would guarantee the
-two drift.
+two drift. Suite D is the exception and says so: its fixture is a
+deployment rather than a work directory, and the machine it backs up comes
+from `rclone-manager`'s own single definition of one
+(`scripts/e2e/source-machine.Dockerfile`) rather than from anything here.
 
 ## Why these live outside `rclone-manager`
 
@@ -36,6 +40,8 @@ make suite-a         # the CLI contract suite
 make suite-b-install # once: Playwright and a Chromium
 make suite-b         # the Web UI suite, against RM_UI_DIR or the pin
 make suite-c         # UI-to-CLI equivalence, against the real engine
+make suite-d-install # once: Playwright and a Chromium
+make suite-d         # the operator's path against a deployment in containers
 make gate            # everything that has to be green before a commit here
 ```
 
@@ -44,6 +50,11 @@ beyond the one clone of `rclone-manager` that the pin resolves, which is
 cached per commit. Most fixtures use `remote.type: local` (FR-4), so a
 checked-in directory tree is a valid remote and there is no SSH endpoint
 to stand up.
+
+Suite D is the other end of that: it needs Docker as well as a browser,
+because what it tests is a deployment rather than a process, and there
+really is an SSH endpoint to stand up. On a machine without a daemon it
+refuses rather than skipping.
 
 ## Which build is under test
 
@@ -111,6 +122,7 @@ suites/
   cli/                     Suite A: harness, cases, COVERAGE.md
   web-ui/                  Suite B
   equivalence/             Suite C
+  live-deployment/         Suite D: containers, a real SFTP source, a browser
 findings/                  contract-versus-observed discrepancies
 docs/                      pinning, and the CI signal design
 ```
@@ -123,20 +135,21 @@ git config core.hooksPath .husky
 
 That wires `.husky/pre-commit` to `scripts/gate-local.sh`, which is the
 gate: `gofmt`, `go vet`, the fixture and state-differ unit tests, the
-harness self-tests, Suite A in full, `tsc --noEmit` over both TypeScript
-suites, and Suite B's own unit tests. It mirrors how `rclone-manager`
+harness self-tests, Suite A in full, `tsc --noEmit` over all three
+TypeScript suites, and the unit tests of Suite B's and Suite D's
+harnesses. It mirrors how `rclone-manager`
 gates itself, and for the same reason: the merge signal in this estate is
 local, so a red gate has to refuse the commit rather than annotate it
 afterwards.
 
-It needs Go, plus `npm ci` in `suites/web-ui` and `suites/equivalence`.
-It refuses rather than skips when those are missing, and names the `npm
-ci` that fixes it. `make gate` is the Go-only half, for a machine with no
+It needs Go, plus `npm ci` in `suites/web-ui`, `suites/equivalence` and
+`suites/live-deployment`. It refuses rather than skips when those are
+missing, and names the `npm ci` that fixes it. `make gate` is the Go-only half, for a machine with no
 Node on it; the hook runs the script.
 
 Playwright transpiles types away without checking them, so before the
-type check went in, nothing in this repository ever read the types in
-Suites B and C at all. What the check does not turn on is
+type check went in, nothing in this repository ever read the types in the
+browser suites at all. What the check does not turn on is
 `noUnusedLocals`/`noUnusedParameters`, and the reason has changed: while
 `suites/web-ui/e2e/` was byte-identical to `rclone-manager`'s
 `ui/shared/e2e/` the one unused binding in there belonged upstream, but

@@ -14,10 +14,11 @@ help:
 	@echo "make smoke       the fast slice of Suite A, for rclone-manager's own per-commit gate"
 	@echo "make selftest    prove the harness can fail, per assertion dimension"
 	@echo "make tools       unit tests for the fixture layer and the state differ"
-	@echo "make typecheck   tsc --noEmit over the TypeScript in Suites B and C"
+	@echo "make typecheck   tsc --noEmit over the TypeScript in Suites B, C and D"
 	@echo "make build       resolve the pinned build under test and run the identity handshake"
 	@echo "make suite-b     the Web UI Playwright suite (needs a browser; see suites/web-ui)"
 	@echo "make suite-c     the UI-to-CLI equivalence suite (needs a browser; see suites/equivalence)"
+	@echo "make suite-d     the live-deployment suite (needs a browser AND Docker; see suites/live-deployment)"
 
 .PHONY: build
 build:
@@ -45,13 +46,14 @@ vet:
 	if [ -n "$$unformatted" ]; then echo "not gofmt-clean:"; echo "$$unformatted"; exit 1; fi
 	$(GO) vet ./...
 
-# tsc --noEmit over both TypeScript suites. Playwright transpiles types
-# away without checking them, so without this nothing in the repository
-# ever reads them.
+# tsc --noEmit over all three TypeScript suites. Playwright transpiles
+# types away without checking them, so without this nothing in the
+# repository ever reads them.
 .PHONY: typecheck
 typecheck:
 	cd suites/web-ui && npm run --silent typecheck
 	cd suites/equivalence && npm run --silent typecheck
+	cd suites/live-deployment && npm run --silent typecheck
 
 .PHONY: gate
 gate: vet tools selftest suite-a
@@ -86,3 +88,23 @@ suite-c:
 .PHONY: suite-c-install
 suite-c-install:
 	cd suites/equivalence && npm ci && npx playwright install chromium
+
+# Deploys the image under test in containers, with a real SFTP source
+# behind it, and drives a browser between them. Needs Docker as well as a
+# browser, and builds the image from the pinned checkout on first use,
+# which is minutes on a cold Docker cache and nothing afterwards.
+.PHONY: suite-d
+suite-d:
+	cd suites/live-deployment && npm test
+
+.PHONY: suite-d-list
+suite-d-list:
+	cd suites/live-deployment && npm run list
+
+.PHONY: suite-d-install
+suite-d-install:
+	cd suites/live-deployment && npm ci && npx playwright install chromium
+
+.PHONY: suite-d-unit
+suite-d-unit:
+	cd suites/live-deployment && npm run unit
