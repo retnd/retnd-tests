@@ -1,0 +1,28 @@
+doc: >
+  `activity` lists the durable lifecycle transitions a real cycle
+  recorded, newest first, which is the same append-only log the Web UI's
+  Activity page draws (rclone-manager#598). Before this verb existed the
+  only way to read that log was a browser, so a deployment whose Activity
+  page was failing had no second way to look at the same rows.
+
+  What is pinned is the shape of a row rather than any one artifact's
+  path through the pipeline: the state entered, the backup set it belongs
+  to and the artifact it is about. Which states a `fetch` replay reaches
+  is a claim the fetch cases make, so this one does not go red when a
+  safety rule changes where an artifact stops.
+scenario: seeded-local
+argv: [activity, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - re: "\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\s+(DISCOVERED|TRANSFERRING|TRANSFERRED|VERIFYING|VERIFIED|COMMITTING|COMMITTED|REMOTE_DELETE_PENDING|COMPLETE|FAILED|QUARANTINED|QUARANTINED_LOST)\\s+production/postgres-primary\\s+pg-2026-06-01\\.dump\\s+.*"
+  - contains: "DISCOVERED"
+stderr:
+  - line: "mode: direct. No process has announced itself as serving this deployment, so this command answered from ${CONFIG} itself."
+  - absent: "mode: engine-attached"
+  - count: 1
+state: unchanged
+contract:
+  - "usage text: activity [--backup-set S] [--severity warn|error] [--limit N] [--json] - list recorded lifecycle events, newest first"
+  - "docs/EPIC.md FR-10 (explicit lifecycle states)"
+  - 'usage text: status, sources, artifacts, retention and activity read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544, #598)'
+tags: [smoke]

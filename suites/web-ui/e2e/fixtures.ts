@@ -13,7 +13,15 @@ export type Scenario =
   // installation in. It is not a variant of "empty": what it exists to
   // show is that a busy instance which never adopted the feature has no
   // trace of it on any page (rclone-manager FR-35).
-  | "no-medium";
+  | "no-medium"
+  // rclone-manager#598, and the only scenario here that is a FAILURE
+  // rather than a state of the deployment: listActivity rejects with a
+  // plain SyntaxError, which is what a 2xx carrying something other than
+  // the JSON the build expected looks like from a page's side, and it is
+  // the shape reported from a real 0.3.2 NAS. Nothing typed it, so every
+  // surface running that call said one fixed sentence and quoted a
+  // correlation id that appears in no log.
+  | "activity-unreadable";
 
 export const PROVIDERS = [
   "generic",
