@@ -8,6 +8,28 @@ The command list was re-derived from `core/cmd/backup-manager/main.go` at
 the pinned commit rather than trusted from a snapshot. It registers
 twelve commands, plus `activity`, which rclone-manager#598 adds.
 
+`medium` and `settings` gained rows with
+[#622](https://github.com/spdrman/rclone-manager/issues/622). They were
+registered commands with no cases at all before that, which the table
+below said by omission rather than out loud, and the gap mattered:
+`settings patch` is the one CLI write that can move where a retention
+tier's backups live, and nothing black-box had ever driven it.
+
+Fifteen of those seventeen cases are RED against the commit
+`build-under-test.json` names, and are supposed to be: they describe
+verbs that commit does not have. That is the specs-first half of the
+lockstep this repository has used since
+[#48](https://github.com/spdrman/rclone-manager-tests/pull/48), whose
+cases sat red the same way until
+[#42](https://github.com/spdrman/rclone-manager-tests/pull/42)'s pin move
+landed on the build that had them. Until the pin moves onto
+rclone-manager#629's merge, `scripts/gate-local.sh` is red on exactly
+those fifteen, and `RM_MODE=local` against a build of that branch is what
+runs them green. The two that pass at both are
+`medium/f1-config-missing` and `settings/f1-config-missing`: the
+`--config` contract is older than any of this, and those two are the
+family's regression guard rather than new coverage.
+
 **Cases pin one claim each.** `artifacts/happy` checks that the listing
 lists, with lifecycle states drawn from FR-10's documented vocabulary; the
 case that pins which state a `stable`-strategy artifact stops at is
@@ -59,7 +81,7 @@ other command that opens a config, so a command that stops honouring
 F1 is repeated for every other command that opens a config, as
 `<command>/f1-config-missing`: `sources`, `status`, `artifacts`,
 `activity`, `fetch`, `retention`, `reconcile`, `validate`, `catalog`,
-`run` and `daemon`. That is twelve near-identical cases on purpose. A command that quietly stops
+`run`, `daemon`, `medium` and `settings`. That is fourteen near-identical cases on purpose. A command that quietly stops
 honouring `--config`, or that starts reporting a missing file as a usage
 error instead of an operational one, has to fail somewhere, and the only
 place that catches it per command is a case per command.
@@ -81,6 +103,8 @@ place that catches it per command is a case per command.
 | `reconcile` | `reconcile/clean`: exit 0, FR-23 startup, no unresolved findings | `reconcile/f1-config-missing` |
 | `validate` | `validate/happy`: exit 0, checked and passed; `validate/operand-after-flags` and `validate/double-dash-ends-flags` cover the other two orders the banner permits | `validate/corrupted-local-copy` (exit 1 and FR-10 QUARANTINED), `validate/wrong-argument-count` (exit 2), `validate/malformed-artifact-id`, `validate/unresolvable-artifact`, `validate/unknown-flag-after-operand` (exit 2), `validate/f1-config-missing` |
 | `catalog rebuild` | `catalog/rebuild-after-database-loss`, `catalog/rebuild-dry-run-writes-nothing` | `catalog/no-subcommand` (exit 2), `catalog/unknown-subcommand` (exit 2), `catalog/f1-config-missing` |
+| `medium` | `medium/list-leads-with-the-local-hard-drive`: the drive this deployment's backups land on is the FIRST entry, names the drive, and says it is not declared, with the S3 medium after it as the control that the local entry was added to the list rather than replacing it ([#622](https://github.com/spdrman/rclone-manager/issues/622)); `medium/test-connection-local-passes`: all nine steps of the local report in the engine's own order, including `space`, which no bucket has, and the two that are SKIPPED rather than passed; `medium/preflight-is-still-the-same-check-under-the-old-name`: the alias, driven against the id the new verb made checkable, which is where two implementations would part; `medium/default-moves-the-mark-and-nothing-else` and `medium/default-writes-the-mark-and-local-clears-it`: the mark moves, no tier is rewritten, and moving it back to the drive REMOVES the key rather than writing `local` into it, which is FR-35's round trip | the three local failures, told apart by which step failed: `medium/test-connection-local-reports-a-missing-path` (`reach`, `not_found`, everything after it skipped), `medium/test-connection-local-reports-a-permission-problem` (`reach` and `space` pass, `write` fails `permission_denied`, from a real probe write into a directory the mutation made read-only), `medium/test-connection-local-reports-no-room` (everything an S3-shaped check looks at passes and `space` still fails, weighed against the operator's own FR-21 margin); plus the two removal refusals, `medium/remove-refuses-the-destination-that-carries-the-mark` and `medium/remove-refuses-the-local-hard-drive`, `medium/default-refuses-a-destination-nothing-declares`, and `medium/f1-config-missing` |
+| `settings` | `settings/patch-tier-medium-moves-one-tier`: one tier moves and the other two are asserted unchanged, because the write REPLACES the whole chain and a flag that built it from the wrong chain would move somebody's other tiers by the act of editing this one; `settings/patch-tier-medium-local-brings-a-tier-back`: `local` is a legal name here and what it writes is absence, so the round trip leaves the file it started with | `settings/patch-tier-medium-refuses-without-the-disclosure` (FR-27's gate, and the refusal IS the disclosure, naming the mapping and no price), `settings/patch-tier-medium-refuses-a-tier-nobody-declared` (exit 2, the tiers there are listed, nothing written), `settings/f1-config-missing` |
 | `version` | `version/happy`: all four fields, shapes asserted, and this case doubles as the identity handshake | `version/no-config-flag` (exit 2 from the flag package), `version/rejects-an-operand` (exit 2 through usageError) |
 
 ## Multi-command sequences

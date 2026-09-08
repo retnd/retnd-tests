@@ -1,0 +1,39 @@
+doc: >
+  `--tier-medium NAME=local` moves a tier back to the drive this
+  deployment's backups already land on, and the configuration ends up as
+  it started (spdrman/rclone-manager#622).
+
+  `local` being a legal name here is the whole of #622's vocabulary
+  decision arriving on a command line. It is the name the picker shows,
+  the name `medium default` takes, and the name a placement record already
+  carries, and a flag that accepted it everywhere except one command would
+  be the same two-spellings problem in a new place.
+
+  What it writes is absence, because absence is the only spelling of local
+  a configuration file accepts. So the pair of writes below is a round
+  trip, and the read that follows is the proof: three tiers, none of them
+  carrying a `medium=` column, which is exactly what `settings` printed
+  before any of this was typed.
+
+  The disclosure is passed on the way OUT and not on the way back, which
+  is the other half of the rule: moving a tier to the drive its backups
+  are already on discloses nothing, and the flag would be refused as
+  acknowledging a write that asks nobody for anything.
+scenario: storage-destinations
+setup:
+  - [settings, patch, --tier-medium, "daily=offsite_s3", --acknowledge-medium-disclosure, --config, "${CONFIG}"]
+  - [settings, patch, --tier-medium, "daily=local", --config, "${CONFIG}"]
+argv: [settings, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "${SP}- name=daily granularity=day keep=7"
+  - line: "${SP}- name=weekly granularity=week keep=3 window_unit=month"
+  - line: "${SP}- name=monthly granularity=month keep=12"
+  - absent: "medium=local"
+  - absent: "medium=offsite_s3"
+stderr: empty
+state: unchanged
+contract:
+  - "usage text: settings patch --tier-medium NAME=MEDIUM_ID - MEDIUM_ID is a declared destination, or \"local\" for the drive this deployment's backups already land on, which moves a tier back"
+  - "docs/EPIC.md FR-35 (a deployment that never configured a storage medium keeps the configuration file it had)"
+tags: [smoke]

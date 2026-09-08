@@ -264,6 +264,15 @@ test.describe("where a backup's copies are", () => {
  * FR-35's compatibility line, in a browser. A deployment that declares no
  * storage medium gets the pages it already had, and this is the only place
  * that can be checked end to end rather than argued.
+ *
+ * The line moved once, and only on one surface. rclone-manager#622 made
+ * the local hard drive a destination in its own right, so "declares
+ * nothing" stopped meaning "has nowhere to send a backup" and started
+ * meaning "has exactly one place, the drive it already writes to". The
+ * two reading surfaces below are untouched by that and still assert the
+ * old thing: no Medium column, no restore, no retrieval billing. The
+ * retention form is the one that changed, and its case says so at
+ * length.
  */
 test.describe("a deployment that never heard of storage mediums", () => {
   test("has no Medium column, and exactly the seven columns it always had", async ({ bm, page }) => {
@@ -291,14 +300,78 @@ test.describe("a deployment that never heard of storage mediums", () => {
     await expect(card.getByText("Needs a restore")).toHaveCount(0);
   });
 
-  test("offers no medium picker on the retention form", async ({ bm, page }) => {
+  /**
+   * This case used to assert the opposite, and it is worth writing down
+   * why rather than quietly turning it around, because BOTH halves of it
+   * were wrong and only one of them was about the product.
+   *
+   * The claim was "a deployment that declares nothing gets no destination
+   * picker", on the reasoning that with nowhere else to send a backup a
+   * picker offers no choice. rclone-manager#622 reverses that on purpose:
+   * with the control absent there was no way to SEE where a tier's
+   * backups go, so the only tier that could ever be pointed at S3 was one
+   * edited outside the product, and the local hard drive is a destination
+   * whether or not anything else is declared.
+   *
+   * The other half is this suite's own problem. The case was written as
+   *
+   *     await expect(tier1.getByLabel("Storage medium for tier 1")).toHaveCount(0)
+   *
+   * and a name-based locator asserted to be EMPTY cannot fail for the
+   * reason it claims. "The control is not there" and "the control is
+   * there under a different accessible name" both make that locator
+   * resolve to nothing, and the case has no way to tell them apart, so it
+   * went on passing through a rename of the very control it was about.
+   * Its own control could not see it either: `getByLabel("Name")` names a
+   * different field, which nobody had renamed. A case that stays green
+   * whatever happens to the thing it is about is worse than no case,
+   * because it occupies the space where a real one would go.
+   *
+   * So every assertion below is POSITIVE, and the picker is reached twice
+   * by two independent routes: once through the DOM structure and the
+   * visible label an operator reads, and once through the accessible name
+   * five cases in settings-recovery.spec.ts query it by. A rename breaks
+   * the second, a restructure breaks the first, and neither can pass by
+   * matching nothing.
+   */
+  test("offers a destination picker on its one tier, on the local hard drive", async ({ bm, page }) => {
     await bm.goto("/settings", "no-medium");
 
     const tier1 = page.getByRole("group", { name: "Tier 1" });
     await expect(tier1).toBeVisible();
-    await expect(tier1.getByLabel("Storage medium for tier 1")).toHaveCount(0);
-    // The control: the tier really rendered, so the absence is the
-    // absence of the picker.
+
+    // Route one: the visible label, through the DOM. The select carries
+    // an aria-label of its own, which wins over the wrapping <label>, so
+    // this genuinely does not go through the accessible name and is not
+    // the same query twice.
+    const storedOn = tier1.locator("label.field").filter({ hasText: "Stored on" }).locator("select");
+    await expect(storedOn).toHaveCount(1);
+
+    // Route two: the accessible name. This is the assertion the old case
+    // had, with the count it should always have had.
+    const picker = tier1.getByRole("combobox", { name: "Storage medium for tier 1" });
+    await expect(picker).toHaveCount(1);
+
+    // And they are the same control, so neither route can be satisfied by
+    // some other select in the row.
+    await expect(storedOn).toHaveAttribute("aria-label", "Storage medium for tier 1");
+
+    // Where it points. A deployment that declared nothing still has one
+    // destination, and the tier is on it: `local` on the wire, and the
+    // words an operator reads on screen.
+    await expect(picker).toHaveValue("local");
+    await expect(picker.locator("option:checked")).toHaveText("Local backup root");
+
+    // What FR-35 still gets: nothing declared means nothing to pick but
+    // the drive. The one other entry is #595's named, disabled,
+    // not-built row, which is not a destination this deployment has. So
+    // the absence that matters here is asserted as a count over what the
+    // menu offers rather than as an empty name-based locator.
+    const selectable = picker.locator("option:not([disabled])");
+    await expect(selectable).toHaveCount(1);
+    await expect(selectable).toHaveText("Local backup root");
+
+    // The tier really rendered, kept from the old case.
     await expect(tier1.getByLabel("Name")).toHaveValue("daily");
   });
 });

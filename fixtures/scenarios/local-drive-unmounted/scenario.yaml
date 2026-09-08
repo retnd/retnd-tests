@@ -1,0 +1,52 @@
+doc: >
+  The same deployment as `storage-destinations`, with `capacity.backup_root`
+  naming a directory that is not there.
+
+  That is the first of the three answers a local test connection has to be
+  able to give apart from each other
+  (spdrman/rclone-manager#622), and it is by far the most
+  common of them on a NAS: the path in the configuration is right, the
+  volume behind it did not mount, and a backup written now would go into
+  an empty mount point on the system disk.
+
+  It is expressed as an explicit `backup_root` rather than by deleting a
+  backup set's `local_path`, because those are two different failures. A
+  set with no local path is a configuration `check` refuses outright; a
+  backup root that is not there is a configuration that loads and a drive
+  that is not answering, which is the situation this is about.
+raw_config: |
+  poll_interval: 15m
+  state:
+    database: ${STATE_DB}
+  capacity:
+    backup_root: ${WORK}/unmounted-volume
+  sources:
+    - id: production
+      backup_sets:
+        - id: postgres-primary
+          remote: {type: local}
+          remote_path: ${REMOTE}/production/postgres-primary
+          local_path: ${LOCAL}/production/postgres-primary
+          include: ["*.dump"]
+          completion: {strategy: rename}
+          stale_after: 30h
+          validation: {hash: sha256}
+  retention:
+    timezone: UTC
+    week_starts_on: monday
+    tiers:
+      - {name: daily, granularity: day, keep: 7}
+    protect_last_known_good: true
+sources:
+  - id: production
+    backup_sets:
+      - id: postgres-primary
+        remote: {type: local}
+        include: ["*.dump"]
+        completion: {strategy: rename}
+        stale_after: 30h
+        validation: {hash: sha256}
+        artifacts:
+          - {name: pg-2026-06-01.dump, size: 4096, seed: u1, mtime: now-2h}
+state: replay
+replay: fetch

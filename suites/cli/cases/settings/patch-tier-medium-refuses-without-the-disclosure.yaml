@@ -1,0 +1,37 @@
+doc: >
+  Sending a tier somewhere other than the local hard drive for the first
+  time is refused without --acknowledge-medium-disclosure, and the refusal
+  IS the disclosure.
+
+  That is FR-27's consent gate, and #622 does not weaken it by adding a
+  flag that reaches it: the same write from a command line meets the same
+  gate the web UI's panel stands in front of. What is being consented to
+  is the deletion of the copy on the operator's own machine after a
+  verified upload, which is what the sentence has to say and what is
+  asserted here.
+
+  It says the mapping it is about ("daily -> offsite_s3") rather than
+  refusing in general, because an operator who passed several
+  --tier-medium flags needs to know which one raised it.
+
+  And it names no price. This product holds no price list and no knowledge
+  of anybody's negotiated rates, so a figure could only be one it made up;
+  the absence is asserted, with the rest of the paragraph as the control
+  that the text really was read.
+scenario: storage-destinations
+argv: [settings, patch, --tier-medium, "daily=offsite_s3", --config, "${CONFIG}"]
+exit: 1
+stdout:
+  - contains: "mode: direct"
+stderr:
+  - contains: "this settings write needs the storage-medium disclosure acknowledged"
+  - contains: "This write sends daily -> offsite_s3"
+  - contains: "After a backup uploads and I verify it, I delete the copy on this machine"
+  - contains: "billed by your provider"
+  - absent: "$"
+state: unchanged
+contract:
+  - "usage text: settings patch --tier-medium - Sending a tier somewhere other than local for the first time needs --acknowledge-medium-disclosure"
+  - "docs/EPIC.md FR-27 (a retention tier that sends backups to a storage medium needs an acknowledged disclosure before the write)"
+  - "usage text: settings patch --policy-file - without it the refusal carries the disclosure (#595)"
+tags: [smoke]

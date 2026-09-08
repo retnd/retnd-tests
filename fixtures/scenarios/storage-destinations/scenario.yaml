@@ -1,0 +1,69 @@
+doc: >
+  A deployment that has somewhere other than its own hard drive to send a
+  backup to: one declared S3 storage medium, and an explicit retention
+  chain whose tiers can be named on a command line.
+
+  It exists for the storage-destination surfaces EPIC H's H2.2
+  (spdrman/rclone-manager#622) added, and it is written as `raw_config`
+  rather than through the rendered shape because two of the keys those
+  surfaces are about have no field in it: `storage_mediums` and an
+  explicit `retention.tiers` chain. The rendered config writes the
+  daily_days/weekly_months/monthly_months shorthand, which is a chain with
+  no tier NAMES an operator could pass to `settings patch --tier-medium`.
+
+  The credential is a REFERENCE and deliberately an environment variable
+  that nothing in this repository ever sets. config.yaml has no field a
+  secret fits in, so there is nothing here to leak; and the variable being
+  unset is harmless because no case in this suite ever asks the bucket to
+  answer. Everything driven against `offsite_s3` here is a configuration
+  read or a configuration write, and the one case that really opens a
+  connection points at `local`, which reads no credential at all.
+
+  One backup set, so `capacity.backup_root` derives to exactly one
+  directory rather than giving up on two volumes with nothing in common,
+  which is the condition the local test connection reports as "this
+  deployment cannot say which directory its backups land in yet".
+raw_config: |
+  poll_interval: 15m
+  state:
+    database: ${STATE_DB}
+  storage_mediums:
+    - id: offsite_s3
+      type: s3
+      bucket: nas-backups
+      region: us-east-1
+      storage_class: STANDARD_IA
+      credentials:
+        env: RM_FIXTURE_S3_CREDENTIALS_NOT_SET
+  sources:
+    - id: production
+      backup_sets:
+        - id: postgres-primary
+          remote: {type: local}
+          remote_path: ${REMOTE}/production/postgres-primary
+          local_path: ${LOCAL}/production/postgres-primary
+          include: ["*.dump"]
+          completion: {strategy: rename}
+          stale_after: 30h
+          validation: {hash: sha256}
+  retention:
+    timezone: UTC
+    week_starts_on: monday
+    tiers:
+      - {name: daily, granularity: day, keep: 7}
+      - {name: weekly, granularity: week, keep: 3, window_unit: month}
+      - {name: monthly, granularity: month, keep: 12}
+    protect_last_known_good: true
+sources:
+  - id: production
+    backup_sets:
+      - id: postgres-primary
+        remote: {type: local}
+        include: ["*.dump"]
+        completion: {strategy: rename}
+        stale_after: 30h
+        validation: {hash: sha256}
+        artifacts:
+          - {name: pg-2026-06-01.dump, size: 4096, seed: m1, mtime: now-2h}
+state: replay
+replay: fetch

@@ -1,0 +1,27 @@
+doc: >
+  `medium default` refuses an id this deployment has no destination for,
+  rather than writing it and leaving the configuration unloadable.
+
+  The question is asked here as well as by `config.Validate`, and the
+  duplication is deliberate in a direction worth naming: Validate sees the
+  whole configuration and answers about a key, while an operator who just
+  picked from a list needs "that is not one of your destinations" against
+  the id they typed. A write that landed and was refused on the NEXT load
+  would surface as "the product broke my configuration".
+
+  Nothing is written, which is the state dimension's job here, and the
+  exit code is 1 rather than 2 because the command line is fine: it is
+  this deployment that cannot answer it.
+scenario: storage-destinations
+argv: [medium, default, nosuch_bucket, --config, "${CONFIG}"]
+exit: 1
+stdout:
+  - contains: "mode: direct"
+stderr:
+  - contains: "storage medium not found"
+  - contains: "nosuch_bucket"
+state: unchanged
+contract:
+  - "usage text: medium default <medium-id> - make this the destination a NEWLY CREATED retention tier starts on"
+  - "usage text: exit codes - 1 is an ordinary failure, including a route that was named and did not answer"
+tags: [smoke]

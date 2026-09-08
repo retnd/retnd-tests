@@ -93,8 +93,19 @@ func (r *Runner) Run(work string, c Case) (Result, error) {
 		}
 	}
 
+	// A mutation may hand back an undo. Only `readonly` does today, and
+	// it has to: a directory left mode 0555 inside the work tree defeats
+	// the caller's own os.RemoveAll, which ignores its error, so the
+	// fixture would survive the run and pile up under the temp root one
+	// case at a time. The undo runs when this function returns, which is
+	// after BOTH snapshots, so restoring the mode cannot show up in the
+	// diff the case is asserting on.
 	for _, m := range c.Mutate {
-		if err := applyMutation(res.Norm, m); err != nil {
+		undo, err := applyMutation(res.Norm, m)
+		if undo != nil {
+			defer undo()
+		}
+		if err != nil {
 			return res, err
 		}
 	}
@@ -243,12 +254,16 @@ func expandAll(n *Normalizer, argv []string) []string {
 // applyMutation performs one operator-plausible act of damage on the
 // fixture, or lets time pass. Every verb here is something a real
 // operator or a real incident can do to a deployment: delete the state
-// database, truncate a sidecar, scribble over an artifact, or simply
-// wait long enough for a freshness threshold to be crossed.
-func applyMutation(n *Normalizer, spec string) error {
+// database, truncate a sidecar, scribble over an artifact, take away the
+// service user's write permission on the directory backups land in, or
+// simply wait long enough for a freshness threshold to be crossed.
+//
+// It returns an undo for the verbs that leave the fixture in a state the
+// caller's own cleanup cannot get out of, and nil for the rest.
+func applyMutation(n *Normalizer, spec string) (func(), error) {
 	fields := strings.Fields(spec)
 	if len(fields) != 2 {
-		return fmt.Errorf("mutate %q: expected \"<verb> <argument>\"", spec)
+		return nil, fmt.Errorf("mutate %q: expected \"<verb> <argument>\"", spec)
 	}
 	if fields[0] == "sleep" {
 		// The one place a case is allowed to wait. It is only ever used
@@ -258,31 +273,68 @@ func applyMutation(n *Normalizer, spec string) error {
 		// slow machine can only make the assertion more true.
 		d, err := time.ParseDuration(fields[1])
 		if err != nil {
-			return fmt.Errorf("mutate %q: %w", spec, err)
+			return nil, fmt.Errorf("mutate %q: %w", spec, err)
 		}
 		time.Sleep(d)
-		return nil
+		return nil, nil
 	}
 	verb, path := fields[0], n.Expand(fields[1])
 	if !filepath.IsAbs(path) {
-		return fmt.Errorf("mutate %q: path must be absolute (use a ${WORK} token)", spec)
+		return nil, fmt.Errorf("mutate %q: path must be absolute (use a ${WORK} token)", spec)
 	}
 	switch verb {
 	case "rm":
-		return os.Remove(path)
+		return nil, os.Remove(path)
 	case "truncate":
-		return os.Truncate(path, 0)
+		return nil, os.Truncate(path, 0)
 	case "corrupt":
 		f, err := os.OpenFile(path, os.O_WRONLY, 0)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		defer func() { _ = f.Close() }()
 		_, err = f.WriteAt([]byte("corrupted-by-the-test-fixture"), 0)
-		return err
+		return nil, err
+	case "readonly":
+		return makeReadOnly(spec, path)
 	default:
-		return fmt.Errorf("mutate %q: unsupported verb %q (expected rm, truncate or corrupt)", spec, verb)
+		return nil, fmt.Errorf("mutate %q: unsupported verb %q (expected rm, truncate, corrupt, readonly or sleep)", spec, verb)
 	}
+}
+
+// makeReadOnly takes away write permission on a directory, which is what
+// "the service cannot write into the folder backups land in" looks like
+// on a real machine: a bind mount owned by a different uid, a volume
+// remounted read-only, a directory an operator tightened by hand.
+//
+// # Why it refuses under a root euid rather than running
+//
+// Mode bits do not apply to root, so a probe write into a 0555 directory
+// SUCCEEDS as root and the case under this mutation would report a
+// passing check and go red for a reason that has nothing to do with the
+// product. That failure would be indistinguishable from a real
+// regression at exactly the moment somebody is deciding whether to
+// believe the suite. Refusing here instead means the run says, in one
+// line, that this machine cannot perform this particular proof, which is
+// the same shape the repository's other capability refusals take.
+func makeReadOnly(spec, path string) (func(), error) {
+	if os.Geteuid() == 0 {
+		return nil, fmt.Errorf("mutate %q: this suite is running as root, and mode bits do not apply to root: "+
+			"a probe write into a mode 0555 directory succeeds, so a case about a permission refusal would go green "+
+			"against a check that never refused. Run the suite as an ordinary user", spec)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("mutate %q: %w", spec, err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("mutate %q: %s is not a directory, and this verb is about a directory nothing may be written into", spec, path)
+	}
+	before := info.Mode().Perm()
+	if err := os.Chmod(path, before&^0o222); err != nil {
+		return nil, fmt.Errorf("mutate %q: %w", spec, err)
+	}
+	return func() { _ = os.Chmod(path, before) }, nil
 }
 
 // FromPin builds a Runner for the checked-in build under test, having
