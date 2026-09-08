@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { CONTENT_COLUMN, TERMINAL, expect, test } from "./fixtures";
 
 /**
  * rclone-manager#617: the global terminal is pinned to the browser window,
@@ -63,10 +63,10 @@ interface Geometry {
 }
 
 async function geometry(page: import("@playwright/test").Page): Promise<Geometry> {
-  return page.evaluate(() => {
-    const dock = document.querySelector("section[aria-label='Terminal']");
+  return page.evaluate(([terminal, contentColumn]) => {
+    const dock = document.querySelector(terminal);
     if (!dock) throw new Error("no terminal on this page");
-    const main = document.querySelector("main");
+    const main = document.querySelector(contentColumn);
     if (!main) throw new Error("no content column on this page");
     const r = dock.getBoundingClientRect();
     return {
@@ -76,7 +76,7 @@ async function geometry(page: import("@playwright/test").Page): Promise<Geometry
       scrollY: window.scrollY,
       scrollable: document.documentElement.scrollHeight - window.innerHeight
     };
-  });
+  }, [TERMINAL, CONTENT_COLUMN] as const);
 }
 
 async function scrollToBottom(page: import("@playwright/test").Page): Promise<void> {
@@ -126,16 +126,16 @@ test.describe("the terminal is pinned to the browser window", () => {
   });
 
   test("the page's own content passes behind it rather than stopping above it", async ({ page }) => {
-    const reading = await page.evaluate(() => {
-      const dock = document.querySelector("section[aria-label='Terminal']")!.getBoundingClientRect();
-      const main = document.querySelector("main")!;
+    const reading = await page.evaluate(([terminal, contentColumn]) => {
+      const dock = document.querySelector(terminal)!.getBoundingClientRect();
+      const main = document.querySelector(contentColumn)!;
       const behind = Array.from(main.querySelectorAll("*")).filter((el) => {
         const b = el.getBoundingClientRect();
         return b.width > 0 && b.height > 0 && b.top < dock.bottom && b.bottom > dock.top;
       }).length;
       const hit = document.elementFromPoint(dock.left + dock.width / 2, dock.top + dock.height / 2);
-      return { behind, dockIsOnTop: !!hit && !!hit.closest("section[aria-label='Terminal']") };
-    });
+      return { behind, dockIsOnTop: !!hit && !!hit.closest(terminal) };
+    }, [TERMINAL, CONTENT_COLUMN] as const);
 
     // Two halves, and both are needed. Content occupying the same band as
     // the terminal says the column is not shrinking around it any more,
@@ -191,11 +191,11 @@ test.describe("the room the content column reserves under itself", () => {
     await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2 - drag, { steps: 10 });
     await page.mouse.up();
     await page.waitForFunction(
-      (was) => {
-        const el = document.querySelector("section[aria-label='Terminal']");
-        return !!el && el.getBoundingClientRect().height > was + 100;
+      ([terminal, was]) => {
+        const el = document.querySelector(terminal as string);
+        return !!el && el.getBoundingClientRect().height > (was as number) + 100;
       },
-      before.dock.height
+      [TERMINAL, before.dock.height] as const
     );
 
     const after = await geometry(page);
@@ -230,12 +230,12 @@ test.describe("a table taller than the window it is read in", () => {
 
   test("its last row can be scrolled entirely clear of the terminal", async ({ page }) => {
     await scrollToBottom(page);
-    const reading = await page.evaluate(() => {
+    const reading = await page.evaluate((terminal) => {
       const rows = document.querySelectorAll("table tbody tr");
-      const dock = document.querySelector("section[aria-label='Terminal']")!.getBoundingClientRect();
+      const dock = document.querySelector(terminal)!.getBoundingClientRect();
       const last = rows[rows.length - 1].getBoundingClientRect();
       return { rows: rows.length, lastRowBottom: last.bottom, dockTop: dock.top };
-    });
+    }, TERMINAL);
 
     expect(reading.rows).toBeGreaterThan(0);
     // Entirely clear: the row's bottom edge, not its top. A row half
@@ -254,12 +254,12 @@ test.describe("a table taller than the window it is read in", () => {
     // is watching for.
     await page.addStyleTag({ content: "main { padding-bottom: 0 !important; }" });
     await scrollToBottom(page);
-    const reading = await page.evaluate(() => {
+    const reading = await page.evaluate((terminal) => {
       const rows = document.querySelectorAll("table tbody tr");
-      const dock = document.querySelector("section[aria-label='Terminal']")!.getBoundingClientRect();
+      const dock = document.querySelector(terminal)!.getBoundingClientRect();
       const last = rows[rows.length - 1].getBoundingClientRect();
       return { lastRowBottom: last.bottom, dockTop: dock.top };
-    });
+    }, TERMINAL);
 
     expect(reading.lastRowBottom).toBeGreaterThan(reading.dockTop);
   });

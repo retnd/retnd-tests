@@ -39,6 +39,15 @@ export const PROVIDERS = [
  *  plumbing again. */
 type SessionState = { authenticated: boolean };
 
+/** The same two elements as `BackupManager.terminal()` and the content
+ *  column, as selectors, for the geometry a locator cannot express: a
+ *  measurement that compares two boxes has to read both inside ONE page
+ *  evaluation, or it is comparing a layout to itself one paint later.
+ *  Here rather than in the spec for the reason the page object exists,
+ *  which is that a selector written twice is a selector that drifts. */
+export const TERMINAL = "section[aria-label='Terminal']";
+export const CONTENT_COLUMN = "main";
+
 /** Page-object surface. Keeps the specs readable and stops selector drift from
  *  spreading across the suite. */
 export class BackupManager {
@@ -72,11 +81,6 @@ export class BackupManager {
    *  card here, and #617 pinned it to the bottom of the browser window. */
   terminal() {
     return this.page.getByRole("region", { name: "Terminal" });
-  }
-
-  /** The content column the terminal reserves room under (#617). */
-  content() {
-    return this.page.getByRole("main");
   }
 
   /** The handle the terminal is resized by. */
