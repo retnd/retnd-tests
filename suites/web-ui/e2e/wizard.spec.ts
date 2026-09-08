@@ -63,24 +63,92 @@ test.describe("add backup set wizard", () => {
     expect(await page.locator("body").innerText()).not.toMatch(/BEGIN (OPENSSH|RSA|EC) PRIVATE KEY/i);
   });
 
-  test("step 2's Use managed key panel says plainly it can't be saved yet, with no fabricated in-use count (rclone-manager#299)", async ({ page }) => {
+  test("step 2's Use managed key panel lists the keys this deployment holds and lets one be picked, still with no fabricated in-use count (rclone-manager#299)", async ({ page }) => {
     await page.getByRole("button", { name: "Authentication" }).click();
     await page.getByRole("radio", { name: /Use managed key/ }).click();
-    // Used to show a picklist of two hardcoded key names and a fabricated
-    // "Already installed on 2 other backup sets" count, with no
-    // managed-key store behind either.
+
+    // This test used to assert a refusal, "Reusing a managed key on save
+    // isn't available yet", and that was the right thing to assert for
+    // one reason that has stopped being true.
     //
-    // exact: true (rclone-manager#329) — the radio just clicked above is a
-    // <label> wrapping title "Use managed key" and detail "Reuse an
-    // existing Backup Manager key" (Choice's own markup), so its full
-    // accessible label contains "managed key" as a case-insensitive
-    // substring. A non-exact getByLabel("Managed key") matches THAT label,
-    // not the absence of the removed picklist: deterministic every run,
-    // not the intermittent staleness #329 first suspected — the radio it
-    // matches was clicked one line above, every time.
-    await expect(page.getByLabel("Managed key", { exact: true })).toHaveCount(0);
+    // #299 found a picklist here of two hardcoded key names and an
+    // "Already installed on 2 other backup sets" count with no store
+    // behind either, and stripped the panel down to that one sentence.
+    // What made a real picklist impossible then was that nothing could
+    // list the keys this deployment holds: an id came back once from the
+    // import and was never shown again. rclone-manager#592 added GET
+    // /ssh-keys, so the radio has a real listing behind it and can be
+    // saved, and the honest assertion is the listing rather than the
+    // refusal it replaced.
+    //
+    // What does NOT come back with the panel is the fabrication, and that
+    // half of #299 is at the bottom of this test. Also gone from here is
+    // a zero on getByLabel("Managed key"), which pinned the absence of
+    // the removed <select>. That was about the shape of a control with
+    // nothing behind it; the picker is asserted positively below, and
+    // which element it is built from was never what #299 was about.
+
+    // A key row is a button carrying a fingerprint, which is also what
+    // makes it worth showing: the fingerprint is the operator's only way
+    // to tell two of these apart. Located that way rather than by
+    // aria-pressed, which the activity toolbar's own filter buttons carry
+    // too and which would fold them into this count.
+    const keys = page.getByRole("button").filter({ hasText: /SHA256:/ });
+    await expect(keys.first()).toBeVisible();
+    const count = await keys.count();
+    expect(count).toBeGreaterThan(1);
+
+    // Each row answers the three things a listing is asked for: which
+    // algorithm, when the key arrived, and which key it actually is.
+    for (let i = 0; i < count; i++) {
+      await expect(keys.nth(i)).toContainText(/ssh-\S+, imported \d{4}-\d{2}-\d{2}/);
+      await expect(keys.nth(i)).toContainText(/SHA256:[A-Za-z0-9+/=]{20,}/);
+    }
+
+    // One can be picked, and none is picked for the operator before they
+    // pick it. The zero comes first deliberately: a build that
+    // pre-selected a key would satisfy "exactly one is pressed" on its
+    // own, and picking a credential for somebody is not a default this
+    // wizard gets to have.
+    const picked = page.locator('button[aria-pressed="true"]').filter({ hasText: /SHA256:/ });
+    await expect(picked).toHaveCount(0);
+    await keys.first().click();
+    await expect(keys.first()).toHaveAttribute("aria-pressed", "true");
+    await expect(picked).toHaveCount(1);
+
+    // A key the deployment holds and cannot offer is listed and refused,
+    // not hidden. An operator hunting for a key they know they imported
+    // has to find it and then be told why it is not on offer, which is
+    // the same rule the import path already applies to a passphrase it
+    // cannot resolve.
+    const needsPassphrase = keys.filter({ hasText: /Needs its passphrase/ });
+    await expect(needsPassphrase).toHaveCount(1);
+    await expect(needsPassphrase).toBeDisabled();
+
+    // The half of #299 that still matters. The count it was filed about
+    // was fabricated: nothing read the store, so "Already installed on 2
+    // other backup sets" said two on a deployment with none. What is
+    // there now names the sets, which is a claim a reader can go and
+    // check on the sets page, and an anonymous count must not come back.
     await expect(page.getByText(/other backup sets/i)).toHaveCount(0);
-    await expect(page.getByText(/Reusing a managed key on save isn.t available yet/)).toBeVisible();
+    await expect(page.getByText(/Already installed on/i)).toHaveCount(0);
+
+    // Control for those two zeros, and the sharper half of them. Usage IS
+    // stated, it is just stated by naming sets, and no two rows state the
+    // same thing. That last part is not decoration: a set points at one
+    // key, so two keys can never share a user, and one sentence repeated
+    // down the list is exactly what the fabricated count looked like.
+    const usedBy = (await keys.filter({ hasText: /Used by / }).allInnerTexts())
+      .map((row) => (row.split("\n").find((line) => line.startsWith("Used by ")) ?? "").trim());
+    expect(usedBy.length).toBeGreaterThan(1);
+    for (const line of usedBy) expect(line).toMatch(/^Used by \S+\/\S+/);
+    expect(new Set(usedBy).size).toBe(usedBy.length);
+
+    // This panel renders material out of the key store now, so the PEM
+    // marker check the Generate test above carries belongs here too.
+    // Matched on the marker and not /private key/i, because the step's own
+    // copy legitimately says private keys are never shown.
+    expect(await page.locator("body").innerText()).not.toMatch(/BEGIN (OPENSSH|RSA|EC) PRIVATE KEY/i);
   });
 
   test("step 3 requires an explicit trust decision", async ({ page }) => {
