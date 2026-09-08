@@ -1,8 +1,8 @@
 {
   "mode": "source",
-  "commit": "d2f43738c634da883d192d05f4de5f6790e7f387",
-  "version": "d2f4373",
+  "commit": "87a9dc72dab2eb3161072b738bd29b0ccfb3b811",
+  "version": "87a9dc7",
   "source_builder": "go",
   "image": "",
-  "notes": "mode: source | registry | local. See docs/pinning.md. registry mode stays unusable until something is actually pushed to ghcr.io/spdrman/backup-manager, so source is the only honest default today. Moved to d2f4373 because rclone-manager#555 gives a read a third way to refuse, the engine at the address a host was given turning out to serve a different deployment, so the banner says three cases and #40 corrected g5 to match. That spec cannot go green against any build older than this one. This is the half of the lockstep with no automation: their scripts/e2e/tests-repo.pin moved to this repository's 0673850 in the same merge, and this line moves by hand or the spec stays red."
+  "notes": "mode: source | registry | local. See docs/pinning.md. registry mode stays unusable until something is actually pushed to ghcr.io/spdrman/backup-manager, so source is the only honest default today. Moved to 87a9dc7 because d2f4373 predates the activity verb, so the five activity cases, backup-set edit-hold and g3's usage listing were all red against it: they assert a command that build does not have. 87a9dc7 also carries rclone-manager#617 and #618, which suites/web-ui/e2e/terminal-dock.spec.ts and theme-contrast.spec.ts were written against. This is the half of the lockstep with no automation: their scripts/e2e/tests-repo.pin moves to this repository in their own merge, and this line moves by hand or the specs stay red."
 }
