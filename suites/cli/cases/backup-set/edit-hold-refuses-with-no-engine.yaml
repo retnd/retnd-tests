@@ -1,0 +1,29 @@
+doc: >
+  `backup-set edit-hold` reads and releases the hold that stops a cycle
+  running against a backup set while somebody is editing it
+  (rclone-manager#350, #600). Until rclone-manager#598 nothing outside a
+  browser could reach those routes at all, so a hold taken by accident
+  could be given back from exactly one place.
+
+  The hold lives in the memory of the process serving this deployment and
+  deliberately does not survive it, so with nothing serving there is no
+  hold and no file that could be consulted. This pins the refusal rather
+  than the report, because the refusal is the interesting half: answering
+  "not held" from a world where the question has no meaning would look
+  exactly like an answer.
+
+  Exit 1 rather than 2: the command line is fine, it is this deployment
+  that cannot answer it.
+scenario: seeded-local
+argv: [backup-set, edit-hold, "production/postgres-primary", --config, "${CONFIG}"]
+exit: 1
+stdout: empty
+stderr:
+  - contains: "an edit hold is held in memory by the process serving this deployment"
+  - contains: "no route"
+  - absent: "held:"
+state: unchanged
+contract:
+  - "usage text: backup-set edit-hold <source/backup-set> [--release]"
+  - "usage text: exit codes - 1 is an ordinary failure, including a route that was named and did not answer"
+tags: [smoke]

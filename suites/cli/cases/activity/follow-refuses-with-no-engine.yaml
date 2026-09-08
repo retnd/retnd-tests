@@ -1,0 +1,28 @@
+doc: >
+  `activity --follow` streams the SERVING PROCESS's own live event feed,
+  which is a different thing from the durable transition log the same verb
+  reads without it (rclone-manager#598).
+
+  With nothing serving this deployment there is no such feed: it is an
+  in-memory tail of a process that is not running, and no file holds it.
+  So the command refuses, and the refusal is the claim here. A fallback to
+  the journal would put the durable log on screen under the flag that
+  asked for the live one, and both would look right, which is exactly the
+  "two surfaces telling an operator different things" defect the mode line
+  exists to prevent one command over.
+
+  Exit 1 rather than 2, because the command line is fine: it is this
+  deployment that cannot answer it.
+scenario: seeded-local
+argv: [activity, --follow, --config, "${CONFIG}"]
+exit: 1
+stdout: empty
+stderr:
+  - contains: "--follow"
+  - contains: "needs a route to the process serving this deployment"
+  - absent: "DISCOVERED"
+state: unchanged
+contract:
+  - "usage text: activity --follow - stream the LIVE feed instead, until interrupted"
+  - "usage text: exit codes - 1 is an ordinary failure, including a route that was named and did not answer"
+tags: [smoke]
