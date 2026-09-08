@@ -61,14 +61,22 @@ test.describe("backup sets", () => {
     await bm.goto("/sets");
 
     const header = page.getByRole("heading", { level: 1 }).locator("xpath=../..");
-    const run = header.getByRole("button", { name: "Run all due sets", exact: true });
+    // "Run all due sets" until #597's batch renamed it, and the rename is
+    // the same class of correction as #214's above: "due" named a filter
+    // that does not exist. RunCycle walks every ENABLED set and skips
+    // only the disabled and the edit-held, so no set is ever due, and the
+    // label was contradicting the tooltip printed right beside it.
+    //
+    // The tooltip is the half that was true both times, which is why it
+    // is the half this test has always leaned on.
+    const run = header.getByRole("button", { name: "Run all enabled sets", exact: true });
     await expect(run).toBeVisible();
     // The tooltip, not just the label. A label alone cannot say that this
     // button walks every enabled backup set, and asserting only the label
     // is how a rewired handler passed under a stale name through #214.
     await expect(run).toHaveAttribute("title", /every enabled backup set, not only this one/);
     // One of it on the whole page, however many sets are configured.
-    await expect(page.getByRole("button", { name: "Run all due sets", exact: true })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "Run all enabled sets", exact: true })).toHaveCount(1);
     await expect(page.getByRole("button", { name: "Run now", exact: true })).toHaveCount(0);
 
     const cards = page.getByRole("article");
@@ -119,21 +127,59 @@ test.describe("backup set detail", () => {
     // exact: true — "Preview retention" is otherwise a substring match of
     // the Retention section's "Preview retention plan" button too.
     const header = page.getByRole("heading", { level: 1 }).locator("xpath=../..");
-    for (const action of ["Run all due sets", "Test connection", "Edit", "Preview retention"]) {
+    for (const action of [
+      "Run this backup set", "Run all enabled sets", "Test connection", "Edit", "Preview retention"
+    ]) {
       await expect(header.getByRole("button", { name: action, exact: true })).toBeVisible();
     }
 
-    // "Run now" was this button's label until #214. It went because core
-    // has no per-set run: one cycle walks every enabled backup set, so a
-    // button named for the set on screen claimed something the API cannot
-    // do. The replacement is only honest while it keeps saying that, so
-    // the tooltip is asserted rather than just the new label, and "Run
-    // now" must not come back here under the old meaning.
-    await expect(header.getByRole("button", { name: "Run all due sets", exact: true }))
+    // Two run controls now, with two scopes, and each one's tooltip is
+    // asserted rather than just its name.
+    //
+    // There was one, called "Run now", until #214 found it calling the
+    // deployment-wide cycle: a button named for the set on screen started
+    // every enabled set, so it claimed something the API could not do.
+    // #214 renamed it for what it did. #597 then built the per-set run
+    // for real. The engine half had existed since FR-1 behind
+    // `backup-manager fetch --backup-set`, and what was missing was a way
+    // to reach it inside the serving process, so the header carries both
+    // today. A pair like that is only honest while each says which one it
+    // is, and a name alone cannot: that is exactly how the rewired
+    // handler passed under a stale name through #214. So both titles are
+    // pinned, and "Run now" must not come back under either meaning.
+    //
+    // The deployment-wide one also lost "due" in #597's batch, because
+    // RunCycle walks every ENABLED set and skips only the disabled and
+    // the edit-held, so nothing is ever due.
+    await expect(header.getByRole("button", { name: "Run this backup set", exact: true }))
+      .toHaveAttribute("title", /one pass over this backup set only/);
+    await expect(header.getByRole("button", { name: "Run all enabled sets", exact: true }))
       .toHaveAttribute("title", /every enabled backup set, not only this one/);
     // The loop above is this zero's control: the same getByRole shape,
-    // with exact names, finds four buttons on this page.
+    // with exact names, finds five buttons on this page.
     await expect(page.getByRole("button", { name: "Run now", exact: true })).toHaveCount(0);
+
+    // Edit is a mode (#350), so the header's shape depends on whether it
+    // is open, and "what the header offers" is not answered until both
+    // states are looked at. #591 added the second way out: CANCEL & EXIT
+    // EDIT MODE discards the draft and leaves the persisted values alone,
+    // beside SAVE ALL & EXIT EDIT which writes it.
+    //
+    // The absence is asserted before the mode is opened rather than only
+    // the presence after, because a build that showed both exits all the
+    // time would satisfy a bare presence check while offering an operator
+    // a "discard the draft" button with no draft to discard.
+    for (const exit of ["SAVE ALL & EXIT EDIT", "CANCEL & EXIT EDIT MODE"]) {
+      await expect(header.getByRole("button", { name: exit, exact: true })).toHaveCount(0);
+    }
+    await header.getByRole("button", { name: "Edit", exact: true }).click();
+    for (const exit of ["SAVE ALL & EXIT EDIT", "CANCEL & EXIT EDIT MODE"]) {
+      await expect(header.getByRole("button", { name: exit, exact: true })).toBeVisible();
+    }
+    // And Edit itself is gone while the mode is open, which is what makes
+    // those two the only ways out of it. This zero has the two visible
+    // assertions above as its control, in the same header locator.
+    await expect(header.getByRole("button", { name: "Edit", exact: true })).toHaveCount(0);
   });
 
   test("keeps destructive actions out of the header", async ({ page }) => {
