@@ -29,6 +29,15 @@ npm run e2e:all-providers       # provider treatment across all seven
 | `responsive.spec.ts` | small app window: no clipped table column, no page-level horizontal scroll, dialogs fully visible |
 | `accessibility.spec.ts` | one h1 per page, every control labelled, no colour-only status, focus visibility, dialog semantics, zero console errors |
 | `safety-invariants.spec.ts` | no remote/file delete anywhere, no private key, no "restore point", no stack traces, no vague destructive labels |
+| `terminal-dock.spec.ts` | the global terminal is pinned to the browser window rather than riding the end of the document, content passes behind it, and the content column reserves the room it takes so the last row of a long table can still be scrolled clear (rclone-manager#617) |
+| `theme-contrast.spec.ts` | a computed-contrast sweep of the rendered tree in both themes, the SSH auth wizard's own controls, the primary button on the accent, and the `color-scheme` declaration that makes native controls follow the theme (rclone-manager#618) |
+
+Two files in here are not specs. `fixtures.ts` is the page object, and
+`contrast.ts` is the sweep `theme-contrast.spec.ts` runs: it walks the
+rendered tree in the browser, composites each element's foreground over
+whatever is actually behind it, and reports a WCAG ratio per element. Its
+own doc says why the colours go through a canvas and where the floor came
+from.
 
 ## Conventions
 
@@ -41,6 +50,13 @@ npm run e2e:all-providers       # provider treatment across all seven
 - Wait on a real signal (an element, a settled fetch, a control leaving its
   disabled state), never on `waitForTimeout`. See #142, and see the
   `toBeEnabled()` gate in `wizard.spec.ts`'s validator picklist assertion.
+- A case that guards against a regression, rather than proving a fix, needs
+  a control beside it that makes it fail. Both of the new files have one:
+  `terminal-dock.spec.ts` takes the reserved room away and requires the
+  overlap to appear, and `theme-contrast.spec.ts` plants a control painted
+  on its own colour and requires the sweep to name it. A sweep that has
+  quietly stopped seeing anything reports exactly what a healthy page
+  reports.
 - The suite starts its own Vite server, on a port derived from this checkout
   (5200 to 6999, printed once at startup), and never adopts one it did not
   start. A `npm run dev` you already have open on 5173 is left alone and can
