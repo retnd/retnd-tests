@@ -324,6 +324,21 @@ test.describe("add backup set wizard", () => {
     await expect(page.getByText(/Acknowledge remote-source handling/)).toBeVisible();
 
     await page.getByRole("checkbox", { name: /remote backup will be removed only after/i }).check();
+
+    // rclone-manager#624 added a fourth precondition after the
+    // acknowledgement: the connection itself has to have been proven. A
+    // trusted host key settles which machine answers and settles nothing
+    // about whether the key authenticates or whether the account can read
+    // the folder, so the wizard now runs the six-step check and keeps Save
+    // disabled until it passes, the way the S3 destination wizard has kept
+    // its own Save disabled since #594.
+    //
+    // It is satisfied here rather than asserted, because this case is about
+    // the acknowledgement. The gate itself is the case below.
+    await expect(runNow).toBeDisabled();
+    await page.getByRole("button", { name: /^Test connection$/ }).click();
+    await expect(page.getByText(/This source has been proven/i)).toBeVisible();
+
     await expect(runNow).toBeEnabled();
     await expect(enable).toBeEnabled();
 
@@ -335,6 +350,55 @@ test.describe("add backup set wizard", () => {
   test("offers a save-disabled escape hatch that needs no acknowledgement", async ({ page }) => {
     await page.getByRole("button", { name: "Review" }).click();
     await expect(page.getByRole("button", { name: "Save disabled" })).toBeEnabled();
+  });
+
+  // rclone-manager#624: a source is not relied on until it has been proven.
+  //
+  // The wizard's Save was gated on a pinned known_hosts line and an
+  // imported key, which is host IDENTITY: it settles that the machine
+  // answering is the one whose fingerprint somebody compared, and settles
+  // nothing about whether that key authenticates or whether the account can
+  // read the folder the backups are in. A set could be saved, relied on,
+  // and only THEN tested, which is the order that issue turns around.
+  //
+  // Its own case rather than an extra assertion on the acknowledgement one,
+  // because the two answer different questions and a case that flips both
+  // at once can only ever say "something is still missing".
+  test("saving is blocked until the connection has been proven", async ({ page }) => {
+    await page.getByRole("button", { name: "Authentication" }).click();
+    await page.getByRole("radio", { name: /Import key/ }).click();
+    // Synthetic fixture only, never a real key.
+    await page.getByLabel(/private key/i).fill("FAKE-TEST-KEY-MATERIAL-not-a-real-key-0123456789");
+    await page.getByRole("button", { name: "Import key" }).click();
+    await expect(page.getByText(/key imported/i)).toBeVisible();
+
+    await page.getByRole("button", { name: "Verify server" }).click();
+    const trust = page.getByRole("button", { name: "Trust host" });
+    await expect(trust).toBeEnabled();
+    await trust.click();
+
+    await page.getByRole("button", { name: "Review" }).click();
+    await page.getByRole("checkbox", { name: /remote backup will be removed only after/i }).check();
+
+    // Every other precondition is met, so this isolates the connection as
+    // the one variable under test.
+    const enable = page.getByRole("button", { name: /^Save & enable$/ });
+    await expect(enable).toBeDisabled();
+    // The reason is stated, not merely enforced: a disabled button with no
+    // reason reads as an application that is broken.
+    await expect(page.getByText(/Test connection before saving/i)).toBeVisible();
+
+    await page.getByRole("button", { name: /^Test connection$/ }).click();
+
+    // Six named outcomes, never one verdict. rclone-manager#596 split DNS,
+    // the connect, the host key, the key material, the authentication and
+    // the listing apart precisely because one boolean made a typo'd
+    // hostname, an unauthorised key, a rotated host key and a missing path
+    // read identically, and those are four different afternoons.
+    for (const step of ["credentials", "resolve", "connect", "host_key", "authenticate", "list"]) {
+      await expect(page.getByText(step, { exact: true })).toBeVisible();
+    }
+    await expect(enable).toBeEnabled();
   });
 
   test("cancel returns to the sets list", async ({ bm, page }) => {
@@ -393,6 +457,10 @@ test.describe("add backup set wizard", () => {
 
     await page.getByRole("button", { name: "Review" }).click();
     await page.getByRole("checkbox", { name: /remote backup will be removed only after/i }).check();
+    // rclone-manager#624: the source has to be proven before it can be
+    // saved. See the acknowledgement case above for why.
+    await page.getByRole("button", { name: /^Test connection$/ }).click();
+    await expect(page.getByText(/This source has been proven/i)).toBeVisible();
 
     await page.getByRole("button", { name: /^Save & enable$/ }).click();
 
