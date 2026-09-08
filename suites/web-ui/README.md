@@ -4,16 +4,18 @@ Migrated out of `rclone-manager`'s `ui/shared/e2e/`, behaviour-preserving.
 
 ```sh
 cd suites/web-ui && npm ci && npx playwright install chromium   # once
-RM_UI_DIR=/path/to/rclone-manager/ui/shared npm run e2e         # 165 tests
+RM_UI_DIR=/path/to/rclone-manager/ui/shared npm run e2e         # 219 tests
 ```
 
 Or from the repository root, `make suite-b`.
 
-All 165 pass against `rclone-manager` `main`. This paragraph used to say
-one of them was red at the pin, which stopped being true the moment
-`612b48c` landed the fix and the pin moved onto it; "The one red there
-used to be" below has that whole story and is written in the past tense
-for the same reason.
+All 219 pass against `rclone-manager` `main`, and against the build the
+pin names, which are now the same tree for everything this suite drives.
+The count started at the migration's 165 and has grown with the specs
+added since. This paragraph used to say one of them was red at the pin,
+which stopped being true the moment `612b48c` landed the fix and the pin
+moved onto it; "The one red there used to be" below has that whole story
+and is written in the past tense for the same reason.
 
 ## The byte-identity invariant, and when it ended
 
@@ -41,25 +43,21 @@ field either asserts the honest replacement in its place or carries a
 comment saying, in as many words, that the field is gone with no
 replacement. Issue #6 has the reasoning per spec.
 
-### The build pin still points before that commit
+### The build pin used to point before that commit
 
-`build-under-test.json` names `612b48c`, which predates #214, so these
-six specs would be red against a Suite B run resolved from the build pin
-rather than from `RM_UI_DIR`. That is stated rather than hidden, and it
-is bounded: nothing automated resolves Suite B from that pin.
-`rclone-manager`'s gate step and its `nightly-e2e.yml` both set
+It does not any more. `build-under-test.json` named `612b48c` when this
+was written, which predates #214, so the six specs above would have been
+red against a Suite B run resolved from the pin rather than from
+`RM_UI_DIR`. The pin has moved four times since and now names
+`87a9dc7`, which is past all of it, so the caveat is history and is kept
+here only because the sections around it are.
+
+What has not changed is that nothing automated resolves Suite B from the
+pin. `rclone-manager`'s gate step and its `nightly-e2e.yml` both set
 `RM_UI_DIR` to a product checkout, this repository's own `suites.yml`
 runs only the Go targets, and a standalone `make suite-b` with no
 `RM_UI_DIR` refuses to start until someone installs dependencies inside
 the cached checkout anyway.
-
-Moving the build pin is issue #7 and not this change, because the bump
-makes Suite C red on purpose: #214 closed six of the gap rows
-`suites/equivalence/MATRIX.md` records as blocked, and
-`specs/contract-gaps.spec.ts` is the strict expected-failure guard that
-goes red the moment a gap closes so the matrix cannot quietly outgrow
-its own rows. That is a matrix rewrite, and folding it in here would
-make both halves harder to read.
 
 ## What "behaviour-preserving" was made to mean
 

@@ -67,6 +67,23 @@ export class BackupManager {
     return this.page.getByRole("region", { name: label });
   }
 
+  /** The global terminal (rclone-manager#599). A <section> with an
+   *  accessible name, so it answers to the region role like every other
+   *  card here, and #617 pinned it to the bottom of the browser window. */
+  terminal() {
+    return this.page.getByRole("region", { name: "Terminal" });
+  }
+
+  /** The content column the terminal reserves room under (#617). */
+  content() {
+    return this.page.getByRole("main");
+  }
+
+  /** The handle the terminal is resized by. */
+  terminalResizeHandle() {
+    return this.page.getByRole("separator", { name: "Resize terminal" });
+  }
+
   dialog(name?: string | RegExp) {
     return name ? this.page.getByRole("dialog", { name }) : this.page.getByRole("dialog");
   }
