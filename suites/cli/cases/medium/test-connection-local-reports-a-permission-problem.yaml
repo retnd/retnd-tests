@@ -1,0 +1,40 @@
+doc: >
+  The second of the three local answers, and the one that could not be
+  reached by looking at a mode bit.
+
+  The directory is there, so `reach` PASSES; it has room, so `space`
+  passes; and the check still fails, at `write`, categorised
+  `permission_denied`, because the service user cannot put a file in it.
+  Three steps have to be read together to get that, which is exactly why
+  the report is a list of steps rather than a verdict.
+
+  A real probe write is what produces it. Comparing mode bits would get
+  ACLs, group membership, read-only mounts and container user namespaces
+  wrong, and a check that guessed would tell an operator their backups
+  will land somewhere they will not.
+
+  The fixture takes write permission away from the directory rather than
+  from a file in it, which is the shape a real one has: a bind mount owned
+  by a different uid, or a volume remounted read-only. The mutation
+  refuses to run as root, because mode bits do not apply to root and this
+  case would then go red against a check that behaved perfectly.
+scenario: storage-destinations
+mutate:
+  - "readonly ${LOCAL}/production/postgres-primary"
+argv: [medium, test-connection, local, --config, "${CONFIG}"]
+exit: 1
+stdout:
+  - line: "storage medium local: NOT ready; see the failing checks below"
+  - line: "${SP}reach${SP}passed${SP}The directory this deployment's backups land in is there and is a directory."
+  - re: "\\s+space\\s+passed\\s+The filesystem this deployment's backups land on has .* available\\."
+  - re: "\\s+write\\s+failed\\(permission_denied\\)\\s+The directory this deployment's backups land in cannot be written to by the user this service runs as\\..*"
+  - line: "${SP}read_back${SP}skipped${SP}This was never tried: nothing was written."
+  - line: "${SP}delete${SP}skipped${SP}This was never tried: nothing was written, so there is nothing to roll back."
+  - absent: "failed(not_found)"
+stderr: empty
+state: unchanged
+contract:
+  - "usage text: medium test-connection - reporting a missing path, a directory the service user cannot write to, and a full filesystem as three different failures"
+  - "usage text: medium preflight - Exits non-zero when any check fails (#443)"
+  - "spdrman/rclone-manager#622: it works on the local hard drive entry and reports a missing path, a permission problem and a full filesystem distinctly"
+tags: [smoke]

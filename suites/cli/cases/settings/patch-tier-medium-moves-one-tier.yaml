@@ -1,0 +1,36 @@
+doc: >
+  `settings patch --tier-medium NAME=MEDIUM_ID` points ONE retention tier
+  at a storage destination and leaves the rest of the chain exactly as it
+  is (spdrman/rclone-manager#622).
+
+  "Leaves the rest as it is" is the load-bearing half, and it is not
+  free. A settings save REPLACES the whole retention chain on the wire
+  (RetentionUpdate.Tiers has no partial shape and is not getting one,
+  because a tier's fields are not independent), so this flag has to read
+  the chain currently in force, change one field, and send all of it back.
+  A flag that built the request from anything else would move somebody's
+  other tiers by the act of editing this one. So all three tiers are
+  asserted, not just the one that moved.
+
+  It is the same request the picker under a tier in the web UI makes,
+  which is why the panel echoes this exact line: the command and the click
+  produce the same write rather than merely the same outcome.
+
+  The two tiers still on the drive print no `medium=` column, which is the
+  rendering rule this printer already had and what keeps a medium-free
+  deployment's output byte for byte what it was.
+scenario: storage-destinations
+argv: [settings, patch, --tier-medium, "weekly=offsite_s3", --acknowledge-medium-disclosure, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - contains: "mode: direct"
+  - line: "${SP}- name=daily granularity=day keep=7"
+  - line: "${SP}- name=weekly granularity=week keep=3 window_unit=month medium=offsite_s3"
+  - line: "${SP}- name=monthly granularity=month keep=12"
+stderr: empty
+state: changed
+contract:
+  - "usage text: settings patch --tier-medium NAME=MEDIUM_ID - point one retention tier at a storage destination and leave the rest of the chain exactly as it is"
+  - "usage text: settings patch --tier-medium - This is the command the picker under a tier in the web UI echoes (#622)"
+  - "spdrman/rclone-manager#622: CLI parity for setting a tier's destination"
+tags: [smoke]

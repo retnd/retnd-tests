@@ -1,0 +1,33 @@
+doc: >
+  `--tier-medium` names a tier this deployment's chain does not have, and
+  is refused rather than creating one.
+
+  Inventing the tier would be inventing a retention rule nobody wrote,
+  deciding what to keep and for how long from a flag that carries neither
+  a granularity nor a keep. So it refuses, and it lists the tiers there
+  ARE, because "which ones do I have then" is the operator's next question
+  and answering it costs one line.
+
+  Exit 2 rather than 1: this is a command line that cannot be carried out
+  as typed, not a deployment that could not answer it, and the refusal is
+  printed by the command itself rather than rendered from a service error.
+
+  Nothing is written, and that is asserted rather than assumed. A refusal
+  that arrived after a partial write would be the worst version of this:
+  an operator reading "nothing was written" over a chain that had already
+  moved.
+scenario: storage-destinations
+argv: [settings, patch, --tier-medium, "quarterly=offsite_s3", --acknowledge-medium-disclosure, --config, "${CONFIG}"]
+exit: 2
+stdout:
+  - contains: "mode: direct"
+stderr:
+  - contains: "--tier-medium names tier \"quarterly\" and this deployment's retention chain has no such tier"
+  - contains: "it has daily, weekly, monthly"
+  - contains: "Nothing was written"
+  - contains: "a tier is created by writing the whole chain with --policy-file"
+state: unchanged
+contract:
+  - "usage text: settings patch --tier-medium NAME=MEDIUM_ID - Repeatable, at most once per tier, and refused when the chain has no tier of that name rather than inventing one"
+  - "usage text: exit codes - 2 is a usage error"
+tags: [smoke]

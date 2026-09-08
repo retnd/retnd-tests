@@ -1,0 +1,35 @@
+doc: >
+  The destination a new retention tier starts on cannot be un-declared
+  (spdrman/rclone-manager#622), and the refusal says what to
+  do about it.
+
+  It is its own refusal beside the in-use one, and the reason is that the
+  two call for opposite next steps. In-use says "backups are there and
+  removing the declaration would leave them unreachable"; this one says
+  "nothing is necessarily there, and this is where the NEXT tier would
+  start, so choose another destination first". A caller that could not
+  tell them apart would show an operator a list of affected backup sets
+  for a destination that holds none, so the sentence that rules the other
+  reading out is asserted as much as the refusal itself.
+
+  Nothing is written: `medium list` in the setup-free half of the estate
+  would still show it. Here that is carried by `state: unchanged`, which
+  is the honest form of "the declaration is still in config.yaml".
+scenario: storage-destinations
+setup:
+  - [medium, default, offsite_s3, --config, "${CONFIG}"]
+argv: [medium, remove, offsite_s3, --config, "${CONFIG}"]
+exit: 1
+stdout:
+  - contains: "mode: direct"
+stderr:
+  - contains: "storage medium is this deployment's default destination"
+  - contains: "offsite_s3 is the destination a newly created retention tier starts on"
+  - contains: "Make another destination the default first, then remove this one"
+  - contains: "this refusal is about where the NEXT tier would start, not about backups that are already somewhere"
+state: unchanged
+contract:
+  - "usage text: medium default <medium-id> - The destination that is the default cannot be removed"
+  - "usage text: medium remove <medium-id> - un-declare a destination. Refused while any copy names it"
+  - "spdrman/rclone-manager#622: the destination marked default cannot be deleted"
+tags: [smoke]

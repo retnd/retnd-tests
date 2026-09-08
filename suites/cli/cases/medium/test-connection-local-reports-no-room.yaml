@@ -1,0 +1,48 @@
+doc: >
+  The third of the three local answers, and the one with a step of its own
+  that no bucket has: `space`.
+
+  It is the sharpest of the three, because everything an S3-shaped check
+  would look at passes. The directory is reachable, a probe file really is
+  written into it and read back and deleted, and the destination is still
+  not ready, because a transfer would be refused before it started for
+  want of room. A check that stopped at "can I write a hundred bytes" says
+  yes here and is wrong.
+
+  "Full" is the operator's own decision and not a number this product
+  invented: `capacity.safety_margin_bytes` is what a transfer refuses to
+  start into, so a destination below it is not ready however cheerfully a
+  probe writes. So the setup below sets that margin past what any
+  filesystem can satisfy, through the product's own documented command
+  rather than by editing YAML, and the check then weighs a real reading
+  against it. That is the only way to reach this answer without a loopback
+  mount and a privilege this suite does not have, and the alternative that
+  must NOT be taken instead is asserting the step's wording without ever
+  making it fail. What is contractual is the STEP and its sentence; both
+  byte figures come off the machine and are wildcards.
+
+  Nothing categorises this failure, and that is deliberate rather than an
+  omission: no transport produced it, and a category is a transport's
+  word for what went wrong. The absence is asserted, with the two
+  categorised failures in the neighbouring cases as its positive control.
+scenario: storage-destinations
+setup:
+  - [settings, patch, --safety-margin-bytes, "900000000000000", --config, "${CONFIG}"]
+argv: [medium, test-connection, local, --config, "${CONFIG}"]
+exit: 1
+stdout:
+  - line: "storage medium local: NOT ready; see the failing checks below"
+  - line: "${SP}reach${SP}passed${SP}The directory this deployment's backups land in is there and is a directory."
+  - re: "\\s+space\\s+failed\\s+The filesystem this deployment's backups land on has .* available, which is below the .* safety margin this deployment holds back before every transfer\\. A transfer would be refused before it started\\."
+  - line: "${SP}write${SP}passed${SP}A probe file was written into the directory this deployment's backups land in, as the user this service runs as."
+  - line: "${SP}read_back${SP}passed${SP}The probe file came back byte for byte."
+  - line: "${SP}delete${SP}passed${SP}The probe file was deleted, so this check left nothing behind."
+  - absent: "failed(not_found)"
+  - absent: "failed(permission_denied)"
+stderr: empty
+state: unchanged
+contract:
+  - "usage text: medium test-connection - reporting a missing path, a directory the service user cannot write to, and a full filesystem as three different failures"
+  - "docs/EPIC.md FR-21 (the manager holds back a safety margin before every transfer)"
+  - "spdrman/rclone-manager#622: it works on the local hard drive entry and reports a missing path, a permission problem and a full filesystem distinctly"
+tags: [smoke]
