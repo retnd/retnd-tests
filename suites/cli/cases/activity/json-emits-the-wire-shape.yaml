@@ -1,0 +1,26 @@
+doc: >
+  `--json` emits the objects the API contract declares, unchanged, so a
+  script parses the contract rather than this binary's column layout
+  (rclone-manager#598). The field names are the claim: they are
+  `ListActivityResponse`'s own, so a change to the table above is free and
+  a change to these is a wire break somebody has to justify.
+
+  `--limit 1` keeps the assertion about the shape of an event rather than
+  about how many a replay produces, which is a different case's business.
+scenario: seeded-local
+argv: [activity, --config, "${CONFIG}", --limit, "1", --json]
+exit: 0
+stdout:
+  - contains: "\"events\": ["
+  - contains: "\"artifact_id\":"
+  - contains: "\"backup_set_id\":"
+  - contains: "\"occurred_at\":"
+  - contains: "\"to\":"
+stderr:
+  - line: "mode: direct. No process has announced itself as serving this deployment, so this command answered from ${CONFIG} itself."
+  - count: 1
+state: unchanged
+contract:
+  - "api/v1/openapi.json: ListActivityResponse and ActivityEvent"
+  - "usage text: --json emits the wire objects unchanged"
+tags: [smoke]

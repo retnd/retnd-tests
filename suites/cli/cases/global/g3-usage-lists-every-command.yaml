@@ -24,6 +24,7 @@ stderr:
   - line: "  sources${SP}list configured sources and backup sets"
   - line: "  artifacts [--source S] [--backup-set B]${SP}list journal artifacts"
   - line: "  artifacts <source/backup-set/name>${SP}print one artifact's full detail, including the reason"
+  - re: "  activity \\[--backup-set S\\] \\[--severity warn\\|error\\] \\[--limit N\\] \\[--json\\]\\s*"
   - line: "  fetch --source S --backup-set B [--dry-run]${SP}run one backup set's cycle on demand"
   - line: "  reconcile${SP}run FR-17 reconciliation for every backup set"
   - line: "  validate <source/backup-set/artifact>${SP}re-check one artifact's durable local copy"
