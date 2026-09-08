@@ -122,9 +122,13 @@ test.describe("version mismatch", () => {
     await expect(page.getByText(/^BACKUPS /)).toBeVisible();
     await expect(page.getByRole("region", { name: "Key metrics" })).toBeVisible();
 
-    // Every mutating control is disabled.
+    // Every mutating control is disabled. The run button was "Run all due
+    // sets" until #597's batch: "due" named a filter that does not exist,
+    // since RunCycle walks every enabled set and skips only the disabled
+    // and the edit-held. Only the name moved; what this line is about did
+    // not.
     await expect(page.getByRole("button", { name: "Add backup set" })).toBeDisabled();
-    await expect(page.getByRole("button", { name: "Run all due sets" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Run all enabled sets", exact: true })).toBeDisabled();
   });
 
   test("disables destructive controls on set detail", async ({ bm, page }) => {
@@ -133,11 +137,16 @@ test.describe("version mismatch", () => {
 
     await expect(page.getByRole("button", { name: /Apply retention now/ })).toBeDisabled();
     await expect(page.getByRole("button", { name: /Remove set configuration/ })).toBeDisabled();
-    // "Run now" until #214. The set-detail header's run button is
-    // deployment-wide now and is named for that; backup-sets.spec.ts
-    // covers the rename and the tooltip that has to carry it. What this
-    // test is about is unchanged: on an incompatible service it is off.
-    await expect(page.getByRole("button", { name: "Run all due sets", exact: true })).toBeDisabled();
+    // "Run now" until #214, then "Run all due sets" until #597's batch.
+    // The set-detail header's deployment-wide run button has been renamed
+    // twice and for the same kind of reason both times: #214 because the
+    // name claimed a per-set scope the API did not have, and #597's batch
+    // because "due" named a filter that does not exist: RunCycle walks
+    // every enabled set and skips only the disabled and the edit-held.
+    // backup-sets.spec.ts covers both renames and the tooltips that have
+    // to carry the two scopes apart. What this test is about is unchanged
+    // through all of it: on an incompatible service it is off.
+    await expect(page.getByRole("button", { name: "Run all enabled sets", exact: true })).toBeDisabled();
   });
 });
 
