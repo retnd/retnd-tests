@@ -1,0 +1,39 @@
+doc: >
+  The on-disk half of `medium default`, in both directions
+  (spdrman/rclone-manager#622).
+
+  Moving the mark out to a bucket writes one top-level key. Moving it back
+  to the drive REMOVES that key rather than writing `local` into it, and
+  that is not tidiness: `local` is a reserved id `config.Validate` refuses
+  outright, and absence is the only spelling of local a configuration file
+  accepts. So the round trip is exact, the file a deployment ends with is
+  the file it started with, and a binary older than this feature goes on
+  loading it. That is FR-35's promise applied to a key FR-35 predates.
+
+  Three commands and one read: mark to the bucket, mark back to the drive,
+  then `medium list` proving the drive carries it again. The
+  `files_present`/state dimension carries the file claim and the argv
+  carries the product's own report of the same fact, because a key an
+  operator can only verify by opening YAML is a key the product is not
+  really reporting.
+scenario: storage-destinations
+setup:
+  - [medium, default, offsite_s3, --config, "${CONFIG}"]
+  - [medium, default, local, --config, "${CONFIG}"]
+argv: [medium, list, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "local"
+  - line: "${SP}default: a retention tier created from here on starts on this destination"
+  - line: "offsite_s3"
+  - line: "${SP}type: s3"
+  # The bucket is still declared and simply no longer carries the mark,
+  # which is the control: the round trip moved a default and did not
+  # un-declare a destination.
+  - absent: "offsite_s3 (default)"
+stderr: empty
+state: unchanged
+contract:
+  - "usage text: medium default <medium-id> - \"local\" is a legal id here and is what a deployment that has chosen nothing already has, so moving the default to a bucket is reversible"
+  - "docs/EPIC.md FR-35 (a deployment that never configured a storage medium keeps the configuration file it had)"
+tags: [smoke]

@@ -272,3 +272,60 @@ func workDir(t *testing.T) string {
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	return dir
 }
+
+// TestReadOnlyMutationRemovesWritePermissionAndGivesItBack proves the one
+// mutation verb whose effect nothing else in this suite can observe.
+//
+// `rm`, `truncate` and `corrupt` announce themselves: the case that uses
+// one asserts an outcome that only happens after the damage, and a verb
+// that did nothing would send that case red. `readonly` is different in
+// two ways, and both of them fail SILENTLY.
+//
+// It can under-do its job. A chmod that did not take, or that landed on a
+// directory nothing writes into, leaves the check under test passing, and
+// the case built on it goes green while proving nothing about a
+// permission refusal. That is the shape spdrman/rclone-manager#622's
+// local test connection cares about most, so it is worth a control of its
+// own rather than being inferred from a case whose green it would fake.
+//
+// And it can over-do it. The mode has to be given back, because the
+// caller's cleanup is an `os.RemoveAll` whose error is discarded, and a
+// directory left at 0555 defeats it: every run would leave its whole
+// fixture behind under the temp root, one case at a time, until somebody
+// noticed the disk rather than the bug.
+//
+// The state directory is the target because the effect is immediate and
+// has nothing to do with what any one command is about: SQLite has to
+// create its write-ahead log beside the database, so a `check` that
+// passes on this fixture in TestBaselinePasses, which is this test's
+// positive control, refuses here.
+func TestReadOnlyMutationRemovesWritePermissionAndGivesItBack(t *testing.T) {
+	c := baseline()
+	c.Name = "selftest/readonly-mutation"
+	c.Mutate = []string{"readonly ${STATE_DIR}"}
+	c.Exit = 1
+	c.Stdout = harness.Stream{Mode: "ignored"}
+	c.Stderr = harness.Stream{Mode: "matchers", Matchers: []harness.Matcher{
+		{Contains: "readonly database"},
+	}}
+
+	work := workDir(t)
+	res, err := runner.Run(work, c)
+	if err != nil {
+		t.Fatalf("running the case: %v", err)
+	}
+	if got := harness.Evaluate(c, res); len(got) != 0 {
+		t.Fatalf("a state directory the service cannot write into should refuse the run, got %d mismatch(es):\n%v", len(got), got)
+	}
+
+	// Given back by the time Run returned, which is what stops a fixture
+	// surviving its own cleanup.
+	info, err := os.Stat(filepath.Join(res.Manifest.Work, "state"))
+	if err != nil {
+		t.Fatalf("stat-ing the state directory after the run: %v", err)
+	}
+	if info.Mode().Perm()&0o200 == 0 {
+		t.Fatalf("the state directory is still mode %v after the run, so the mutation's undo did not run: "+
+			"os.RemoveAll cannot empty it and every case using this verb would leave its fixture behind", info.Mode().Perm())
+	}
+}

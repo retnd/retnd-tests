@@ -1,0 +1,36 @@
+doc: >
+  The drive this deployment's backups land on cannot be un-declared,
+  because it was never declared
+  (spdrman/rclone-manager#622).
+
+  This is the invariant "there is never zero destinations", stated rather
+  than left to follow from the fact that local is always present. #622
+  asks for exactly that: the rule should be tested rather than inherited
+  as a side effect, and the way to test it is to try the one command that
+  could break it.
+
+  The refusal explains both halves, and both are asserted. It is not a
+  storage_mediums entry, so there is nothing to take out of the file; and
+  every retention tier that names no destination means this one, so a
+  deployment without it is not a state this product can be in.
+
+  It refuses even though local is not always the marked default, which is
+  what makes this a different rule from the case beside it rather than the
+  same one reaching the same destination.
+scenario: storage-destinations
+setup:
+  - [medium, default, offsite_s3, --config, "${CONFIG}"]
+argv: [medium, remove, local, --config, "${CONFIG}"]
+exit: 1
+stdout:
+  - contains: "mode: direct"
+stderr:
+  - contains: "local is the drive this deployment's backups land on"
+  - contains: "It is not declared in the configuration and cannot be un-declared"
+  - contains: "a deployment with no destination at all is not a state this product can be in"
+state: unchanged
+contract:
+  - "usage text: medium remove <medium-id> - un-declare a destination"
+  - "usage text: medium default <medium-id> - removing down to one destination makes that one the default (#622)"
+  - "spdrman/rclone-manager#622: there is never zero destinations"
+tags: [smoke]

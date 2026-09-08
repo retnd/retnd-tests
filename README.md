@@ -86,8 +86,11 @@ The disagreement is written up in [`findings/`](findings/README.md),
 filed against `rclone-manager`, and the case is marked
 `known_discrepancy`, which the runner treats as a strict expected
 failure: red while the issue is open, and red again the moment it starts
-passing, so a fix forces the marker's removal. Two entries are open
-today, and no contract question is. Five have been retired: four when
+passing, so a fix forces the marker's removal. Three entries are open
+today, and no contract question is. (This line said two while the table
+in `findings/` had one row in it, which is what a hand-maintained count
+does; it is derived from that table now, and DISC-008 and DISC-009 are
+the two that made the drift visible.) Five have been retired: four when
 [#209](https://github.com/spdrman/rclone-manager/pull/209) answered them,
 and DISC-006's FR-18 bucket-key question when
 [#215](https://github.com/spdrman/rclone-manager/pull/215) wrote the

@@ -1,0 +1,44 @@
+doc: >
+  `medium list` names every destination this deployment has, and the first
+  of them is the drive its backups land on
+  (spdrman/rclone-manager#622).
+
+  The issue's complaint was that this list showed declared S3 mediums
+  only, so the one destination every deployment has appeared nowhere and
+  an operator reading it could not find out where their backups actually
+  go. Three things make the fix real rather than cosmetic, and each is
+  asserted here:
+
+  it is FIRST, because an entry buried under the buckets answers "where do
+  my backups go" no better than a missing one; it NAMES THE DRIVE, because
+  an entry saying only "local" leaves somebody with two NAS volumes
+  exactly where they started; and it says it is not declared, because the
+  next thing an operator will try is to edit or remove it and the reason
+  they cannot is not guessable.
+
+  The declared medium is still listed after it, which is the control: the
+  local entry was added to this list rather than replacing what was on it.
+  It also carries no credential and not even which kind of credential it
+  reads, which is #594's rule and is asserted as an absence with the whole
+  rest of the entry as its positive control.
+scenario: storage-destinations
+argv: [medium, list, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "local"
+  - line: "${SP}default: a retention tier created from here on starts on this destination"
+  - line: "${SP}type: local (this deployment's own hard drive, which every retention tier that names no destination means)"
+  - line: "${SP}path: ${LOCAL}/production/postgres-primary"
+  - line: "${SP}not declared: it is not a storage_mediums entry, so it cannot be edited or removed"
+  - line: "offsite_s3"
+  - line: "${SP}type: s3"
+  - line: "${SP}bucket: nas-backups"
+  - absent: "RM_FIXTURE_S3_CREDENTIALS_NOT_SET"
+  - absent: "credentials"
+stderr: empty
+state: unchanged
+contract:
+  - "usage text: medium list - list every storage destination this deployment declares, in declaration order. No credential is reported, not even which of the three sources a destination reads (#594)"
+  - "usage text: medium test-connection - It also answers for \"local\", the drive this deployment's backups land on"
+  - "spdrman/rclone-manager#622: settings always lists a local hard drive entry naming the drive it writes to"
+tags: [smoke]

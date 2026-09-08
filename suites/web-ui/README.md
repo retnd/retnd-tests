@@ -4,18 +4,27 @@ Migrated out of `rclone-manager`'s `ui/shared/e2e/`, behaviour-preserving.
 
 ```sh
 cd suites/web-ui && npm ci && npx playwright install chromium   # once
-RM_UI_DIR=/path/to/rclone-manager/ui/shared npm run e2e         # 219 tests
+RM_UI_DIR=/path/to/rclone-manager/ui/shared npm run e2e         # 237 tests
 ```
 
 Or from the repository root, `make suite-b`.
 
-All 219 pass against `rclone-manager` `main`, and against the build the
-pin names, which are now the same tree for everything this suite drives.
 The count started at the migration's 165 and has grown with the specs
 added since. This paragraph used to say one of them was red at the pin,
 which stopped being true the moment `612b48c` landed the fix and the pin
 moved onto it; "The one red there used to be" below has that whole story
 and is written in the past tense for the same reason.
+
+**"All of them pass" is not true right now, and the reason is the
+lockstep rather than a defect.** Two changes here landed their specs
+ahead of the product work they describe, which is the order that
+repository's pin exists to allow: `wizard.spec.ts`'s three
+connection cases need `rclone-manager` #624, and
+`storage-destinations.spec.ts`'s seventeen plus one corrected case in
+`backups.spec.ts` need #622. Against a checkout carrying both, the whole
+237 pass; against the commit `build-under-test.json` names, which
+predates both, twenty of them are red and are supposed to be. Each side's
+own pull request records the counts both ways.
 
 ## The byte-identity invariant, and when it ended
 

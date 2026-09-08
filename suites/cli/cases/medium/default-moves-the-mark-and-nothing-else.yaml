@@ -1,0 +1,42 @@
+doc: >
+  `medium default <id>` moves the destination a NEWLY CREATED retention
+  tier starts on (spdrman/rclone-manager#622), and moves
+  nothing else.
+
+  That second half is the one that matters and the one this case is built
+  around. "Default" is a new word in this product, and the reading an
+  operator could reasonably fear is that it relocates their backups. It
+  does not: the retention chain is read back after the move and every tier
+  still names what it named. The output says so in its own line, because a
+  sentence that costs one line here is the one that stops somebody
+  reaching for a rollback.
+
+  The setup half does the move; the argv under test is the READ that
+  proves the chain survived it. Written that way round rather than as one
+  command with a state assertion, because "the file changed in the ways I
+  expected" is a weaker claim than "the product still reports the same
+  chain", and the second is the one an operator would make.
+
+  `settings` prints a `medium=` column only for a tier that is NOT on the
+  local hard drive, which is a rendering rule this product already had and
+  is what keeps a medium-free deployment printing the line it always
+  printed. So the two local tiers carry no column here, asserted as
+  written-out lines rather than by ignoring the end of them.
+scenario: storage-destinations
+setup:
+  - [medium, default, offsite_s3, --config, "${CONFIG}"]
+argv: [settings, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "retention:"
+  - line: "${SP}tiers:"
+  - line: "${SP}- name=daily granularity=day keep=7"
+  - line: "${SP}- name=weekly granularity=week keep=3 window_unit=month"
+  - line: "${SP}- name=monthly granularity=month keep=12"
+  - absent: "name=daily granularity=day keep=7 medium="
+stderr: empty
+state: unchanged
+contract:
+  - "usage text: medium default <medium-id> - make this the destination a NEWLY CREATED retention tier starts on. It moves that and nothing else: every tier that already names a destination goes on naming it and no backup is relocated"
+  - "usage text: settings - report the live retention/capacity settings"
+tags: [smoke]
