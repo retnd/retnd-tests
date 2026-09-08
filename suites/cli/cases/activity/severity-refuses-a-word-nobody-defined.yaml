@@ -1,0 +1,23 @@
+doc: >
+  An unrecognised `--severity` is a command line no deployment would
+  accept, so it is a 2 and not a 1, and it is refused rather than treated
+  as "everything" (rclone-manager#598).
+
+  That last part is the point. A filter that silently did nothing would
+  print the whole feed under a flag that says it is narrowed, which is the
+  worst of the three possible answers: an operator asking for errors would
+  read a full pipeline log and conclude the deployment had a great many of
+  them. It refuses before opening anything, so there is no mode line.
+scenario: seeded-local
+argv: [activity, --config, "${CONFIG}", --severity, loud]
+exit: 2
+stdout: empty
+stderr:
+  - contains: "backup-manager: activity: --severity"
+  - contains: "warn or error"
+  - absent: "DISCOVERED"
+state: unchanged
+contract:
+  - "usage text: activity --severity warn|error"
+  - "usage text: exit codes - 2 is a command line no deployment would accept"
+tags: [smoke]

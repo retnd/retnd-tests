@@ -22,6 +22,7 @@ npm run e2e:all-providers       # provider treatment across all seven
 | `backups.spec.ts` | table semantics, all seven columns, multi-classification, filtering, artifact detail, lifecycle ordering |
 | `retention.spec.ts` | server-issued plan id, keep/delete itemisation, stale-plan refusal, consequence-named confirm, safe default focus, Escape |
 | `quarantine-activity.spec.ts` | three safe actions only, no "delete anyway", event vocabulary, filters |
+| `activity-failure.spec.ts` | the failure path the block above structurally cannot see: a `listActivity` that throws something untyped, and what an operator is told about it (rclone-manager#598). Names the exception, offers no invented correlation id, offers a way to copy it, and holds the dashboard's Recent activity panel to the same rule rather than letting it draw empty |
 | `settings-recovery.spec.ts` | service settings, capability honesty, build provenance, version-mismatch read-only mode, non-destructive catalog rebuild |
 | `auth.spec.ts` | login is not a NAS system login, enrolment validation, password never echoed |
 | `provider-treatment.spec.ts` | per-provider identity, shared IA, accent token, chrome/picker/notifications only where supported |
