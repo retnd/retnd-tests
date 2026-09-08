@@ -137,6 +137,23 @@ test.describe("version mismatch", () => {
 
     await expect(page.getByRole("button", { name: /Apply retention now/ })).toBeDisabled();
     await expect(page.getByRole("button", { name: /Remove set configuration/ })).toBeDisabled();
+    // #597's per-set run belongs in this list for the same reason the
+    // three around it do, and it is here because a control this page only
+    // just grew is the obvious one for a later change to forget to switch
+    // off. Its guard is unit-covered in the product, but a unit test is
+    // not where an operator-visible regression gets caught.
+    //
+    // The title is asserted alongside the disabled state, and not as
+    // decoration. This button is ALSO disabled when the set itself is
+    // disabled, and a run would skip such a set anyway, so a bare
+    // toBeDisabled() here could be satisfied by a reason that has nothing
+    // to do with the service being incompatible. Pinning the enabled-set
+    // wording is what rules that out: the product picks between two
+    // sentences on exactly that condition, so reading this one back
+    // proves the refusal on screen is the version one.
+    const perSetRun = page.getByRole("button", { name: "Run this backup set", exact: true });
+    await expect(perSetRun).toHaveAttribute("title", /one pass over this backup set only/);
+    await expect(perSetRun).toBeDisabled();
     // "Run now" until #214, then "Run all due sets" until #597's batch.
     // The set-detail header's deployment-wide run button has been renamed
     // twice and for the same kind of reason both times: #214 because the
