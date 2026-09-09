@@ -1,29 +1,43 @@
-import { expect, test } from "./fixtures";
+import { expect, needs, test } from "./fixtures";
 
 /**
  * rclone-manager#598: the Activity page failing on a real 0.3.2 NAS with
  * "Backup Manager could not complete that request." and, under Advanced
  * details, the literal string "correlation id unavailable".
  *
- * # Why this is a separate file from quarantine-activity.spec.ts
+ * # This file is the reason the suite moved, and it is the file that
+ * # changed least
  *
- * That file already has a `test.describe("activity")` block that drives
- * /activity and asserts events render with timestamps, severity glyphs and
- * set names. It runs on every commit, it did not catch this, and it
- * structurally could not have: this whole suite drives `createMockApi`
- * through the Vite dev server, and the mock resolved `listActivity`
- * cleanly every time. Another happy-path spec beside it would be exactly
- * as blind.
+ * The old header here said, correctly, that `quarantine-activity.spec.ts`
+ * "runs on every commit, it did not catch this, and it structurally could
+ * not have: this whole suite drives `createMockApi` through the Vite dev
+ * server". That is no longer true of the suite, and the interesting part
+ * is that it barely changes this file.
  *
- * So these are failure-path cases, and the mock grew one scenario to make
- * them expressible: `activity-unreadable`, whose `listActivity` throws a
- * plain `SyntaxError` rather than a `BackupManagerError`. That is the NAS's
- * shape reproduced exactly. It is the only scenario in the fixture that is
- * a failure rather than a state of the deployment, and only that one call
- * fails, so what is asserted is what the failing panel says rather than
- * whether the page came up at all.
+ * The failure cases below never depended on mock DATA. They depended on
+ * one call FAILING in a particular way, and they reached that by adding a
+ * scenario to the mock. Against a real deployment the same shape is
+ * reached by intercepting the response with `page.route`, which is a
+ * legitimate thing to do against a real backend and a different thing from
+ * asking a mock for a fixture: the app, the bundle, the router, the error
+ * boundary and the panel are all the real ones, and only the bytes on the
+ * wire are substituted. That is exactly the substitution #598 was about,
+ * since the NAS really did answer 200 with something the build could not
+ * read.
  *
- * # What each case claims
+ * So `?scenario=activity-unreadable` becomes a route interception, one
+ * that answers the real endpoint with the real symptom: a 200, the right
+ * content type, and a body that is not the JSON the build expects.
+ *
+ * # The success case is the one that got stronger
+ *
+ * "activity, when the feed reads fine, still lists the recorded events"
+ * used to pass against the mock and was named in the brief as the case
+ * that proved nothing. It now reads the real feed from a real SQLite
+ * catalogue, and it says so, which means it can finally fail the way the
+ * NAS failed.
+ *
+ * # What each failure case claims
  *
  * Never "the page failed". Always that what reaches an operator names
  * something: the exception's own words are on screen, the words tell a
@@ -37,15 +51,45 @@ import { expect, test } from "./fixtures";
  *  that always passed. */
 const NOT_AN_ID = "correlation id unavailable";
 
+/** The reported NAS's shape, reproduced on the wire.
+ *
+ *  A 200 with `application/json` and a body that is not JSON. The client
+ *  (ui/shared/src/api/client.ts) calls `response.json()` on it and gets a
+ *  plain `SyntaxError`, not a `BackupManagerError`, which is the whole
+ *  root cause: nothing typed it, so every surface running that call said
+ *  one fixed sentence and quoted a correlation id that appears in no log.
+ *
+ *  Deliberately NOT a 500. A refusal the client understands would be
+ *  handled by the code path that already worked, and the bug was in the
+ *  other one. */
+async function serveUnreadableActivity(page: import("@playwright/test").Page) {
+  await page.route("**/api/v1/activity*", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      // What a truncating proxy, a captive portal or an HTML error page
+      // in front of the service all look like from the browser's side.
+      body: "<!doctype html><html><body>not the JSON this build expected</body></html>"
+    });
+  });
+}
+
 test.describe("activity, when the feed cannot be read", () => {
-  test.beforeEach(async ({ bm }) => {
-    await bm.goto("/activity", "activity-unreadable");
+  test.beforeEach(async ({ bm, page }) => {
+    // The interception goes on BEFORE the navigation, because the page
+    // fires this fetch as it mounts. Everything else about the app is the
+    // real deployment: the bundle came off `serve-ui`, the session is a
+    // real one, and every other call on this page reaches SQLite.
+    await serveUnreadableActivity(page);
+    await bm.goto("/activity");
   });
 
   test("says a failure happened at all, rather than an empty feed", async ({ page }) => {
     // An empty timeline is a claim about the deployment ("nothing has
     // happened here"), and it is not the claim this page is entitled to
-    // make when the fetch threw.
+    // make when the fetch threw. Sharper against a real backend than it
+    // ever was against the mock: an empty feed is now a state this
+    // deployment can genuinely be in, so the two really are confusable.
     await expect(page.getByRole("alert")).toBeVisible();
     await expect(page.getByText("No matching events")).toHaveCount(0);
   });
@@ -63,16 +107,16 @@ test.describe("activity, when the feed cannot be read", () => {
     const alert = page.getByRole("alert");
     await alert.getByText("Advanced details").click();
     await expect(alert).toContainText("SyntaxError");
-    await expect(alert).toContainText("is not valid JSON");
+    await expect(alert).toContainText(/is not valid JSON|Unexpected token/);
   });
 
   test("offers no correlation id, and never the literal one", async ({ page }) => {
-    // The positive half first, and it is load-bearing. A build that does
-    // not know this scenario at all falls back to "default" and draws a
-    // perfectly healthy feed, which contains no correlation id either, so
-    // the two absence assertions below would pass against exactly the
-    // build this case exists to fail against. Asserting the banner is
-    // there first is what stops that.
+    // The positive half first, and it is load-bearing. A build that
+    // handled this cleanly would draw a perfectly healthy-looking failed
+    // state which contains no correlation id either, so the two absence
+    // assertions below would pass against exactly the build this case
+    // exists to fail against. Asserting the banner is there first is what
+    // stops that.
     await expect(page.getByRole("alert")).toBeVisible();
     // The whole of what the reported NAS gave an operator.
     await expect(page.locator("body")).not.toContainText(NOT_AN_ID);
@@ -85,7 +129,8 @@ test.describe("activity, when the feed cannot be read", () => {
     // A NAS is served over http:// far more often than https://, and the
     // async clipboard does not exist on an insecure origin. Whether the
     // copy lands is the browser's business; that the control exists and
-    // reports which happened is the product's.
+    // reports which happened is the product's. This deployment is served
+    // over http, so that is not hypothetical here.
     await expect(alert.getByRole("button", { name: /copy details/i })).toBeVisible();
   });
 
@@ -94,7 +139,8 @@ test.describe("activity, when the feed cannot be read", () => {
     await alert.getByRole("button", { name: /try again/i }).click();
     // Against a service that is still down, the banner has to change.
     // Identical words with no sign anything happened is a button people
-    // press harder.
+    // press harder. The interception is still installed, so the retry
+    // really does go out and really does fail again.
     await expect(alert.getByText(/tried again at/i)).toBeVisible();
   });
 
@@ -105,11 +151,29 @@ test.describe("activity, when the feed cannot be read", () => {
     expect(body).not.toContain("    at ");
     expect(body).not.toMatch(/\/src\/[A-Za-z]+\.tsx?/);
   });
+
+  test("recovers when the service starts answering properly again", async ({ page, bm }) => {
+    // New here, and the case that keeps every one above honest. All seven
+    // assert on a failure banner; a build that rendered that banner
+    // permanently would satisfy all seven. This takes the interception
+    // away and requires the page to come back, which is what an operator
+    // who fixed the proxy in front of their NAS actually experiences.
+    needs(
+      bm.facts.activityEvents > 0,
+      "at least one recorded activity event, so the recovered page has something to draw"
+    );
+    await page.unroute("**/api/v1/activity*");
+    await page.getByRole("alert").getByRole("button", { name: /try again/i }).click();
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    await expect(page.getByRole("listitem").first()).toBeVisible();
+  });
 });
 
 test.describe("the dashboard does not swallow the same failure", () => {
   test("a Recent activity panel that could not load says so", async ({ bm, page }) => {
-    await bm.goto("/", "activity-unreadable");
+    needs(bm.facts.configured, "a configured deployment, so the dashboard renders its panels at all");
+    await serveUnreadableActivity(page);
+    await bm.goto("/");
     const panel = page.getByRole("region", { name: "Recent activity" });
 
     // The quieter half of the same bug, and the surface an operator lands
@@ -121,11 +185,19 @@ test.describe("the dashboard does not swallow the same failure", () => {
     await expect(panel).not.toContainText("unavailable");
   });
 
-  test("a Recent activity panel with nothing in it draws no alert", async ({ bm, page }) => {
+  test("a Recent activity panel with a healthy feed draws no alert", async ({ bm, page }) => {
     // The positive control for the case above. Without it, a panel that
     // shouted on every render would pass it.
-    await bm.goto("/", "empty");
+    //
+    // This was `?scenario=empty`, and it did not need to be: what it
+    // needs is a feed that reads fine, which is the deployment's ordinary
+    // state whether the feed is empty or full. So it is now the real
+    // feed, with no interception at all, which also makes it a claim
+    // about the real path rather than about a fixture.
+    needs(bm.facts.configured, "a configured deployment, so the dashboard renders its panels at all");
+    await bm.goto("/");
     const panel = page.getByRole("region", { name: "Recent activity" });
+    await expect(panel).toBeVisible();
     await expect(panel.getByRole("alert")).toHaveCount(0);
   });
 });
@@ -135,8 +207,23 @@ test.describe("activity, when the feed reads fine", () => {
     // The regression guard for the root-cause half: everything above is
     // about how a failure is reported, and none of it is worth anything if
     // the working path stopped working.
+    //
+    // This is the case the brief named. It used to pass against the mock,
+    // which resolved `listActivity` cleanly every time, so it could not
+    // have caught #598 and could not catch its recurrence. It now reads
+    // the deployment's own catalogue over the real transport, which is
+    // where a 200-carrying-the-wrong-bytes actually happens.
+    needs(
+      bm.facts.activityEvents > 0,
+      "at least one recorded activity event. A fresh deployment has none until a backup runs, and " +
+        "an empty feed cannot tell a working read from a failed one, which is this case's whole subject"
+    );
     await bm.goto("/activity");
     await expect(page.getByRole("listitem").first()).toBeVisible();
     await expect(page.getByRole("alert")).toHaveCount(0);
+    // A timestamp on the first row, which is the cheapest proof that what
+    // rendered is an event rather than an empty-state line that happens to
+    // be a list item.
+    await expect(page.getByRole("listitem").first()).toContainText(/\d{2}:\d{2}:\d{2}/);
   });
 });

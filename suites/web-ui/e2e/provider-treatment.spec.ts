@@ -1,12 +1,32 @@
-import { expect, test } from "./fixtures";
+import { resolvePlatform } from "../harness/deployment";
+import { expect, needs, test } from "./fixtures";
 
 /** §46 — provider treatment is 5-10%: accent token, window chrome, native
  *  capabilities. This spec proves the shared product is identical across
  *  providers and that no provider claims a capability it lacks (§45).
  *
- *  Run per provider:  VITE_PLATFORM=<id> npx playwright test --project=providers
+ *  # It runs once now, not seven times
+ *
+ *  This used to read `VITE_PLATFORM` and be re-run per provider by
+ *  restarting the Vite dev server with a different value each time
+ *  (`scripts/e2e-all-providers.mjs`, gone with the dev server). Nothing
+ *  here can do that any more, and the reason is the product's own: the
+ *  provider bundle is chosen at BUILD time and `serve-ui` serves one
+ *  embedded bundle per profile, so a deployment IS one provider. Driving
+ *  the other six means building the other six images.
+ *
+ *  So `RM_PLATFORM` describes which bundle the image under test carries,
+ *  and the run asserts that one provider's treatment properly rather than
+ *  pretending at a sweep it cannot do. The expectations table below is
+ *  kept whole, because the moment the topology builds a second image the
+ *  only thing that changes is the variable.
+ *
+ *  The one thing that got stronger: the mount path. Every provider has a
+ *  different storage mount, that path is where backups really land, and
+ *  the mock reported it from a fixture. It now comes off a running
+ *  container that is really writing there.
  */
-const PLATFORM = process.env.VITE_PLATFORM ?? "generic";
+const PLATFORM = resolvePlatform();
 
 const EXPECTED: Record<
   string,
@@ -24,6 +44,10 @@ const EXPECTED: Record<
 const expected = EXPECTED[PLATFORM];
 
 test.describe("provider: " + PLATFORM, () => {
+  test.beforeEach(async ({ bm }) => {
+    needs(bm.facts.configured, "a configured deployment: the settings page reads a running service");
+  });
+
   test("identifies itself in the sidebar and settings", async ({ page }) => {
     await page.goto("/settings");
     await expect(page.getByText(expected.name).first()).toBeVisible();
@@ -40,7 +64,12 @@ test.describe("provider: " + PLATFORM, () => {
 
   test("retains Backup Manager product identity, not provider branding", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("rclone-manager")).toBeVisible();
+    // .first(): the product name is legitimately on this page more than
+    // once against a real deployment (the header lockup and the footer's
+    // "Backup Manager running on ..."), and an unscoped strict-mode
+    // locator resolves to both. The mock rendered fewer of them, which is
+    // why this only showed up on the first real run.
+    await expect(page.getByText("rclone-manager").first()).toBeVisible();
     const title = await page.title();
     expect(title).toMatch(/Backup Manager/);
   });
@@ -68,6 +97,8 @@ test.describe("provider: " + PLATFORM, () => {
   });
 
   test("offers a native storage picker only when supported", async ({ page }) => {
+    // /sets/new is reachable on any instance, configured or not: it is the
+    // page a first-run deployment sends an operator to.
     await page.goto("/sets/new");
     await page.getByRole("button", { name: "Storage & validation" }).click();
 
@@ -101,6 +132,10 @@ test.describe("provider: " + PLATFORM, () => {
   });
 
   test("contains no provider-specific lifecycle UI", async ({ page }) => {
+    // A sweep over real pages drawing real rows now, which is when a
+    // provider name qualifying a lifecycle word would actually appear:
+    // against the mock, the vocabulary on screen came from a fixture that
+    // had never heard of a provider either.
     for (const path of ["/", "/sets", "/backups", "/quarantine"]) {
       await page.goto(path);
       const text = await page.locator("body").innerText();

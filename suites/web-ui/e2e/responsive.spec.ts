@@ -1,10 +1,32 @@
-import { expect, test } from "./fixtures";
+import { expect, needs, test } from "./fixtures";
 
 /** §31 — desktop-first, but a small app window must stay fully usable. This
- *  project runs at 940x720; the regression it guards is a clipped table column. */
+ *  project runs at 940x720; the regression it guards is a clipped table column.
+ *
+ *  Layout is layout, so most of this survived the move untouched. The one
+ *  thing that did not is which pages have a TABLE on them: a table is
+ *  drawn when there are rows, and a real deployment's quarantine queue is
+ *  empty by design. The old version swept /backups and /quarantine
+ *  together and, against the mock, both always had rows. Here each is
+ *  visited only when this deployment has something to draw in it, and the
+ *  case says which. */
 test.describe("small app window", () => {
-  test("no data table hides a column", async ({ page }) => {
-    for (const path of ["/backups", "/quarantine"]) {
+  test.beforeEach(async ({ bm }) => {
+    needs(bm.facts.configured, "a configured deployment: these pages refuse with NOT_CONFIGURED before the first backup set exists");
+  });
+
+  test("no data table hides a column", async ({ bm, page }) => {
+    const tables = [
+      { path: "/backups", rows: bm.facts.backups.length },
+      { path: "/quarantine", rows: bm.facts.quarantined.length }
+    ].filter((t) => t.rows > 0);
+    needs(
+      tables.length > 0,
+      "at least one page holding a data table. An empty catalogue and an empty quarantine queue " +
+        "both draw an empty state instead, which has no columns to clip"
+    );
+
+    for (const { path } of tables) {
       await page.goto(path);
 
       const scroller = page.locator(".table-scroll");
@@ -36,7 +58,8 @@ test.describe("small app window", () => {
     await expect(page.getByRole("button", { name: "Add backup set" })).toBeVisible();
   });
 
-  test("set cards reflow instead of overlapping", async ({ page }) => {
+  test("set cards reflow instead of overlapping", async ({ bm, page }) => {
+    needs(bm.facts.sets.length > 0, "at least one backup set, so there is a card to measure");
     await page.goto("/sets");
     const cards = page.getByRole("article");
     const count = await cards.count();
@@ -50,7 +73,8 @@ test.describe("small app window", () => {
     }
   });
 
-  test("dialogs remain fully visible", async ({ page }) => {
+  test("dialogs remain fully visible", async ({ bm, page }) => {
+    needs(bm.facts.sets.length > 0, "at least one backup set, so a retention preview can be opened");
     await page.goto("/sets");
     await page.getByRole("article").first().getByRole("button", { name: "Open" }).click();
     // exact: true — disambiguates from the detail page's other

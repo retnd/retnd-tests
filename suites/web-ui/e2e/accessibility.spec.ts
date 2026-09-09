@@ -1,10 +1,31 @@
-import { expect, test } from "./fixtures";
+import { expect, needs, test } from "./fixtures";
 
 /** §32 — keyboard, semantics and non-colour-only status, checked structurally
- *  rather than with a snapshot so failures point at a real defect. */
+ *  rather than with a snapshot so failures point at a real defect.
+ *
+ *  Structural checks are the other kind a real backend improves without
+ *  changing: "every control on this page is labelled" and "no status is
+ *  conveyed by colour alone" are sweeps over whatever rendered, and what
+ *  renders here is the real app with real data in it. The mock's fixture
+ *  never produced a row whose label came out of the catalogue, so a
+ *  control labelled from data was never in the sweep at all.
+ *
+ *  Two cases needed a deployment to hold something: the progress bar
+ *  belongs to a running operation, and the table semantics case needs a
+ *  table. Both say so.
+ *
+ *  "No console errors on any page" is the case worth watching after this
+ *  move. rclone-manager#598 was a page erroring in a browser against a
+ *  server answering 200, which is precisely the class of failure that
+ *  reaches the console and reaches nothing else, and this is the first
+ *  time this sweep has run against a service that can answer that way. */
 const PAGES = ["/", "/sets", "/backups", "/activity", "/quarantine", "/settings"];
 
 test.describe("accessibility", () => {
+  test.beforeEach(async ({ bm }) => {
+    needs(bm.facts.configured, "a configured deployment: these pages refuse with NOT_CONFIGURED before the first backup set exists");
+  });
+
   for (const path of PAGES) {
     test("exactly one h1 on " + path, async ({ page }) => {
       await page.goto(path);
@@ -111,7 +132,8 @@ test.describe("accessibility", () => {
     expect(outline!.style).not.toBe("none");
   });
 
-  test("dialogs are modal, labelled and Escape-dismissible", async ({ page }) => {
+  test("dialogs are modal, labelled and Escape-dismissible", async ({ bm, page }) => {
+    needs(bm.facts.sets.length > 0, "at least one backup set, so a retention preview can be opened");
     await page.goto("/sets");
     await page.getByRole("article").first().getByRole("button", { name: "Open" }).click();
     // exact: true — disambiguates from the detail page's other
@@ -124,18 +146,29 @@ test.describe("accessibility", () => {
     expect(label).toBeTruthy();
   });
 
-  test("progress and meters expose their values", async ({ page }) => {
+  test("the storage meter exposes its value", async ({ page }) => {
+    // Always on the dashboard, because the manager always has a backup
+    // root to measure. Split from the progress bar below, which is not.
+    await page.goto("/");
+    const meter = page.getByRole("meter", { name: "Storage used" });
+    await expect(meter).toHaveAttribute("aria-valuenow", /\d+/);
+  });
+
+  test("a progress bar exposes its value", async ({ bm, page }) => {
+    needs(
+      bm.facts.runningOperations > 0,
+      "an operation running right now: there is no progress bar on a deployment with nothing in " +
+        "flight, where the mock held one permanently"
+    );
     await page.goto("/");
     const bar = page.getByRole("progressbar").first();
     await expect(bar).toHaveAttribute("aria-valuenow", /\d+/);
     await expect(bar).toHaveAttribute("aria-valuemin", "0");
     await expect(bar).toHaveAttribute("aria-valuemax", "100");
-
-    const meter = page.getByRole("meter", { name: "Storage used" });
-    await expect(meter).toHaveAttribute("aria-valuenow", /\d+/);
   });
 
-  test("tables use real table semantics", async ({ page }) => {
+  test("tables use real table semantics", async ({ bm, page }) => {
+    needs(bm.facts.backups.length > 0, "at least one ingested backup, so a table is drawn at all");
     await page.goto("/backups");
     const table = page.getByRole("table");
     await expect(table).toBeVisible();

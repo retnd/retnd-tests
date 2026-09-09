@@ -1,280 +1,263 @@
-# Suite B: the Web UI Playwright suite
+# Suite B: the Web UI, against a real deployment
 
-Migrated out of `rclone-manager`'s `ui/shared/e2e/`, behaviour-preserving.
+This suite used to drive a Vite dev server. It drives a running
+`rclone-manager` now: a browser in one container, `rbm-web serve-ui` and
+`rbm-web serve` in another, a real sshd holding real backup files in a
+third, and SQLite behind all of it.
 
 ```sh
 cd suites/web-ui && npm ci && npx playwright install chromium   # once
-RM_UI_DIR=/path/to/rclone-manager/ui/shared npm run e2e         # 237 tests
+RM_BASE_URL=http://rclone-manager:8080 \
+RM_ADMIN_USERNAME=e2e-operator \
+RM_ADMIN_PASSWORD=... \
+  npm run e2e
 ```
 
-Or from the repository root, `make suite-b`.
+The rig itself lives in the product repository, under `scripts/e2e/`, and
+brings the containers up before this runner starts. Nothing in this
+directory starts anything. From a product checkout:
 
-The count started at the migration's 165 and has grown with the specs
-added since. This paragraph used to say one of them was red at the pin,
-which stopped being true the moment `612b48c` landed the fix and the pin
-moved onto it; "The one red there used to be" below has that whole story
-and is written in the past tense for the same reason.
+```sh
+scripts/e2e/three-machine-web-ui.sh --suite ../rclone-manager-tests/suites/web-ui
+```
 
-**"All of them pass" is not true right now, and the reason is the
-lockstep rather than a defect.** Two changes here landed their specs
-ahead of the product work they describe, which is the order that
-repository's pin exists to allow: `wizard.spec.ts`'s three
-connection cases need `rclone-manager` #624, and
-`storage-destinations.spec.ts`'s seventeen plus one corrected case in
-`backups.spec.ts` need #622. Against a checkout carrying both, the whole
-237 pass; against the commit `build-under-test.json` names, which
-predates both, twenty of them are red and are supposed to be. Each side's
-own pull request records the counts both ways.
+Against the rig as it stands (one backup set, three ingested artifacts, a
+healthy deployment with nothing declared), that is **191 passed, 69
+skipped, 8 expected failures**, green, in about ten minutes. The eight
+expected failures are all `findings/DISC-010.md`, and the run ends by
+printing every skipped case with the reason it declined.
 
-## The byte-identity invariant, and when it ended
+## Why it moved
 
-Read the next two sections as history. They describe a round trip that
-existed while `e2e/` had an upstream twin, and it does not any more:
-`rclone-manager` #217 (`0ec5f45`) deleted `ui/shared/e2e/` in the same
-change that made this suite that repository's blocking gate step, so this
-directory has been the only home the browser suite has since the day it
-arrived. `diff -r` against `ui/shared/e2e/` no longer has anything to
-compare against.
+The old arrangement ran `npm run dev` against a `ui/shared` checkout, and
+`ui/shared/src/app/createApp.tsx` wires `createMockApi` under
+`import.meta.env.DEV`. So the app under test answered its own questions:
+every `?scenario=` state a spec drove was a fixture inside the browser,
+and no test in this repository could fail on anything below it. Not the
+session, not the reverse proxy, not the engine, not the database.
 
-That matters because it moves where a spec edit belongs. While the twin
-existed, an edit went upstream and this copy took it whole, and editing
-here would have spent the migration's proof. Now there is nothing to
-re-sync from, so a spec that has drifted from the UI is corrected here,
-and the pin in `rclone-manager`'s `scripts/e2e/tests-repo.pin` is what
-moves the correction into that repository's gate.
+That gap cost something specific. `rclone-manager` #598 was the Activity
+page erroring in a browser while the server answered HTTP 200 with 64KB
+of valid JSON in 20ms. `activity-failure.spec.ts` has a case beside it
+called "activity, when the feed reads fine, still lists the recorded
+events", and it passed the whole time, because the mock resolved
+`listActivity` cleanly every time it was asked.
 
-`fix/223-resync-web-ui-specs` is the first change to use that route, and
-it is worth naming what it did NOT do. `rclone-manager` #214 removed nine
-fields the shared UI was rendering that nothing in the running system
-computes, and six specs here still asked for them. They were updated to
-assert what the UI ships instead, never emptied: each one that lost a
-field either asserts the honest replacement in its place or carries a
-comment saying, in as many words, that the field is gone with no
-replacement. Issue #6 has the reasoning per spec.
+The old README argued this was fine and that proving the real path was
+"Suite C's job". That argument is retired: the browser is where an
+operator meets this product, and a browser suite that cannot see the
+service is a suite that reports on a drawing of it.
 
-### The build pin used to point before that commit
+## The environment it reads
 
-It does not any more. `build-under-test.json` named `612b48c` when this
-was written, which predates #214, so the six specs above would have been
-red against a Suite B run resolved from the pin rather than from
-`RM_UI_DIR`. The pin has moved four times since and now names
-`87a9dc7`, which is past all of it, so the caveat is history and is kept
-here only because the sections around it are.
+Four variables are required and have no defaults. A base URL that
+silently fell back to `localhost` is the same defect the old
+`reuseExistingServer: true` was, so the run stops and names the variable
+instead.
 
-What has not changed is that nothing automated resolves Suite B from the
-pin. `rclone-manager`'s gate step and its `nightly-e2e.yml` both set
-`RM_UI_DIR` to a product checkout, this repository's own `suites.yml`
-runs only the Go targets, and a standalone `make suite-b` with no
-`RM_UI_DIR` refuses to start until someone installs dependencies inside
-the cached checkout anyway.
-
-## What "behaviour-preserving" was made to mean
-
-Not an intention. Three checkable facts, all recorded in the migration
-pull request:
-
-1. **`e2e/` is byte-identical** to `rclone-manager`'s `ui/shared/e2e/` at
-   the baseline commit. `diff -r` between the two directories prints
-   nothing. Every spec, `fixtures.ts`, the port helper, its unit test, and
-   the suite's own README moved without an edit, including the parts of
-   that README that describe the old home. Nothing inside a spec was
-   touched in the same change that moved it, because a migration that
-   edits and moves at once cannot be shown to be faithful.
-2. **The test list is identical**, modulo the one startup line this
-   harness prints about which tree it is testing. `playwright test --list
-   --project=generic --project=small-window` reports **165 tests in 13
-   files** in both homes, and the 165 lines match one for one.
-3. **The pass count is identical**: 165 passed in the old home, 165 passed
-   in the new one, three consecutive times, at the same `rclone-manager`
-   commit. That commit is `137f646`, the baseline, and the claim is about
-   the two homes agreeing rather than about the number being permanent:
-   at the pin's current commit both homes now say 164, together, for the
-   reason set out below. Agreeing is the property that was being bought.
-
-That third number is worth stating carefully, because a remembered one was
-wrong. The count quoted in the issue was 174, an earlier one 158, and a
-static count of `test(` call sites disagreed with both. 174 counts the
-`providers` project's loop-generated re-runs of the provider spec, which
-`npm run e2e` does not run. The baseline for this migration is what
-`--list` says for the two projects `npm run e2e` actually runs, and that
-is 165.
-
-## The permitted deltas, exhaustively
-
-All of them are in `playwright.config.ts` and `harness/`, and all of them
-are about **where the app comes from**, never about what is asserted:
-
-| Delta | Why |
+| variable | what it is |
 |---|---|
-| the app under test is resolved from `RM_UI_DIR`, then `RM_SOURCE_DIR/ui/shared`, then the pin's own checkout | in the old home it was implicitly "the directory this config sits in", which out here would be this repository, which has no app in it |
-| the derived port is derived from the checkout the **app** is in | out here the config and the app live in two different repositories, and only the app's checkout varies per concurrent run |
-| the port is additionally probed free before Vite is asked for it, **once**, in the runner, and read back by the workers | one tests-repo checkout can be pointed at many product checkouts, so the collision odds went up rather than down. The scan runs once because Playwright re-evaluates this config in every worker, and by then the runner's Vite holds the runner's answer, so a worker that scans again walks to the next slot and points `baseURL` at nothing. `harness/under-test.test.ts` occupies the port and requires the two to agree, with a no-handoff resolver over the same occupied port as the control that the scan really does move on |
-| `webServer.cwd` is the app under test | `npm run dev` has to run where the app is |
-| reporter and `outputDir` are local to this suite | nothing else to say about this one |
+| `RM_BASE_URL` | where the Web UI answers on the private network, e.g. `http://rclone-manager:8080`. A container name, resolved by Docker's embedded DNS, not a published host port |
+| `RM_ADMIN_USERNAME` | the throwaway administrator this run signs in as |
+| `RM_ADMIN_PASSWORD` | its password. Held in this process's environment and written nowhere: no file, no argv, no report |
+| `RM_ARTIFACTS_DIR` | where the evidence goes. Traces, screenshots and videos land in `<dir>/test-results` and the HTML report in `<dir>/html-report`, both a level below the directory itself: Playwright removes its own output directory on startup and a bind mount cannot be unlinked from inside the container |
 
-Deliberately **not** a delta: `reuseExistingServer` is still an
-unconditional `false`, `--strictPort` is still passed, and there is no
-environment variable that opens either. A run here never adopts a server
-it did not start. That property was bought expensively (`rclone-manager`
-#172: a stale dev server from another worktree answered a run on a shared
-port, a control reported green against a different commit, and the real
-failure was dismissed twice as an ordering flake) and the move out here
-makes the hazard bigger, not smaller.
+And the optional ones, each of which unlocks cases that otherwise state
+why they are skipped:
 
-## What this suite does and does not prove
-
-It drives **the mock API**. `ui/shared/src/app/createApp.tsx` wires
-`createMockApi(scenarioFromLocation())` under `import.meta.env.DEV`, and
-this config runs the dev server, so every `?scenario=` state the specs
-drive is a fixture inside the browser rather than a backend.
-
-That is not a defect of the migration, it is what the suite has always
-been, and it is worth saying out loud in its new home because the move
-makes it easy to assume otherwise. What it proves is product behaviour in
-the browser: information architecture, accessibility, safety invariants,
-capability honesty per provider, and the states an operator can reach.
-
-What it does not prove is that any of that reaches a real backend. That
-claim belongs to Suite C, which drives the real built app against a real
-engine and compares resulting backend state. Two of the scenarios here
-(`storage-critical`, `version-mismatch`) are unreachable against a real
-backend by design, so "run this same suite against the real app" is not a
-behaviour-preserving step and is not attempted as one.
-
-## The app under test
-
-Resolved once, printed at startup, and the run refuses to start if it
-cannot be resolved:
-
-| Source | When |
+| variable | what it unlocks |
 |---|---|
-| `RM_UI_DIR` | `rclone-manager`'s own gate sets it, so the app under test is the working tree being committed |
-| `RM_SOURCE_DIR/ui/shared` | the same variable Suite A already uses to name a checkout |
-| the pinned build's checkout | a standalone run, which also gets Suite A's identity handshake on the way, since `tools/getbuild` resolves it |
+| `RM_BACKUP_SET` | the set the topology seeded, in `source/set` form (`e2e/vps`). It is the anchor `real-path.spec.ts` uses: a name this suite did not choose and the bundle cannot invent |
+| `RM_BOOTSTRAP_TOKEN` | the single-use enrolment token, for a deployment that has no administrator yet. Without it the run needs one already enrolled |
+| `RM_VPS_HOST`, `RM_VPS_PORT`, `RM_VPS_USER`, `RM_VPS_PATH` | the source machine, for the wizard cases that probe a real host and prove a real connection |
+| `RM_PLATFORM` | which provider bundle the image serves. It DESCRIBES the image; it does not choose one |
+| `RM_ALLOW_DESTRUCTIVE=1` | the cases that destroy data nothing puts back: applying a retention plan, and removing a declared storage destination |
+| `RM_WORKERS` | more than one browser at a time. Read the note in `harness/deployment.ts` before setting it |
+| `RM_NO_SANDBOX=1` | `--no-sandbox`, for an image that runs Chromium as root |
 
-A resolved directory with no `node_modules/` stops the run and names the
-`npm ci` that fixes it, rather than letting `npm run dev` fail sixty
-seconds later inside a webServer timeout.
+## Signing in, for real
 
-## The one red there used to be, and how it was closed
+`e2e/fixtures.ts` used to intercept `**/api/v1/auth/session` and answer
+`{"username":"e2e-admin"}`. Nothing authenticated and nothing could be
+refused. It now does what the client does (`harness/session.ts`):
 
-At `rclone-manager` `defa0a6` this suite was **164 passed, 1 failed**:
+1. GET any page. `apps/common/csrf`'s `EnsureCookie` runs in front of
+   every response precisely so a fresh client has a token before it needs
+   one, and sets `bm_csrf`.
+2. POST `/api/v1/auth/login` carrying that cookie and its value again in
+   `X-CSRF-Token`. The cookie is what a cross-site attacker can make a
+   browser send; the header is what it cannot read to construct.
+3. A 204, and a `bm_session` cookie the browser then carries.
 
+A deployment with no administrator is enrolled instead, through
+`/api/v1/auth/enroll` with the single-use `X-Bootstrap-Token`, when the
+run was handed one.
+
+Two properties are worth knowing about:
+
+- **Once per worker.** `apps/common/auth/local` allows ten login attempts
+  a minute per client address. A per-test login across 260 cases would
+  trip that and report a product failure that was really a fixture
+  failure. So the session is a worker fixture, checked before each test
+  with the un-rate-limited `GET /auth/session`, and re-established only
+  after something spends it.
+- **Nothing reaches disk.** There is no `storageState` file: the cookies
+  come back as an in-memory object and go straight into a browser
+  context. No failure path in `harness/session.ts` quotes a response
+  body either, because a refusal from these two routes can echo what was
+  submitted.
+
+A spec that wants the signed-out UI says `test.use({ signedIn: false })`
+and gets a context with no session at all, which is both the honest thing
+and free. `bm.signOut()` is kept for the one case that is about signing
+out: it really revokes the session server-side, which is why it tells the
+store.
+
+## The trap, and what it did to the specs
+
+The mock returned fixed, complete data on every call: a dozen backups, a
+stale set, a set halted on a changed host key, an operation mid-transfer,
+a five-row quarantine queue, two declared storage mediums. A real
+deployment starts empty and gains each of those only when something
+actually happens.
+
+So a case asserting on rows now does one of four things, and says which:
+
+| | what it means | where it shows up |
+|---|---|---|
+| runs | the claim never depended on which data was behind it | most of the suite |
+| `needs(...)` | the deployment is not in the state this case is about, and the reason is read off the API rather than off a flag | the run prints `needs a backup set halted on a changed host key`, and so on |
+| `mockOnly(...)` | the case's SUBJECT is a state only `createMockApi` could manufacture | three cases, all in the version-mismatch block |
+| `destructive()` | it destroys something nothing puts back | two cases |
+
+Nothing was deleted to reach green. A case that quietly disappears is
+indistinguishable from one nobody wrote; a case that says "skipped,
+because this deployment has no quarantined backups" is a line somebody
+can act on, and it turns back on by itself the moment the topology
+arranges that state.
+
+`harness/skips-reporter.ts` is what makes that true rather than
+aspirational. Playwright's list reporter prints a bare `-` for a skip and
+leaves the reason in an annotation only the HTML and JSON reporters
+render, so the run ends with a grouped summary of every declined case and
+why, deduplicated by reason: eleven cases wanting a quarantined backup is
+one thing for the topology to arrange, not eleven.
+
+Several assertions got sharper rather than softer, because a real service
+can disagree with a page in a way a mock cannot:
+
+- the dashboard's backup-set count is compared against `GET
+  /system/health` in the same run;
+- the last-cycle panel's two numbers are compared against `GET
+  /operations`;
+- a retention policy saved through the form is read back through `GET
+  /settings`;
+- a reinstatement is required to have changed the quarantine queue, not
+  merely to have drawn a cheerful notice;
+- the System information card's service version is compared against the
+  binary that answered the request.
+
+And three cases inverted. `?scenario=empty`, `?scenario=no-medium` and an
+empty quarantine queue were all fixtures the mock had to manufacture, and
+all three are a real deployment's ordinary state.
+
+## Arranging state through the API
+
+`harness/api.ts` is where a spec goes to put the deployment in a state,
+and the browser is kept for the thing under test. Driving the UI to reach
+a precondition makes every spec depend on the flow it is not testing.
+
+The storage-critical case is the one worth reading. It was
+`?scenario=storage-critical`, a fixture that could never have been real.
+It is now a capacity threshold written through `PATCH /settings` above
+what the disk actually has free, a `CRITICAL` verdict the service really
+computes from it, an escalated headline in the browser, and a restore in
+a `finally` so the next spec reads the deployment this one found.
+Everything that writes here knows how to put back what it changed.
+
+## Running it
+
+```sh
+npm run e2e          # generic, small-window and provider projects
+npm run e2e:list     # the test list, with no deployment
+npm run unit         # the harness's own unit tests
+npm run typecheck
 ```
-[generic] e2e/accessibility.spec.ts:65 accessibility > tab order reaches the section navigation
-Error: Section navigation was not reachable within 12 tab stops
-```
 
-It was deterministic (three consecutive runs) and none of it belonged to
-the migration. Four things established that at the time:
+`npm run e2e:list` passes a deliberately unreachable base URL of its own,
+so listing the suite never needs a deployment and never quietly points at
+one.
 
-1. the same spec passed against `ui/shared` at `137f646`, the migration
-   baseline, so the suite had not changed: the app had;
-2. the same spec failed **in its old home**, run from
-   `rclone-manager/ui/shared` with that repository's own
-   `playwright.config.ts`, at `defa0a6`. That was `rclone-manager` main
-   being red on its own e2e suite, and the move neither caused it nor
-   hid it;
-3. the accessibility property itself was intact. Wait for the shell and
-   the section nav is **three** tab stops away, not more than twelve;
-4. `e2e/` was still byte-identical to `ui/shared/e2e/`, `diff -r` and all.
+## What running it for the first time found
 
-The cause was a race the spec always had and had started always losing.
-Line 65 did a bare `page.goto("/")` and started pressing Tab immediately,
-with nothing waited on, while every neighbouring test goes through
-`bm.goto()`, which waits for the section nav to render (the comment below
-it says so, in as many words, about the test right underneath).
-[#195](https://github.com/spdrman/rclone-manager/pull/195) then put an
-extra round trip in front of the shell: `App.tsx` asks
-`getFirstRunStatus()` before it can know which mode the instance is in,
-and renders a `<Splash />` until the answer arrives. All twelve Tab
-presses landed on that splash.
+Worth recording, because it is the answer to "was this worth doing".
 
-The fix belonged upstream, because `e2e/` is byte-identical to
-`ui/shared/e2e/` by construction and editing it here would have spent the
-migration's proof to close a product bug. It landed as `rclone-manager`
-`612b48c`, the file was copied back rather than retyped, `diff -r` against
-`ui/shared/e2e/` at that commit prints nothing, and this suite is
-**165 passed** at the pin.
+The first run against the rig was 173 passed, 24 failed. Every one of the
+24 was a real finding about something, and they sorted into three kinds.
 
-That round trip was the re-sync procedure, and it was the whole point of
-insisting on byte-identity: a change to a spec went to the product
-repository, and this copy took it whole. It is closed now, for the reason
-at the top of this file: the tree it round-tripped through no longer
-exists, so a spec fix is made here and reaches `rclone-manager` through
-its pin instead.
+**A product bug nothing could have caught.** Clicking a backup lands an
+operator on the Dashboard. An artifact id is three slash-separated
+segments (`e2e/vps/notes.txt`) and `BackupsPage` navigates with
+`"/backups/" + a.id` against a route declared as one segment, so the URL
+matches nothing and App.tsx's catch-all takes it. The detail page, the
+lifecycle timeline and the whole Copies card are unreachable in a browser
+on any real deployment. The mock's ids were `art_01J9C1XY7T09`, one
+segment, so the route matched and five cases asserted their way through a
+page nobody could open. `findings/DISC-010.md`, and App.tsx fixed this
+exact defect on the neighbouring backup-set route in #285.
 
-## Type checking, and the one thing it does not check
+**Two cases that had learned something untrue from the fixture.** The
+storage-critical case asserted that a full disk escalates the headline;
+§8 says the headline is the BACKUP verdict and storage is a chip beside
+it, and `HealthSummary` does exactly that. The mock escalated it. And the
+nav badge beside "Backups" counts backup SETS, not backups (#211), so it
+reads 1 beside a page listing 3, which the mock's fixture hid by having
+the two numbers agree.
 
-`npm run typecheck` is `tsc --noEmit` over `e2e/`, `harness/`, `scripts/`
-and both configs, and the gate runs it. It went in because Playwright
-transpiles types away without checking them, so until it did, nothing in
-this repository read the types in this suite at all.
+**The rest, which were mine, and all of one shape:** copy, counts and
+locators pinned to what the fixture happened to render. The engine's
+retention verdict is a paragraph where the mock's was a phrase; a badge is
+omitted at zero rather than showing one; the product name is on the page
+twice; the terminal truthfully logs a refused host-key probe naming the
+wizard's example host, which an unscoped negative read as the review step
+showing it.
 
-`noUnusedLocals` and `noUnusedParameters` are off, and real ESLint is
-absent, for one reason: both of them have exactly one finding on this
-tree, and it is inside `e2e/`.
+None of them was reachable from the mock, and none of them is exotic.
 
-```
-e2e/shell.spec.ts(20,77): 'page' is declared but its value is never read
-```
+## What this suite still does not prove
 
-That is an unused Playwright fixture in a destructured parameter list,
-and it is a real (small) finding. But `e2e/` being byte-identical to
-`ui/shared/e2e/` is this suite's whole migration argument, so editing it
-to satisfy a check added here would trade a strong property for a weak
-one. The alternative, configuring the check to ignore its own only
-finding, is worse: a check that has been told not to look at the one
-thing it can see is coverage in appearance only, which is the shape this
-whole repository exists to argue against.
-
-So it goes upstream, and it turns out it has to. Nothing catches that
-binding in its old home either: `ui/shared`'s ESLint config switches
-`@typescript-eslint/no-unused-vars` off on the stated grounds that "TS's
-own noUnused* compiler options already cover this project-wide", and
-`ui/shared/tsconfig.json` has both options on, but its `include` is
-`["src"]`, so `tsc --noEmit` there has never read `e2e/` at all. The
-rule was turned off in favour of a check that does not reach these files.
-That is a gap in `rclone-manager`'s gate rather than something the
-migration introduced, and it is why the finding survived the move.
-
-The order that fixed it for both homes used to be: correct
-`ui/shared/e2e/shell.spec.ts` upstream, give that tsconfig (or a second
-one) the `e2e` directory so the claim its ESLint config makes becomes
-true, re-sync the byte-identical copy here, and then turn both options on
-in this suite with nothing left to suppress.
-
-Half of that is moot now. There is no upstream copy to correct, so the
-binding is this repository's to fix and the two options are this
-repository's to turn on, in a change that does only that. It is left
-alone here on purpose: this branch is a spec re-sync, and folding a
-compiler-option change into it would make the re-sync harder to read.
-The gap it names in `rclone-manager`'s own gate (its `tsconfig.json`
-`include` is `["src"]`, so `tsc --noEmit` there never read `e2e/`) is
-unchanged and still worth closing on the parts of `ui/shared` that do
-still exist.
+- **The other six providers.** The bundle is chosen when the image is
+  built (`VITE_PLATFORM`, and `serve-ui --profile`), so a deployment is
+  one provider. `scripts/e2e-all-providers.mjs` re-ran the provider spec
+  seven times by restarting Vite with a different value; nothing here can
+  do that, and the sweep is not pretended at. `RM_PLATFORM` says which
+  one this image is, and the expectations table in
+  `provider-treatment.spec.ts` is kept whole so a second image is the
+  only thing a second provider needs.
+- **A service speaking a different `/api/v1` contract.** Version mismatch
+  needs two builds that genuinely disagree. Three cases are marked
+  `mockOnly` for it, each naming what it would take.
+- **The three local test-connection failure modes.** A missing path, an
+  unwritable directory and a full filesystem are told apart by which step
+  failed, and arranging each one means arranging a filesystem.
+  `suites/cli/cases/medium/test-connection-local-*` drives the real
+  binary against a real directory for each.
 
 ## Files
 
 ```
-e2e/                     the browser specs; byte-identical to ui/shared/e2e/
-                         until #217 deleted that directory (see the top of
-                         this file), maintained here since
-harness/under-test.ts    which app, which port, resolved out loud
-harness/under-test.test.ts  the port is the same number in every process of one run
-harness/pick-free-port.mjs
-playwright.config.ts     the deltas above, and nothing else
-scripts/e2e-all-providers.mjs
-scripts/e2e-all-providers.test.ts
-vitest.config.ts         runs the two unit tests ui/shared's vitest used to
+e2e/                      the browser specs
+e2e/fixtures.ts           real sign-in, deployment facts, and the three ways
+                          a case can decline to assert
+e2e/real-path.spec.ts     the claim the move exists to make, in one file
+harness/deployment.ts     which deployment, read out of the environment
+harness/session.ts        the CSRF and login handshake
+harness/api.ts            reading the deployment, and arranging it
 ```
 
-Two of the three `.test.ts` files came with the code they test:
-`e2e/port.test.ts` pins the port helper's `E2E_PORT` validation, and
-`scripts/e2e-all-providers.test.ts` reads back what the seven-provider
-spawner hands each run, including the negative assertion that it no longer
-forces `CI=1` (which used to buy a retry, and a retry is what turned
-rclone-manager #172's deterministic red into something that read as a
-flake). The third, `harness/under-test.test.ts`, is new here, because the
-per-process port resolution is new here. `npm run unit` runs all three,
-and all three are in this repository's gate and in rclone-manager's.
+`harness/under-test.ts`, `harness/pick-free-port.mjs`, `e2e/port.ts` and
+`scripts/e2e-all-providers.mjs` are gone. All four existed to start and
+find a dev server, and there is no dev server. Their unit tests went with
+them and were replaced by `harness/deployment.test.ts` and
+`harness/session.test.ts`, which pin the same kind of thing one layer up:
+what a run reads out of its environment, and what it refuses.

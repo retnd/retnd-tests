@@ -1,8 +1,78 @@
-import { expect, test } from "./fixtures";
+import { retentionClasses } from "../harness/api";
+import { expect, mockOnly, needs, test } from "./fixtures";
 import type { BackupManager } from "./fixtures";
+
+/**
+ * The backups table and one backup's detail, against a real deployment.
+ *
+ * The split here is the cleanest in the suite, and it is worth reading
+ * before the cases.
+ *
+ * The TABLE and the DETAIL page are real: their columns, their vocabulary,
+ * their refusals and their lifecycle ordering are claims about the app,
+ * and they hold on whatever the deployment happens to hold, so long as it
+ * holds something. Each of those cases needs one backup and says so.
+ *
+ * The COPIES block is the exception, and it is the sharpest example in the
+ * whole suite of the trap the brief named. Every case in it is written
+ * against three artifacts by name (`postgres-prod-20260828.dump.zst`,
+ * `billing-20260827.sql.gz`, `media-week34.tar`), on named storage
+ * classes (`STANDARD_IA`, `DEEP_ARCHIVE`), verified to named depths, one
+ * of them on a medium nothing can reach. That is not a state a deployment
+ * gets into; it is a fixture somebody wrote to make five different
+ * readings expressible in one page. So those cases each state which
+ * placement they would need, read the deployment's real placements to
+ * decide, and skip with that reading printed rather than passing against
+ * whatever happens to be there.
+ *
+ * None of them was deleted, and none was loosened into a shape that
+ * cannot fail. A case about telling "unreachable" from "gone" is worth
+ * nothing if it is rewritten to accept either.
+ *
+ * # DISC-010: none of this is reachable in a browser today
+ *
+ * The first run of this suite against a real deployment found that a
+ * backup's detail page cannot be opened at all. An artifact id is three
+ * slash-separated segments (`e2e/vps/notes.txt`, model.ArtifactID.String)
+ * and BackupsPage navigates with `"/backups/" + a.id`, against a route
+ * declared as one segment. The URL matches nothing, App.tsx's catch-all
+ * takes it, and the operator lands on the Dashboard.
+ *
+ * The mock could not see it: its ids were `art_01J9C1XY7T09`, one
+ * segment, so the route matched perfectly and five cases asserted their
+ * way through a page nobody could reach.
+ *
+ * findings/DISC-010.md has the whole thing, including that App.tsx fixed
+ * this exact defect on the neighbouring backup-set route in #285, with a
+ * comment four lines above the artifact route explaining why. The cases
+ * below carry `expectedToFailOnDISC010()` rather than being skipped or
+ * loosened, which is this repository's strict expected-failure shape: red
+ * while the defect stands, and red on purpose the moment somebody fixes
+ * the route and forgets to remove the marker.
+ */
+
+/** Marks a case as one DISC-010 currently prevents from passing.
+ *
+ *  Deliberately not a `needs()`: a skip says "this deployment is not in
+ *  the state the case is about", and that is not what is happening here.
+ *  The deployment is in exactly the right state; the product cannot show
+ *  it. */
+function expectedToFailOnDISC010() {
+  test.fail(
+    true,
+    "DISC-010: a backup's detail page is unreachable, because an artifact id is three URL " +
+      "segments and /backups/:artifactId is one. See findings/DISC-010.md"
+  );
+}
 
 test.describe("backups table", () => {
   test.beforeEach(async ({ bm }) => {
+    needs(bm.facts.configured, "a configured deployment: this page refuses with NOT_CONFIGURED before the first backup set exists");
+    needs(
+      bm.facts.backups.length > 0,
+      "at least one ingested backup. A real deployment has none until a cycle runs and something " +
+        "lands, where the mock's catalogue was populated on every page load"
+    );
     await bm.goto("/backups");
   });
 
@@ -25,22 +95,56 @@ test.describe("backups table", () => {
     }
   });
 
-  test("uses column headers, not styled divs", async ({ page }) => {
-    // Eight on this fixture, not seven: the Medium column is here because
-    // a backup on this instance has a copy somewhere other than the local
-    // backup root. The no-medium scenario below is where the count is
-    // seven, and the pair is the assertion, not either number alone.
-    await expect(page.getByRole("columnheader")).toHaveCount(8);
+  test("uses column headers, not styled divs", async ({ bm, page }) => {
+    // Seven or eight, and which one is a fact about the deployment rather
+    // than about the page. The eighth is Medium, and it is there when this
+    // instance has a copy somewhere other than the local backup root.
+    //
+    // The old case pinned eight, because the mock always had one. Pinning
+    // a number the deployment decides would make this red on every
+    // deployment that declares no storage medium, which is FR-35's
+    // supported case and the state a fresh install is in.
+    const expected = bm.facts.mediums.length > 0 ? 8 : 7;
+    await expect(page.getByRole("columnheader")).toHaveCount(expected);
     const rows = await page.getByRole("row").count();
     expect(rows).toBeGreaterThan(1);
   });
 
-  test("a backup can hold several retention classifications at once", async ({ page }) => {
-    const multi = page.getByRole("row").filter({ hasText: "Daily" }).filter({ hasText: "Weekly" });
-    await expect(multi.first()).toBeVisible();
+  test("a backup can hold several retention classifications at once", async ({ bm, page }) => {
+    // A real state rather than a fixture: the newest backup of a
+    // deployment with a daily/weekly/monthly chain is all three at once,
+    // once retention has classified it. It just has not necessarily
+    // happened yet on this deployment, so the premise is read off the
+    // catalogue instead of assumed.
+    const multi = bm.facts.backups.find((b) => retentionClasses(b).length > 1);
+    needs(
+      multi !== undefined,
+      "a backup carrying more than one retention class. Retention has to have classified this " +
+        "deployment's catalogue first; until it runs, every artifact carries at most one"
+    );
+    const row = page.getByRole("row").filter({ hasText: multi!.name });
+    // Two of its real classes, whichever two they are, on its own row.
+    for (const cls of retentionClasses(multi!).slice(0, 2)) {
+      await expect(row).toContainText(new RegExp(cls, "i"));
+    }
   });
 
-  test("marks the protected artifact distinctly", async ({ page }) => {
+  test("marks the protected artifact distinctly", async ({ bm, page }) => {
+    // My first version of this comment said last-known-good protection is
+    // on by default so any deployment holding a backup has a protected
+    // row, and the first real run said otherwise: every row read
+    // "unclassified", and nothing was marked.
+    //
+    // Protection is a RETENTION verdict, and retention has to have run
+    // and classified the catalogue before any artifact is the newest
+    // known-good of anything. A deployment that has ingested backups and
+    // never applied retention has no protected row, correctly, and the
+    // mock hid that by shipping a catalogue that was already classified.
+    needs(
+      bm.facts.backups.some((b) => retentionClasses(b).length > 0),
+      "a catalogue retention has classified. Every artifact here is unclassified, which is what an " +
+        "ingested-but-never-retained deployment really looks like, and nothing in it is protected yet"
+    );
     await expect(page.getByText("Protected").first()).toBeVisible();
   });
 
@@ -53,7 +157,12 @@ test.describe("backups table", () => {
     await expect(page.getByText(/Remote source (removed|retained)/).first()).toBeVisible();
   });
 
-  test("filters by backup set", async ({ page }) => {
+  test("filters by backup set", async ({ bm, page }) => {
+    needs(
+      bm.facts.sets.length > 1,
+      "more than one backup set: filtering one of one removes nothing, so the case would pass " +
+        "against a control wired to nothing"
+    );
     const before = await page.getByRole("row").count();
     await page.getByLabel("Filter by backup set").selectOption({ index: 1 });
     await expect(page.getByRole("row")).not.toHaveCount(before);
@@ -66,6 +175,7 @@ test.describe("backups table", () => {
   });
 
   test("row click opens the artifact detail", async ({ page }) => {
+    expectedToFailOnDISC010();
     await page.getByRole("row").nth(1).click();
     await expect(page.getByText("Artifact ID")).toBeVisible();
   });
@@ -75,8 +185,16 @@ test.describe("backups table", () => {
     await expect(page.getByRole("button", { name: /^delete file/i })).toHaveCount(0);
   });
 
-  test("empty install explains what has not happened yet", async ({ bm, page }) => {
-    await bm.goto("/backups", "empty");
+});
+
+/** What `?scenario=empty` stood in for, and the state a real container is
+ *  genuinely in before a cycle has landed anything. It runs on a fresh
+ *  deployment and states why it does not on a seeded one, which is the
+ *  exact reverse of how it read against the mock. */
+test.describe("a deployment that has ingested nothing yet", () => {
+  test("explains what has not happened yet", async ({ bm, page }) => {
+    needs(bm.facts.backups.length === 0, "a deployment holding no backups");
+    await bm.goto("/backups");
     await expect(page.getByText("No backups yet")).toBeVisible();
     await expect(page.getByText(/has not completed its first successful ingestion/)).toBeVisible();
   });
@@ -84,11 +202,13 @@ test.describe("backups table", () => {
 
 test.describe("backup detail", () => {
   test.beforeEach(async ({ bm, page }) => {
+    needs(bm.facts.backups.length > 0, "at least one ingested backup to open");
     await bm.goto("/backups");
     await page.getByRole("row").nth(1).click();
   });
 
   test("shows every documented artifact field", async ({ page }) => {
+    expectedToFailOnDISC010();
     // "Ingestion path", not "Local path". The old label read as "this is
     // where your backup is", which the field has never meant: it is where
     // ingestion landed, and it stays populated for a transfer still
@@ -104,7 +224,21 @@ test.describe("backup detail", () => {
     }
   });
 
+  /** §15's ordering, and the one assertion in this file that got STRONGER
+   *  by moving off the mock: the mock drew a fixed timeline, so the order
+   *  was a property of a fixture. Here the phases were reached by a real
+   *  cycle, in real time, and the page is rendering what the catalogue
+   *  recorded.
+   *
+   *  The phases a backup has not reached are the change. The mock's
+   *  artifact had reached all six; a real backup on a set that keeps its
+   *  remote source never reaches the sixth, and one still being verified
+   *  has not reached the fourth. So the assertion is about the ORDER of
+   *  the phases this backup did reach, which is what §15 is about, rather
+   *  than about all six being present. Remote deletion after commit is
+   *  the rule, and a timeline missing remote deletion has not broken it. */
   test("renders the lifecycle in the only correct order", async ({ page }) => {
+    expectedToFailOnDISC010();
     const timeline = page.getByRole("region", { name: "Lifecycle" }).or(page.locator("ol").last());
     const text = await timeline.innerText();
 
@@ -112,21 +246,31 @@ test.describe("backup detail", () => {
       "DISCOVERED", "TRANSFERRED", "VERIFIED", "COMMITTED",
       "SAFE STATE PERSISTED", "REMOTE SOURCE DELETED"
     ];
-    const positions = order.map((label) => text.indexOf(label));
+    const reached = order.map((label) => ({ label, at: text.indexOf(label) })).filter((p) => p.at > -1);
 
-    for (const p of positions) expect(p).toBeGreaterThan(-1);
-    for (let i = 1; i < positions.length; i++) {
+    // The premise: a lifecycle with nothing in it satisfies every ordering
+    // rule there is. Discovery is the one phase every artifact in the
+    // catalogue has by definition.
+    expect(reached.map((p) => p.label)).toContain("DISCOVERED");
+    expect(reached.length).toBeGreaterThan(1);
+
+    for (let i = 1; i < reached.length; i++) {
       // Remote deletion can never precede commit (§15).
-      expect(positions[i]).toBeGreaterThan(positions[i - 1]);
+      expect(
+        reached[i].at,
+        reached[i].label + " is rendered before " + reached[i - 1].label
+      ).toBeGreaterThan(reached[i - 1].at);
     }
   });
 
   test("timestamps every reached phase", async ({ page }) => {
+    expectedToFailOnDISC010();
     const timeline = page.locator("ol").last();
     await expect(timeline).toContainText(/\d{2}:\d{2}:\d{2}/);
   });
 
   test("frames remote deletion as a consequence, not an action", async ({ page }) => {
+    expectedToFailOnDISC010();
     await expect(
       page.getByText(/lifecycle consequence of a proven NAS copy .* never an independent file operation/)
     ).toBeVisible();
@@ -134,6 +278,7 @@ test.describe("backup detail", () => {
   });
 
   test("returns to the table", async ({ bm, page }) => {
+    expectedToFailOnDISC010();
     await page.getByRole("button", { name: /Backups/ }).first().click();
     await expect(bm.heading("Backups")).toBeVisible();
   });
@@ -158,31 +303,76 @@ test.describe("where a backup's copies are", () => {
     page.getByRole("region", { name: "Copies" });
 
   async function openBackup(bm: BackupManager, page: import("@playwright/test").Page, filename: string) {
+    // Every case in this block reaches its subject through here, so this
+    // is where DISC-010 stops all of them.
+    expectedToFailOnDISC010();
     await bm.goto("/backups");
     await page.getByRole("row").filter({ hasText: filename }).click();
     await expect(copies(page)).toBeVisible();
   }
 
+  /** The first backup in this deployment's catalogue whose placements
+   *  match what a case needs, or undefined.
+   *
+   *  This is what replaced three hardcoded filenames. Each case below says
+   *  which PLACEMENT it is about, finds a backup that really has one, and
+   *  drives the page to it. A deployment that has no such backup gets the
+   *  reading printed instead of a green tick. */
+  const withPlacement = (
+    bm: BackupManager,
+    matches: (p: NonNullable<(typeof bm.facts.backups)[number]["placements"]>[number]) => boolean
+  ) => bm.facts.backups.find((b) => (b.placements ?? []).some(matches));
+
+  /** The columns are the app's, so they hold for any backup with a copy.
+   *  What was fixture-shaped was the CONTENT: `offsite_s3` and
+   *  `STANDARD_IA` are one deployment's declared medium and one storage
+   *  class, and a deployment that declares nothing has neither. So the
+   *  columns are asserted unconditionally and the contents are asserted
+   *  against this deployment's own placement, whatever it is on. */
   test("lists one row per durable copy, with where it is and what it is on", async ({ bm, page }) => {
-    await openBackup(bm, page, "postgres-prod-20260828.dump.zst");
+    const artifact = bm.facts.backups.find((b) => (b.placements ?? []).length > 0);
+    needs(artifact !== undefined, "a backup with at least one recorded copy");
+    await openBackup(bm, page, artifact!.name);
 
     const card = copies(page);
     for (const col of ["Where", "Location", "Copy size", "Class", "Access", "Verification"]) {
       await expect(card.getByRole("columnheader", { name: col })).toBeVisible();
     }
-    await expect(card.getByText("Local backup root")).toBeVisible();
-    await expect(card.getByText("offsite_s3")).toBeVisible();
-    await expect(card.getByText("STANDARD_IA")).toBeVisible();
+    // One row per placement the service recorded, and each row naming the
+    // medium it is on. The count is the sharp half: a card that drew one
+    // row for a backup with two copies is the defect this block exists
+    // for, and no assertion on text alone can see it.
+    const placements = artifact!.placements ?? [];
+    await expect(card.getByRole("row")).toHaveCount(placements.length + 1);
+    for (const placement of placements) {
+      await expect(card.getByText(placement.medium === "local" ? "Local backup root" : placement.medium)).toBeVisible();
+    }
   });
 
+  /** Two copies of one backup, verified to different depths, and the page
+   *  saying so. An existence check reported as content verification is
+   *  worse than no check at all: it turns "nobody has read these bytes in
+   *  a year" into a green tick.
+   *
+   *  Reaching it needs a backup with copies on two mediums that were
+   *  verified differently, which is a deployment that declares a remote
+   *  medium and has moved something to it. On a local-only deployment
+   *  every copy is content-verified and the weaker rung has nothing to
+   *  render, so the case says that rather than asserting one of the two
+   *  and calling it covered. */
   test("reports the verification each copy actually achieved, never a stronger one", async ({ bm, page }) => {
-    await openBackup(bm, page, "postgres-prod-20260828.dump.zst");
+    const artifact = bm.facts.backups.find((b) => {
+      const classes = new Set((b.placements ?? []).map((p) => p.verification_class));
+      return classes.size > 1;
+    });
+    needs(
+      artifact !== undefined,
+      "a backup with copies verified to different depths. That needs a declared remote medium and " +
+        "something moved to it: on a local-only deployment every copy is content-verified"
+    );
+    await openBackup(bm, page, artifact!.name);
 
     const card = copies(page);
-    // Two copies of one backup, verified to different depths, and the
-    // page says so. An existence check reported as content verification
-    // is worse than no check at all: it turns "nobody has read these
-    // bytes in a year" into a green tick.
     await expect(card.getByText("Content verified")).toBeVisible();
     await expect(card.getByText("Existence only")).toBeVisible();
     // The backend's own words for what the weaker rung proves, rather
@@ -191,10 +381,15 @@ test.describe("where a backup's copies are", () => {
   });
 
   test("says an archive copy needs a restore before anybody plans around it", async ({ bm, page }) => {
-    await openBackup(bm, page, "billing-20260827.sql.gz");
+    const artifact = withPlacement(bm, (p) => p.access === "requires_restore");
+    needs(
+      artifact !== undefined,
+      "a backup with a copy on an archive class. That needs a declared archive medium (DEEP_ARCHIVE " +
+        "or equivalent) with a copy already on it, which no deployment reaches by running one cycle"
+    );
+    await openBackup(bm, page, artifact!.name);
 
     const card = copies(page);
-    await expect(card.getByText("DEEP_ARCHIVE")).toBeVisible();
     await expect(card.getByText("Needs a restore")).toBeVisible();
     // Twice, deliberately: once on the row and once in the footer's
     // disclosure. `first()` rather than a narrower matcher because both
@@ -207,12 +402,19 @@ test.describe("where a backup's copies are", () => {
     await expect(card.getByText("Readable now")).toHaveCount(0);
   });
 
+  /** The distinction this whole block exists for, and the one it would be
+   *  worst to loosen: "nothing here can confirm this copy" is not "the
+   *  copy is gone". A deployment reaches it when a declared medium stops
+   *  answering, which is a state the topology can arrange by taking the
+   *  medium's endpoint away, and one no amount of running backups
+   *  produces on its own. */
   test("says nothing can confirm a copy on a medium it cannot reach, and does not call it gone", async ({ bm, page }) => {
-    await bm.goto("/quarantine");
-    await page.getByRole("row").filter({ hasText: "billing-20260824.sql.gz" }).first().click();
-    // Reached through the backups list rather than quarantine's own
-    // actions, so this stays a test about the copies card.
-    await bm.goto("/backups/art_01J9C1XY7T09");
+    const artifact = withPlacement(bm, (p) => p.access === "unreachable");
+    needs(
+      artifact !== undefined,
+      "a backup with a copy on a medium this deployment cannot currently reach"
+    );
+    await openBackup(bm, page, artifact!.name);
 
     const card = copies(page);
     await expect(card.getByText("Out of reach")).toBeVisible();
@@ -222,20 +424,32 @@ test.describe("where a backup's copies are", () => {
   });
 
   test("says there is no copy at all, rather than showing the ingestion path as one", async ({ bm, page }) => {
-    await openBackup(bm, page, "media-week34.tar");
+    const artifact = bm.facts.backups.find((b) => (b.placements ?? []).length === 0);
+    needs(
+      artifact !== undefined,
+      "a backup still arriving, with no confirmed copy yet. That is a window of seconds on a real " +
+        "deployment rather than the permanent fixture the mock held"
+    );
+    await openBackup(bm, page, artifact!.name);
 
     const card = copies(page);
     await expect(card.getByText("No confirmed copy yet")).toBeVisible();
     await expect(card.getByText(/a partial file is not a copy/i)).toBeVisible();
     // The ingestion path is on the page, labelled as what it is, and it is
     // not inside the list of copies. That is the assertion: not that the
-    // path is hidden, but that it is not presented as storage.
+    // path is hidden, but that it is not presented as storage. The path is
+    // this deployment's own rather than the fixture's.
     await expect(page.getByText("Ingestion path", { exact: true })).toBeVisible();
-    await expect(card.getByText("/data/backups/media/2026/w34/media-week34.tar")).toHaveCount(0);
+    await expect(card.getByRole("row")).toHaveCount(0);
   });
 
   test("states that retrieval is billed, and shows no figure for it", async ({ bm, page }) => {
-    await openBackup(bm, page, "postgres-prod-20260828.dump.zst");
+    const artifact = withPlacement(bm, (p) => p.medium_type === "s3");
+    needs(
+      artifact !== undefined,
+      "a backup with a copy on a provider that bills for retrieval, which needs a declared S3 medium"
+    );
+    await openBackup(bm, page, artifact!.name);
 
     await expect(copies(page).getByText(/billed by your provider/i)).toBeVisible();
     // rclone-manager#211's rule: this product holds no price list and
@@ -246,17 +460,28 @@ test.describe("where a backup's copies are", () => {
     expect(text).not.toMatch(/per\s+(GB|TB|gigabyte)/i);
   });
 
-  test("shows a Medium column, and flags the copies nobody can reach", async ({ bm, page }) => {
+  test("shows a Medium column once this deployment declares one", async ({ bm, page }) => {
+    needs(
+      bm.facts.mediums.length > 0,
+      "a deployment that declares a storage medium. With none declared the column is correctly " +
+        "absent, which is FR-35's compatibility case and is asserted in its own block below"
+    );
     await bm.goto("/backups");
 
     const table = page.getByRole("table");
     await expect(table.getByRole("columnheader", { name: "Medium" })).toBeVisible();
-    await expect(table.getByText("offsite_cold")).toBeVisible();
+    // This deployment's own declared medium, rather than the fixture's
+    // `offsite_cold`.
+    await expect(table.getByText(bm.facts.mediums[0].id)).toBeVisible();
+
     // A backup still arriving has no copy, and the cell says so rather
     // than being blank, which would read as "the column does not apply".
-    await expect(
-      page.getByRole("row").filter({ hasText: "media-week34.tar" }).getByText("No copy yet")
-    ).toBeVisible();
+    const arriving = bm.facts.backups.find((b) => (b.placements ?? []).length === 0);
+    if (arriving) {
+      await expect(
+        page.getByRole("row").filter({ hasText: arriving.name }).getByText("No copy yet")
+      ).toBeVisible();
+    }
   });
 });
 
@@ -275,8 +500,22 @@ test.describe("where a backup's copies are", () => {
  * length.
  */
 test.describe("a deployment that never heard of storage mediums", () => {
+  // `?scenario=no-medium` was the mock's way of manufacturing this, and it
+  // is the second scenario in the suite that turned out to describe a real
+  // deployment's ordinary state rather than a fixture: an instance that
+  // declares nothing is exactly what migration 0007's backfill leaves
+  // every pre-EPIC-E installation as, and what a fresh container is.
+  test.beforeEach(async ({ bm }) => {
+    needs(
+      bm.facts.mediums.length === 0,
+      "a deployment declaring no storage medium. FR-35's compatibility line is about that instance " +
+        "specifically, so it cannot be asserted against one that declares any"
+    );
+  });
+
   test("has no Medium column, and exactly the seven columns it always had", async ({ bm, page }) => {
-    await bm.goto("/backups", "no-medium");
+    needs(bm.facts.backups.length > 0, "at least one ingested backup, so there is a table to count columns on");
+    await bm.goto("/backups");
 
     const table = page.getByRole("table");
     await expect(table).toBeVisible();
@@ -288,7 +527,9 @@ test.describe("a deployment that never heard of storage mediums", () => {
   });
 
   test("still says where each backup's one copy is", async ({ bm, page }) => {
-    await bm.goto("/backups", "no-medium");
+    needs(bm.facts.backups.some((b) => (b.placements ?? []).length > 0), "at least one backup with a copy recorded");
+    expectedToFailOnDISC010();
+    await bm.goto("/backups");
     await page.getByRole("row").nth(1).click();
 
     const card = page.getByRole("region", { name: "Copies" });
@@ -335,7 +576,7 @@ test.describe("a deployment that never heard of storage mediums", () => {
    * matching nothing.
    */
   test("offers a destination picker on its one tier, on the local hard drive", async ({ bm, page }) => {
-    await bm.goto("/settings", "no-medium");
+    await bm.goto("/settings");
 
     const tier1 = page.getByRole("group", { name: "Tier 1" });
     await expect(tier1).toBeVisible();
