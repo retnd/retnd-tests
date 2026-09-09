@@ -30,6 +30,16 @@ runs them green. The two that pass at both are
 `--config` contract is older than any of this, and those two are the
 family's regression guard rather than new coverage.
 
+**Almost every case here is RED against the pin right now**, and for the
+same specs-first reason. `build-under-test.json` names 87a9dc7, which
+still calls itself `backup-manager`; the matrix asserts `rbm` throughout,
+which is what
+[rclone-manager#648](https://github.com/spdrman/rclone-manager/issues/648)
+makes it print. The pin moves in rclone-manager's own merge, and these go
+green there. Retargeting them was not a rename of one word per file: the
+old spelling also survives in three places that are not the command, and
+those are named at the end of the Global section below.
+
 **Cases pin one claim each.** `artifacts/happy` checks that the listing
 lists, with lifecycle states drawn from FR-10's documented vocabulary; the
 case that pins which state a `stable`-strategy artifact stops at is
@@ -59,6 +69,28 @@ lives. `harness/selftest` proves each of the four can actually fail.
 | `global/g4-config-default-is-the-packaged-directory` | the banner's `--config` default is `/etc/backup-manager/config/config.yaml`, and a directory there resolves to `config.yaml` inside it (#196) |
 | `global/g5-usage-explains-the-mode-line` | the banner says which commands announce a `mode:` line and what `engine-attached`, `direct` and `unconfirmed` each mean ([#536](https://github.com/spdrman/rclone-manager/issues/536), [#544](https://github.com/spdrman/rclone-manager/issues/544)); doubles as the positive control for every `absent: "mode: engine-attached"` in the matrix |
 | `global/f6-unknown-flag` | exit 2 on a flag the command does not define |
+| `global/g6-the-old-name-reaches-the-same-binary` | the build under test, reached through a file called `backup-manager`, still answers `version` with `rbm` on the first line |
+| `global/g7-the-old-name-still-says-rbm` | reached through the old name, an unknown command still prefixes its diagnostic `rbm: ` and still prints `usage: rbm`, so one host cannot tell two operators two different things |
+
+**The two names.** The command is `rbm` from 0.3.3
+([rclone-manager#648](https://github.com/spdrman/rclone-manager/issues/648)),
+`backup-manager` until then, and the old spelling still runs: the image
+links it beside the new one so nothing an operator already automated has
+to change. Every case in this matrix asserts the printed name is `rbm`,
+including the two above, which reach the binary through the old filename.
+That pairing is the whole claim: the name a build prints is a fact about
+the build, so both files have to print the same one.
+
+What the pair does not cover is whether the shipped image actually
+contains both names. `invoke_as` makes the link in the harness, and the
+`go` builder the pin uses does not produce an image at all, so the case
+is about the binary and `container/Dockerfile` owns the packaging half.
+The three spellings that are *not* the command stay where they are and
+are asserted that way: the config directory at `/etc/backup-manager`
+(`global/g4-config-default-is-the-packaged-directory`), the image
+reference `ghcr.io/spdrman/backup-manager`, and the Go package path
+`core/cmd/backup-manager` that this document derives its command list
+from.
 
 ## The shared failure family
 
@@ -68,7 +100,7 @@ other command that opens a config, so a command that stops honouring
 
 | Case | Fixture | Expectation |
 |---|---|---|
-| `check/f1-config-missing` | none | exit 1, `backup-manager: ` naming the path |
+| `check/f1-config-missing` | none | exit 1, `rbm: ` naming the path |
 | `check/f2-malformed-yaml` | `malformed-yaml` | exit 1, stderr naming a parse problem |
 | `check/f3-duplicate-backup-set-id` | `invalid-duplicate-set` | exit 1, stderr naming the offending field path (FR-7) |
 | `check/f3-unsupported-remote-type` | `invalid-remote-type` | exit 1, stderr naming the type and the field (FR-4) |
@@ -169,5 +201,6 @@ Stated rather than implied.
 - **The disk-pressure and quarantine surfaces** FR-21 and FR-10 describe
   are visible in `status` output but have no fixture that drives a set
   into them.
-- **`backup-manager-web`** and its `serve`, `serve-ui` and `healthcheck`
+- **`rbm-web`** (`backup-manager-web` before 0.3.3, and still linked
+  under that name) and its `serve`, `serve-ui` and `healthcheck`
   commands are Suites B and C's territory and are not covered here.

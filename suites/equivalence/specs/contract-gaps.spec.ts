@@ -265,7 +265,7 @@ test.describe("the matrix's gap rows", () => {
     // would let every assertion below pass by finding nothing.
     expect(
       usage.length,
-      "backup-manager printed no usage at all, so this case compared nothing"
+      "rbm printed no usage at all, so this case compared nothing"
     ).toBeGreaterThan(200);
     expect(
       usage,

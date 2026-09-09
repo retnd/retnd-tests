@@ -31,12 +31,35 @@ func TestCommitsAgree(t *testing.T) {
 	}
 }
 
+// TestParseVersion runs the same four lines under both names the command
+// has had. The pin is free to point either side of the 0.3.3 rename, and
+// this parser runs before any case does, so a build that cannot be
+// identified is a run that refuses rather than a run that certifies
+// nothing. The second half of the table is the one that would have caught
+// what happened here: the parser matched on the literal `backup-manager`,
+// so against an `rbm` build it silently reported an empty version while
+// the commit line still lined up and the handshake still passed.
 func TestParseVersion(t *testing.T) {
-	info := parseVersion("backup-manager 8ad3100\nrclone v1.71.1\ngo go1.27.0\ncommit 8ad310014b5be92e75789c8cff4167942d0c8e42\n")
-	if info.BinaryVersion != "8ad3100" || info.Rclone != "v1.71.1" || info.Go != "go1.27.0" {
-		t.Errorf("parseVersion misread the first three lines: %+v", info)
+	for _, name := range []string{"rbm", "backup-manager"} {
+		t.Run(name, func(t *testing.T) {
+			info := parseVersion(name + " 8ad3100\nrclone v1.71.1\ngo go1.27.0\ncommit 8ad310014b5be92e75789c8cff4167942d0c8e42\n")
+			if info.BinaryVersion != "8ad3100" || info.Rclone != "v1.71.1" || info.Go != "go1.27.0" {
+				t.Errorf("parseVersion misread the first three lines: %+v", info)
+			}
+			if info.Commit != "8ad310014b5be92e75789c8cff4167942d0c8e42" {
+				t.Errorf("commit = %q", info.Commit)
+			}
+		})
 	}
-	if info.Commit != "8ad310014b5be92e75789c8cff4167942d0c8e42" {
-		t.Errorf("commit = %q", info.Commit)
+}
+
+// TestParseVersionIgnoresAnUnrelatedFirstWord is the positive control for
+// the case above: the parser accepting two names must not mean it accepts
+// any name, or the "which build is this" line would read a number off
+// whatever happened to be printed first.
+func TestParseVersionIgnoresAnUnrelatedFirstWord(t *testing.T) {
+	info := parseVersion("rclone-manager 8ad3100\ncommit 8ad310014b5be92e75789c8cff4167942d0c8e42\n")
+	if info.BinaryVersion != "" {
+		t.Errorf("BinaryVersion = %q, want empty: only the CLI names itself on that line", info.BinaryVersion)
 	}
 }

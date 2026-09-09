@@ -16,7 +16,7 @@ catch.
 
 **Catalog state is seeded by replaying documented operator commands,
 never by writing SQLite rows.** A scenario with `state: replay` runs
-`backup-manager fetch` (or `run`) against the fixture and lets the
+`rbm fetch` (or `run`) against the fixture and lets the
 product build its own catalog. Writing rows directly would bake FR-9's
 schema into the fixtures, which is knowledge an operator does not have,
 and it would rot silently on the first migration.

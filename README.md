@@ -7,7 +7,7 @@ Three suites live here:
 
 | Suite | What it is | Status |
 |---|---|---|
-| **A. CLI contract** | `backup-manager` driven black-box: argv in, exit code plus stdout plus stderr plus resulting on-disk state out | built, `make suite-a` |
+| **A. CLI contract** | `rbm` driven black-box: argv in, exit code plus stdout plus stderr plus resulting on-disk state out | built, `make suite-a` |
 | **B. Web UI** | the Playwright suite, migrated out of `rclone-manager`'s `ui/shared/e2e/` | migrated, `make suite-b`, see [`suites/web-ui/README.md`](suites/web-ui/README.md) |
 | **C. UI to CLI equivalence** | every backend-affecting UI action proved equal to its CLI equivalent by comparing resulting backend state | built, `make suite-c`, with the matrix in [`suites/equivalence/MATRIX.md`](suites/equivalence/MATRIX.md) |
 
@@ -50,6 +50,18 @@ to stand up.
 `build-under-test.json` is the pin, and it is the only thing that decides
 what a run certifies. See [`docs/pinning.md`](docs/pinning.md) for the
 three modes and how to point the suites at a newer build in one command.
+
+The command is `rbm` from 0.3.3
+([rclone-manager#648](https://github.com/spdrman/rclone-manager/issues/648)),
+and was `backup-manager` before it. The old name still runs, because the
+image links it beside the new one, so this repository has to be able to
+tell the two apart: what the binary *prints* is asserted as `rbm` in
+every case, what an operator *types* is asserted under both names in
+`global/g6-…` and `global/g7-…`, and the three things merely named after
+the old command (the config directory `/etc/backup-manager`, the image
+`ghcr.io/spdrman/backup-manager`, the Go package path
+`core/cmd/backup-manager`) did not move and are still spelled that way
+throughout.
 
 Every run, in every mode, starts by asking the binary `version` and
 refusing to continue unless the commit it reports matches what the pin

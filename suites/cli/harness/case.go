@@ -1,4 +1,4 @@
-// Package harness runs one backup-manager invocation against one fixture
+// Package harness runs one rbm invocation against one fixture
 // and decides whether the result matched a checked-in expectation.
 //
 // # Why there is no golden mode
@@ -67,6 +67,20 @@ type Case struct {
 	// Argv is the invocation under test, with ${CONFIG} and friends
 	// expanded against the materialised fixture.
 	Argv []string `yaml:"argv"`
+	// InvokeAs runs the argv under test through a second filename for the
+	// same binary, rather than through the name the pin resolved. It is
+	// how the old command name gets asserted from outside: `rbm` was
+	// `backup-manager` until 0.3.3 and the old spelling still has to
+	// work, and a promise like that is exactly the kind that rots
+	// silently because nothing an operator runs ever proves it.
+	//
+	// It is a bare filename, and the harness makes the link itself, so
+	// what a case using this asserts is that the binary does not care
+	// which name reached it. What it cannot assert is that the shipped
+	// image has that second name in it, because in the `go` builder there
+	// is no image; that half is container/Dockerfile's, and the two are
+	// deliberately not conflated here.
+	InvokeAs string `yaml:"invoke_as"`
 	// NoArguments says the empty argv is the point. It has to be spelled
 	// out rather than inferred from an empty list, so that a case whose
 	// argv failed to load reads as a broken case rather than as a
@@ -261,6 +275,9 @@ func (c Case) validate() error {
 	}
 	if len(c.KnownDiscrepancyDimensions) > 0 && c.KnownDiscrepancy == "" {
 		return fmt.Errorf("%s: known_discrepancy_dimensions without a known_discrepancy issue reference", c.Name)
+	}
+	if c.InvokeAs != "" && (c.InvokeAs != filepath.Base(c.InvokeAs) || c.InvokeAs == "." || c.InvokeAs == "..") {
+		return fmt.Errorf("%s: invoke_as %q: expected a bare filename, not a path", c.Name, c.InvokeAs)
 	}
 	if len(c.Contract) == 0 {
 		return fmt.Errorf("%s: contract is required: name the document, FR number or usage text this expectation came from", c.Name)

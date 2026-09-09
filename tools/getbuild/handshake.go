@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// VersionInfo is what `backup-manager version` reports, parsed.
+// VersionInfo is what `rbm version` reports, parsed.
 type VersionInfo struct {
 	BinaryVersion string
 	Rclone        string
@@ -61,7 +61,16 @@ func parseVersion(out string) VersionInfo {
 			continue
 		}
 		switch fields[0] {
-		case "backup-manager":
+		// Both spellings, and deliberately not one. The command is `rbm`
+		// from 0.3.3 on and was `backup-manager` before it, and the pin
+		// is allowed to point at either side of that line: this parser
+		// runs before any case does, so a pin moved back to an older
+		// build has to still be able to say which commit it is. The
+		// version command's own printed name is asserted where an
+		// assertion belongs, in cases/version/happy.yaml, which is a
+		// single spelling and goes red if the product prints the other
+		// one.
+		case "rbm", "backup-manager":
 			info.BinaryVersion = fields[1]
 		case "rclone":
 			info.Rclone = fields[1]
