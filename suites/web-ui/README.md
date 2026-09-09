@@ -15,7 +15,17 @@ RM_ADMIN_PASSWORD=... \
 
 The rig itself lives in the product repository, under `scripts/e2e/`, and
 brings the containers up before this runner starts. Nothing in this
-directory starts anything.
+directory starts anything. From a product checkout:
+
+```sh
+scripts/e2e/three-machine-web-ui.sh --suite ../rclone-manager-tests/suites/web-ui
+```
+
+Against the rig as it stands (one backup set, three ingested artifacts, a
+healthy deployment with nothing declared), that is **188 passed, 69
+skipped, 3 expected failures**, in about ten minutes. The three expected
+failures are `findings/DISC-010.md`, and the run ends by printing every
+skipped case with the reason it declined.
 
 ## Why it moved
 
@@ -177,6 +187,42 @@ npm run typecheck
 `npm run e2e:list` passes a deliberately unreachable base URL of its own,
 so listing the suite never needs a deployment and never quietly points at
 one.
+
+## What running it for the first time found
+
+Worth recording, because it is the answer to "was this worth doing".
+
+The first run against the rig was 173 passed, 24 failed. Every one of the
+24 was a real finding about something, and they sorted into three kinds.
+
+**A product bug nothing could have caught.** Clicking a backup lands an
+operator on the Dashboard. An artifact id is three slash-separated
+segments (`e2e/vps/notes.txt`) and `BackupsPage` navigates with
+`"/backups/" + a.id` against a route declared as one segment, so the URL
+matches nothing and App.tsx's catch-all takes it. The detail page, the
+lifecycle timeline and the whole Copies card are unreachable in a browser
+on any real deployment. The mock's ids were `art_01J9C1XY7T09`, one
+segment, so the route matched and five cases asserted their way through a
+page nobody could open. `findings/DISC-010.md`, and App.tsx fixed this
+exact defect on the neighbouring backup-set route in #285.
+
+**Two cases that had learned something untrue from the fixture.** The
+storage-critical case asserted that a full disk escalates the headline;
+§8 says the headline is the BACKUP verdict and storage is a chip beside
+it, and `HealthSummary` does exactly that. The mock escalated it. And the
+nav badge beside "Backups" counts backup SETS, not backups (#211), so it
+reads 1 beside a page listing 3, which the mock's fixture hid by having
+the two numbers agree.
+
+**The rest, which were mine, and all of one shape:** copy, counts and
+locators pinned to what the fixture happened to render. The engine's
+retention verdict is a paragraph where the mock's was a phrase; a badge is
+omitted at zero rather than showing one; the product name is on the page
+twice; the terminal truthfully logs a refused host-key probe naming the
+wizard's example host, which an unscoped negative read as the review step
+showing it.
+
+None of them was reachable from the mock, and none of them is exotic.
 
 ## What this suite still does not prove
 
