@@ -50,7 +50,7 @@ instead.
 | `RM_BASE_URL` | where the Web UI answers on the private network, e.g. `http://rclone-manager:8080`. A container name, resolved by Docker's embedded DNS, not a published host port |
 | `RM_ADMIN_USERNAME` | the throwaway administrator this run signs in as |
 | `RM_ADMIN_PASSWORD` | its password. Held in this process's environment and written nowhere: no file, no argv, no report |
-| `RM_ARTIFACTS_DIR` | where traces, screenshots and videos land. Mounted out of the client container so the evidence survives teardown |
+| `RM_ARTIFACTS_DIR` | where the evidence goes. Traces, screenshots and videos land in `<dir>/test-results` and the HTML report in `<dir>/html-report`, both a level below the directory itself: Playwright removes its own output directory on startup and a bind mount cannot be unlinked from inside the container |
 
 And the optional ones, each of which unlocks cases that otherwise state
 why they are skipped:
@@ -125,6 +125,13 @@ indistinguishable from one nobody wrote; a case that says "skipped,
 because this deployment has no quarantined backups" is a line somebody
 can act on, and it turns back on by itself the moment the topology
 arranges that state.
+
+`harness/skips-reporter.ts` is what makes that true rather than
+aspirational. Playwright's list reporter prints a bare `-` for a skip and
+leaves the reason in an annotation only the HTML and JSON reporters
+render, so the run ends with a grouped summary of every declined case and
+why, deduplicated by reason: eleven cases wanting a quarantined backup is
+one thing for the topology to arrange, not eleven.
 
 Several assertions got sharper rather than softer, because a real service
 can disagree with a page in a way a mock cannot:

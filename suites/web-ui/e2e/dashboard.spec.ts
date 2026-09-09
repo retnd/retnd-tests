@@ -52,7 +52,22 @@ test.describe("dashboard", () => {
     // repeats "Service running" with a different suffix (uptime, not
     // version), so an unscoped match is ambiguous.
     await expect(page.getByRole("banner").getByText(/Service running/)).toBeVisible();
-    await expect(page.getByText(/a healthy daemon is not a healthy backup|not produced a verified backup|halted/i).first()).toBeVisible();
+    // The sentence under the verdict, whichever verdict this deployment
+    // is on. The three alternatives here were the mock's, and its fixture
+    // was never healthy, so the healthy sentence had never been seen by
+    // this suite at all: the first real run found it saying "a known-good
+    // backup exists within the stale threshold and nothing needs
+    // attention" and read that as a missing subhead.
+    //
+    // What §8 is about survives whichever one renders: the line under
+    // BACKUPS talks about BACKUPS, not about the process being up.
+    await expect(
+      page
+        .getByText(
+          /a healthy daemon is not a healthy backup|not produced a verified backup|halted|known-good backup exists/i
+        )
+        .first()
+    ).toBeVisible();
   });
 
   test("every status chip pairs a glyph with a text label", async ({ bm, page }) => {
@@ -170,8 +185,14 @@ test.describe("dashboard", () => {
     // the claim is that the two agree.
     await bm.goto("/");
     const metrics = page.getByRole("region", { name: "Key metrics" });
+    // Anchored on the detail line that follows, not on whitespace after
+    // the number. A MetricCard renders label, value and detail line with
+    // NOTHING between them, so on this deployment the card's text is
+    // literally "Backup sets10 stale · 0 failing": one set, then a
+    // detail line starting with a zero. A `\s` after the count matches
+    // nothing, and worse, a bare `1` would have matched the wrong digit.
     await expect(metrics).toContainText(
-      new RegExp("Backup sets\\s*" + bm.facts.sets.length + "\\s")
+      new RegExp("Backup sets\\s*" + bm.facts.sets.length + "\\s*\\d+ stale")
     );
   });
 
@@ -255,41 +276,62 @@ test.describe("dashboard", () => {
     await expect(bm.heading("Activity")).toBeVisible();
   });
 
-  test("critical storage escalates the headline", async ({ bm, page }) => {
-    // This was `?scenario=storage-critical`, a fixture the mock returned
-    // and a state the old suite could never have reached for real. It is
-    // real now, and the arrange step is why: the deployment is told its
-    // critical threshold is more free space than the disk actually has,
-    // the service computes CRITICAL from that the way it would on a full
-    // NAS, and the threshold is put back however this ends.
+  test("a critical storage verdict is computed, shown, and kept out of the headline", async ({ bm, page }) => {
+    // This was `?scenario=storage-critical` and it asserted "BACKUPS
+    // FAILING". Both halves turned out to be wrong, and the first real
+    // run is what showed it.
     //
-    // Filling the disk would be the other way to reach it. This one is a
-    // supported configuration change rather than an attack on the host,
-    // and it exercises the same code path: nothing in the product knows
-    // which of the two numbers moved.
+    // The scenario was a fixture that could never have been real. The
+    // arrange step below is: the deployment is told its critical
+    // threshold is more free space than the disk has, the service
+    // computes CRITICAL from that exactly as it would on a full NAS, and
+    // the threshold goes back however this ends.
+    //
+    // The assertion was wrong about the product, and in a way that
+    // contradicted the very section it cites. §8 is that "APPLICATION
+    // RUNNING" and "BACKUPS HEALTHY" are two different facts, and
+    // HealthSummary builds the headline from `health.backupHealth`
+    // alone, with storage as a separate chip beside it. A full disk is
+    // not a statement about whether the backups this NAS holds are good,
+    // and the mock escalating the headline for one was the fixture
+    // disagreeing with the product's own rule.
+    //
+    // So the case now asserts what §8 actually asks for, which is
+    // stronger and only expressible here: the verdict is real, it is on
+    // screen, and it did NOT hijack the headline.
     const free = await freeBytes(bm.api);
     needs(
       free !== null,
       "a deployment that can measure its own free space; GET /system/storage reported it unknown"
     );
 
+    await bm.goto("/");
+    const summary = page.getByRole("region", { name: "Backup health" });
+    const headlineBefore = await summary.getByText(/^BACKUPS /).innerText();
+
     await withCapacityThresholds(
       bm.api,
       // A threshold above what is free, so the reading crosses the line.
-      { critical_free_bytes: (free ?? 0) + 1024 * 1024 * 1024, warning_free_bytes: (free ?? 0) + 2 * 1024 * 1024 * 1024 },
+      {
+        critical_free_bytes: (free ?? 0) + 1024 * 1024 * 1024,
+        warning_free_bytes: (free ?? 0) + 2 * 1024 * 1024 * 1024
+      },
       async () => {
         await bm.goto("/");
-        await expect(page.getByText("BACKUPS FAILING")).toBeVisible();
-        await expect(page.getByText(/Storage critical/)).toBeVisible();
+        // The service really computed it, and the page really says so.
+        await expect(summary.getByText(/Storage critical/)).toBeVisible();
+        // And §8's rule holds under exactly the pressure that would break
+        // it: the backups on this NAS are as good as they were a moment
+        // ago, so the verdict about them has not moved.
+        await expect(summary.getByText(/^BACKUPS /)).toHaveText(headlineBefore);
       }
     );
 
-    // And back again, which is the half an arrange step owes the run. The
-    // reload is on the real page rather than on the API, because that is
-    // the claim: an operator who fixes the threshold sees the headline
-    // come down.
+    // And the chip comes down when the threshold does, which is the
+    // control: without it, a page that said "Storage critical"
+    // permanently would satisfy the assertion above.
     await bm.goto("/");
-    await expect(page.getByText("BACKUPS FAILING")).toHaveCount(0);
+    await expect(summary.getByText(/Storage critical/)).toHaveCount(0);
   });
 });
 

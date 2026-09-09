@@ -259,9 +259,28 @@ export function resolveChromiumArgs(env: NodeJS.ProcessEnv = process.env): strin
   return args;
 }
 
-/** Where traces, screenshots and videos land. Named, because they are
- *  written inside a container and have to be mounted out to be read. */
-export function resolveOutputDir(env: NodeJS.ProcessEnv = process.env): string {
+/** Where this run's evidence goes: traces, screenshots, videos, and the
+ *  HTML report.
+ *
+ *  Two SUBDIRECTORIES of `RM_ARTIFACTS_DIR`, never the directory itself,
+ *  and that is not tidiness. Playwright removes its own `outputDir`
+ *  between runs, so pointing it at the mount point makes the run die
+ *  before it starts a browser:
+ *
+ *      Error: EACCES: permission denied, rmdir '/artifacts'
+ *
+ *  A bind mount cannot be unlinked from inside the container. It also
+ *  refuses an HTML report folder nested inside the test output folder, so
+ *  the two are siblings rather than one inside the other. Both are still
+ *  under the directory the client container mounts out, which is the
+ *  property that matters: a failure here happens on a private network
+ *  against a deployment that is deleted seconds later, so evidence that
+ *  does not survive teardown is evidence nobody ever reads. */
+export function resolveArtifactPaths(env: NodeJS.ProcessEnv = process.env): {
+  outputDir: string;
+  htmlReport: string;
+} {
   const raw = (env[OUTPUT_DIR_VAR] ?? "").trim();
-  return raw === "" ? "./test-results" : raw;
+  const root = (raw === "" ? "." : raw).replace(/\/+$/, "");
+  return { outputDir: root + "/test-results", htmlReport: root + "/html-report" };
 }

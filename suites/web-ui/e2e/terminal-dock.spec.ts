@@ -243,10 +243,17 @@ test.describe("a table taller than the window it is read in", () => {
     // the bottom" worth reading, and how many rows this deployment holds
     // is not something this file gets to decide.
     const g = await geometry(page);
+    // Taller than the window by more than the terminal occupies, not
+    // merely taller than the window. The control below takes the reserved
+    // room away and requires the last row to fall behind the panel, and
+    // it can only do that if there is at least a panel's worth of page to
+    // fall through. The first real run landed 1px short of that on a
+    // three-row table and read as a layout regression, which it was not.
     needs(
-      g.scrollable > 0,
-      "a backups table taller than a 640px window. This deployment holds " + bm.facts.backups.length +
-        " backup(s), which fit"
+      g.scrollable > g.dock.height,
+      "a backups table taller than a 640px window by more than the terminal's own height (" +
+        Math.round(g.scrollable) + "px of scroll against a " + Math.round(g.dock.height) +
+        "px panel). This deployment holds " + bm.facts.backups.length + " backup(s)"
     );
   });
 

@@ -182,7 +182,12 @@ export async function readFacts(api: APIRequestContext): Promise<Omit<Deployment
   }>(api, "/operations", {});
   const settings = await readJson<{ mediums?: WireMedium[] }>(api, "/settings", {});
   const storage = await readJson<{ manager?: { level?: string } }>(api, "/system/storage", {});
-  const version = await readJson<{ service?: string }>(api, "/system/version", {});
+  // `core_version` on the wire, and `service` in the client's own shape
+  // (fromWireVersion, ui/shared/src/api/client.ts). Read as the wire
+  // spells it, because this suite talks to the service and not to the
+  // bundle: asking for `service` here got "(unreported)" out of a
+  // deployment that was reporting a version perfectly well.
+  const version = await readJson<{ core_version?: string }>(api, "/system/version", {});
 
   return {
     configured: firstRun.configured === true,
@@ -198,7 +203,7 @@ export async function readFacts(api: APIRequestContext): Promise<Omit<Deployment
     lastCycle: (operations.operations ?? []).find((op) => op.cycle != null)?.cycle ?? null,
     mediums: (settings.mediums ?? []).filter((m) => m.id !== "local"),
     storageLevel: (storage.manager?.level as DeploymentFacts["storageLevel"]) ?? "",
-    serviceVersion: version.service ?? "(unreported)"
+    serviceVersion: version.core_version ?? "(unreported)"
   };
 }
 

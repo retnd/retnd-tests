@@ -63,8 +63,32 @@ test.describe("retention preview and apply", () => {
 
   test("itemises what is kept and why, and what is deleted and why", async ({ page }) => {
     const dialog = page.getByRole("dialog");
-    await expect(dialog.getByText(/Not selected by current retention policy/).first()).toBeVisible();
+
+    // The kept half, unchanged: last-known-good protection is a reason
+    // this plan states on the artifact it applies to.
     await expect(dialog.getByText("Protected").first()).toBeVisible();
+
+    // The deleted half was pinned to "Not selected by current retention
+    // policy", which is the mock's summary of a verdict. The engine's own
+    // sentence is a different and much better thing, and the first real
+    // run is what showed it:
+    //
+    //   no configured GFS retention tier selects this artifact and it
+    //   does not hold last-known-good protection; its canonical path was
+    //   confirmed beneath the backup-set root, confirmed a final managed
+    //   artifact, and confirmed not a symlink; sibling collision: ...
+    //
+    // So what is asserted is what the case is named for, against whatever
+    // the engine says rather than against a fixture's paraphrase: the row
+    // names the rule that reached the verdict, and it is a REASON rather
+    // than a label. The length check is the second half of that and is
+    // not decoration: "no" would satisfy a bare presence check, and a
+    // deletion this product cannot explain is the thing §17 is about.
+    const deleted = dialog.getByRole("listitem").filter({ hasText: /retention/i });
+    await expect(deleted.first()).toBeVisible();
+    const reason = await deleted.first().innerText();
+    expect(reason).toMatch(/retention tier selects this artifact|Not selected by current retention policy/i);
+    expect(reason.length, "the deletion reason is a label rather than an explanation").toBeGreaterThan(40);
   });
 
   // §96 design pass: a refused delete is a third, deliberate verdict

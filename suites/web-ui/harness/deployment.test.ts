@@ -17,6 +17,7 @@ import {
   PASSWORD_VAR,
   PLATFORM_VAR,
   USERNAME_VAR,
+  resolveArtifactPaths,
   resolveBaseUrl,
   resolveChromiumArgs,
   resolveDeployment,
@@ -181,6 +182,37 @@ describe("Chromium inside a container", () => {
   it("only drops the sandbox when the image says it has to", () => {
     expect(resolveChromiumArgs(env())).not.toContain("--no-sandbox");
     expect(resolveChromiumArgs(env({ RM_NO_SANDBOX: "1" }))).toContain("--no-sandbox");
+  });
+});
+
+describe("where the evidence goes", () => {
+  // The one that cost a run. Playwright removes its own outputDir on
+  // startup, and RM_ARTIFACTS_DIR is a bind mount, which cannot be
+  // unlinked from inside the container: pointing outputDir straight at it
+  // dies with EACCES rmdir before a browser ever starts. So both paths sit
+  // a level below it.
+  it("never puts the test output directory on the mount point itself", () => {
+    const paths = resolveArtifactPaths(env({ RM_ARTIFACTS_DIR: "/artifacts" }));
+    expect(paths.outputDir).not.toBe("/artifacts");
+    expect(paths.outputDir.startsWith("/artifacts/")).toBe(true);
+  });
+
+  // And Playwright refuses an HTML report folder nested inside the test
+  // output folder, so the two are siblings.
+  it("keeps the HTML report beside the test output rather than inside it", () => {
+    const paths = resolveArtifactPaths(env({ RM_ARTIFACTS_DIR: "/artifacts" }));
+    expect(paths.htmlReport.startsWith(paths.outputDir)).toBe(false);
+    expect(paths.htmlReport.startsWith("/artifacts/")).toBe(true);
+  });
+
+  it("tolerates a trailing slash on the mount path", () => {
+    expect(resolveArtifactPaths(env({ RM_ARTIFACTS_DIR: "/artifacts/" })).outputDir).toBe(
+      "/artifacts/test-results"
+    );
+  });
+
+  it("falls back to the suite directory when no artifacts directory is named", () => {
+    expect(resolveArtifactPaths(env()).outputDir).toBe("./test-results");
   });
 });
 

@@ -64,7 +64,12 @@ test.describe("provider: " + PLATFORM, () => {
 
   test("retains Backup Manager product identity, not provider branding", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("rclone-manager")).toBeVisible();
+    // .first(): the product name is legitimately on this page more than
+    // once against a real deployment (the header lockup and the footer's
+    // "Backup Manager running on ..."), and an unscoped strict-mode
+    // locator resolves to both. The mock rendered fewer of them, which is
+    // why this only showed up on the first real run.
+    await expect(page.getByText("rclone-manager").first()).toBeVisible();
     const title = await page.title();
     expect(title).toMatch(/Backup Manager/);
   });

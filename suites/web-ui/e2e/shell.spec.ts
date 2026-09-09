@@ -19,7 +19,14 @@ test.describe("application shell", () => {
     await bm.goto("/");
 
     await expect(page.getByRole("img", { name: "Backup Manager" })).toBeVisible();
-    await expect(page.getByText("rclone-manager")).toBeVisible();
+    // Scoped to the header rather than `.first()`, because this case is
+    // about the LOCKUP. Against a real deployment the product name is on
+    // the page twice (the header, and the footer's "Backup Manager
+    // running on ..."), which resolved two elements and failed strict
+    // mode on the first real run; the mock's page had fewer of them.
+    // `.first()` would have made it pass by picking whichever came first
+    // in the DOM, which is not the same claim.
+    await expect(page.getByRole("banner").getByText("rclone-manager")).toBeVisible();
     // Scoped to the header (role "banner") — the dashboard body's own
     // health summary widget repeats "Service running" with a different
     // suffix (uptime, not version), so an unscoped match is ambiguous once
@@ -52,13 +59,31 @@ test.describe("application shell", () => {
 
   test("shows counts on sets, backups and quarantine", async ({ bm }) => {
     await bm.goto("/");
-    // Any digit, including a zero, which is what makes this survive a
-    // deployment with an empty quarantine queue. A zero here is the true
-    // reading rather than a placeholder: the mock's fixed fixture was the
-    // only reason this ever saw a number above one.
-    await expect(bm.nav("Backup sets")).toContainText(/\d/);
-    await expect(bm.nav("Backups")).toContainText(/\d/);
-    await expect(bm.nav("Quarantine")).toContainText(/\d/);
+
+    // A digit where there is something to count, and NO digit where there
+    // is nothing. My first version of this asserted a digit on all three
+    // and said a zero would be the true reading; the first real run said
+    // otherwise, with the Quarantine link reading exactly "Quarantine" on
+    // a deployment with an empty queue.
+    //
+    // The product is right and the old case could not have noticed either
+    // way: the mock's fixture had a non-zero count on all three, forever,
+    // so "shows counts" was satisfied by a badge that might have been
+    // painted unconditionally. Reading both directions off the service is
+    // the claim worth making, and it is only expressible against one.
+    const badge = async (label: string, count: number) => {
+      const link = bm.nav(label);
+      if (count > 0) {
+        await expect(link, label + " counts " + count + " and shows no number").toContainText(/\d/);
+        await expect(link).toContainText(String(count));
+      } else {
+        await expect(link, label + " counts nothing and still shows a number").not.toContainText(/\d/);
+      }
+    };
+
+    await badge("Backup sets", bm.facts.sets.length);
+    await badge("Backups", bm.facts.backups.length);
+    await badge("Quarantine", bm.facts.quarantined.length);
   });
 
   test("names the platform it is running on", async ({ bm, page }) => {

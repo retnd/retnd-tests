@@ -1,4 +1,4 @@
-import { expect, needs, test } from "./fixtures";
+import { CONTENT_COLUMN, expect, needs, test } from "./fixtures";
 
 /**
  * The add-backup-set wizard, against a real deployment.
@@ -534,19 +534,42 @@ test.describe("add backup set wizard", () => {
   });
 
   test("a hostname typed in step 1 shows up in the review step, not the built-in example", async ({ page }) => {
+    // Scoped to the content column, and the first real run is what showed
+    // why. The Review card is right: it says warehouse-nas.internal. The
+    // page-wide negative failed on the TERMINAL, which had truthfully
+    // logged a refused host-key probe naming the example host:
+    //
+    //   [you] post /ssh/host-key-probe refused: HOST_KEY_PROBE_FAILED
+    //   connecting to prod-db-01.internal:22: ... no such host
+    //
+    // That line is the terminal doing its job. Against the mock there was
+    // no probe to refuse and no line to log, so an unscoped negative was
+    // accidentally safe. What this case is about is what the REVIEW STEP
+    // reports, so that is what it reads.
+    const wizard = page.locator(CONTENT_COLUMN);
     const host = page.getByLabel("Server hostname");
     await host.fill("warehouse-nas.internal");
 
     await page.getByRole("button", { name: "Review" }).click();
-    await expect(page.getByText("warehouse-nas.internal")).toBeVisible();
-    await expect(page.getByText("prod-db-01.internal")).toHaveCount(0);
+    await expect(wizard.getByText("warehouse-nas.internal")).toBeVisible();
+    await expect(wizard.getByText("prod-db-01.internal")).toHaveCount(0);
   });
 
   test("importing a key never leaves the pasted material on screen", async ({ page }) => {
     await page.getByRole("button", { name: "Authentication" }).click();
     await page.getByRole("radio", { name: /Import key/ }).click();
 
-    // Synthetic fixture only — never a real key.
+    // Synthetic fixture only, never a real key. Against the mock this was
+    // accepted and the case went on to assert the textarea had cleared;
+    // against a real key store it is REFUSED, correctly, because it is
+    // not a key. The first real run failed waiting for "key imported".
+    //
+    // The refusal makes the case stronger rather than weaker, because the
+    // security property is about both outcomes and the dangerous one is
+    // the refusal: an import that fails and echoes what it was given back
+    // in an error message is exactly how key material ends up on a
+    // screen. So the outcome is whichever the service gives, and the
+    // claim is asserted against it either way.
     const fixtureKey = "FAKE-TEST-KEY-MATERIAL-not-a-real-key-0123456789";
     const textarea = page.getByLabel(/private key/i);
     await textarea.fill(fixtureKey);
@@ -555,9 +578,20 @@ test.describe("add backup set wizard", () => {
     await expect(importBtn).toBeEnabled();
     await importBtn.click();
 
-    await expect(page.getByText(/key imported/i)).toBeVisible();
-    await expect(page.getByLabel(/private key/i)).toHaveCount(0);
+    // Something is said. A button that swallows a submission and reports
+    // neither outcome is its own defect.
+    const imported = page.getByText(/key imported/i);
+    const refused = page.getByRole("alert");
+    await expect(imported.or(refused).first()).toBeVisible();
+
+    // The property this case exists for, on whichever path was taken.
     expect(await page.locator("body").innerText()).not.toContain(fixtureKey);
+
+    // And on the accepted path only, the field is cleared as well: there
+    // is nothing left to read even by looking at the control.
+    if ((await imported.count()) > 0) {
+      await expect(page.getByLabel(/private key/i)).toHaveCount(0);
+    }
   });
 
   // Issue #146 (B2.7): the wizard's Save buttons previously had no

@@ -1,9 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
 import {
+  resolveArtifactPaths,
   resolveChromiumArgs,
   resolveDeployment,
-  resolveOutputDir,
   resolveWorkers
 } from "./harness/deployment";
 
@@ -69,7 +69,7 @@ import {
 // `on-first-retry` would never fire at all with retries at zero, so it
 // would have been a rule that quietly did nothing.
 const deployment = resolveDeployment();
-const outputDir = resolveOutputDir();
+const { outputDir, htmlReport } = resolveArtifactPaths();
 
 // Once, from the runner process (workers re-load this file, and Playwright
 // stamps TEST_WORKER_INDEX into theirs). A run that passes should have
@@ -83,7 +83,7 @@ if (process.env.TEST_WORKER_INDEX === undefined) {
   if (deployment.seededBackupSet) {
     console.log("e2e: the topology seeded backup set " + deployment.seededBackupSet);
   }
-  console.log("e2e: failure evidence goes to " + outputDir);
+  console.log("e2e: failure evidence goes to " + outputDir + ", report to " + htmlReport);
   if (deployment.source) {
     console.log("e2e: source machine is " + deployment.source.user + "@" + deployment.source.host);
   }
@@ -105,7 +105,27 @@ export default defineConfig({
   workers: resolveWorkers(),
   forbidOnly: !!process.env.CI,
   retries: 0,
-  reporter: process.env.CI ? [["github"], ["list"], ["html", { open: "never" }]] : [["list"]],
+  // Both under RM_ARTIFACTS_DIR, and both a level below it. The client
+  // container mounts the tests checkout at /suite, so a report written
+  // beside the specs would land in somebody's git status; and Playwright
+  // removes its own outputDir on startup, which a bind mount cannot
+  // survive. resolveArtifactPaths has the whole story.
+  //
+  // ./harness/skips-reporter.ts is on every run, CI or not, and it is not
+  // decoration. Three helpers in e2e/fixtures.ts decline to assert and say
+  // why, and the whole argument for them over deleting a case is that the
+  // reason reaches a reader. Playwright's list reporter prints a bare `-`
+  // and keeps the reason in an annotation only the HTML and JSON
+  // reporters render, so without this the suite's skips are exactly the
+  // silent gap this repository exists to argue against.
+  reporter: process.env.CI
+    ? [
+        ["github"],
+        ["list"],
+        ["./harness/skips-reporter.ts"],
+        ["html", { open: "never", outputFolder: htmlReport }]
+      ]
+    : [["list"], ["./harness/skips-reporter.ts"]],
   outputDir,
 
   use: {

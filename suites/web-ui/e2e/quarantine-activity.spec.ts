@@ -41,8 +41,19 @@ test.describe("quarantine", () => {
     await bm.goto("/quarantine");
   });
 
-  test("explains that remote originals are retained", async ({ page }) => {
+  test("explains that remote originals are retained", async ({ bm, page }) => {
+    // The page's standing copy, which is on screen whether or not there
+    // is anything in the queue.
     await expect(page.getByText(/remote originals are retained until the issue is resolved/)).toBeVisible();
+    // This second sentence is not: the first real run found it absent on
+    // a deployment with an empty queue, which is the page correctly not
+    // explaining the consequences of rows it does not have. It is a claim
+    // about how a quarantined backup is treated, so it needs one.
+    needs(
+      bm.facts.quarantined.length > 0,
+      "at least one quarantined backup, so the page explains what quarantine costs rather than " +
+        "only reassuring that the queue is empty"
+    );
     await expect(
       page.getByText(/never counted as known-good, and never trigger remote deletion/)
     ).toBeVisible();
@@ -205,7 +216,15 @@ test.describe("quarantine", () => {
     expect(rows.length).toBe(before - 1);
   });
 
-  test("says a reinstated backup keeps its remote source for good, before anyone clicks", async ({ page }) => {
+  test("says a reinstated backup keeps its remote source for good, before anyone clicks", async ({ bm, page }) => {
+    // Before anyone clicks, but not before there is anything to click.
+    // The mock's permanent five-row queue meant this copy was always on
+    // screen; on a deployment with an empty queue the page correctly
+    // explains nothing about a cost nothing here can incur.
+    needs(
+      bm.facts.quarantined.length > 0,
+      "at least one quarantined backup, so the page has a Reinstate to warn about"
+    );
     await expect(page.getByText(/reinstated backup keeps its remote source for good/i)).toBeVisible();
   });
 
@@ -299,12 +318,19 @@ test.describe("activity", () => {
     const before = await page.getByRole("listitem").count();
     await page.getByLabel("Severity").selectOption("2");
     const after = await page.getByRole("listitem").count();
+    // Both halves of the premise, because either one alone is satisfied
+    // by a feed this case cannot say anything about. The first real run
+    // narrowed 24 events to zero: every event on a deployment where
+    // nothing went wrong is below the filtered severity, so the filter
+    // removed all of them, which is correct behaviour and not a
+    // narrowing this case can read.
     needs(
-      after < before,
-      "an event feed holding more than one severity. This one is all at or above the filtered " +
-        "level, which is what a deployment where nothing has gone wrong looks like"
+      after < before && after > 0,
+      "an event feed holding events on both sides of the severity filter. This one narrowed " +
+        before + " to " + after + ", so there is no non-empty narrowing to observe"
     );
     expect(after).toBeGreaterThan(0);
+    expect(after).toBeLessThan(before);
   });
 
   test("set filter narrows the list", async ({ bm, page }) => {
