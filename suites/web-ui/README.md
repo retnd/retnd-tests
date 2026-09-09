@@ -22,10 +22,10 @@ scripts/e2e/three-machine-web-ui.sh --suite ../rclone-manager-tests/suites/web-u
 ```
 
 Against the rig as it stands (one backup set, three ingested artifacts, a
-healthy deployment with nothing declared), that is **188 passed, 69
-skipped, 3 expected failures**, in about ten minutes. The three expected
-failures are `findings/DISC-010.md`, and the run ends by printing every
-skipped case with the reason it declined.
+healthy deployment with nothing declared), that is **191 passed, 69
+skipped, 8 expected failures**, green, in about ten minutes. The eight
+expected failures are all `findings/DISC-010.md`, and the run ends by
+printing every skipped case with the reason it declined.
 
 ## Why it moved
 
