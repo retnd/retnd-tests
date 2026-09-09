@@ -576,20 +576,29 @@ test.describe("add backup set wizard", () => {
 
     const importBtn = page.getByRole("button", { name: "Import key" });
     await expect(importBtn).toBeEnabled();
-    await importBtn.click();
 
-    // Something is said. A button that swallows a submission and reports
-    // neither outcome is its own defect.
-    const imported = page.getByText(/key imported/i);
-    const refused = page.getByRole("alert");
-    await expect(imported.or(refused).first()).toBeVisible();
+    // Waited on the RESPONSE rather than on a control, and that is a
+    // finding in itself. The real service refuses this material with
+    // INVALID_REQUEST ("resolved key material does not parse as a valid
+    // SSH private key"), and the only place that refusal appears is the
+    // terminal dock: the panel the operator submitted from renders no
+    // alert of its own. So an outcome-shaped wait has nothing to wait for
+    // on the refusal path, while the request itself is unambiguous.
+    const [response] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/api/v1/ssh-keys") && r.request().method() === "POST"),
+      importBtn.click()
+    ]);
 
-    // The property this case exists for, on whichever path was taken.
+    // The property this case exists for, on whichever path was taken, and
+    // the refusal path is the dangerous one: an import that fails and
+    // echoes what it was given back in an error message is exactly how key
+    // material ends up on a screen.
     expect(await page.locator("body").innerText()).not.toContain(fixtureKey);
 
     // And on the accepted path only, the field is cleared as well: there
     // is nothing left to read even by looking at the control.
-    if ((await imported.count()) > 0) {
+    if (response.status() === 200 || response.status() === 201) {
+      await expect(page.getByText(/key imported/i)).toBeVisible();
       await expect(page.getByLabel(/private key/i)).toHaveCount(0);
     }
   });

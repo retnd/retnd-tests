@@ -61,29 +61,39 @@ test.describe("application shell", () => {
     await bm.goto("/");
 
     // A digit where there is something to count, and NO digit where there
-    // is nothing. My first version of this asserted a digit on all three
-    // and said a zero would be the true reading; the first real run said
-    // otherwise, with the Quarantine link reading exactly "Quarantine" on
-    // a deployment with an empty queue.
+    // is nothing. My first version asserted a digit on all three and said
+    // a zero would be the true reading; the first real run said otherwise,
+    // with the Quarantine link reading exactly "Quarantine" on a
+    // deployment with an empty queue.
     //
-    // The product is right and the old case could not have noticed either
-    // way: the mock's fixture had a non-zero count on all three, forever,
-    // so "shows counts" was satisfied by a badge that might have been
-    // painted unconditionally. Reading both directions off the service is
-    // the claim worth making, and it is only expressible against one.
+    // The mock's fixture had a non-zero count on all three, forever, so
+    // "shows counts" was satisfied by a badge that might have been painted
+    // unconditionally. Reading both directions off the service is the
+    // claim worth making, and it is only expressible against one.
     const badge = async (label: string, count: number) => {
       const link = bm.nav(label);
       if (count > 0) {
-        await expect(link, label + " counts " + count + " and shows no number").toContainText(/\d/);
-        await expect(link).toContainText(String(count));
+        await expect(link, label + " counts " + count + " and shows no number").toContainText(String(count));
       } else {
         await expect(link, label + " counts nothing and still shows a number").not.toContainText(/\d/);
       }
     };
 
     await badge("Backup sets", bm.facts.sets.length);
-    await badge("Backups", bm.facts.backups.length);
     await badge("Quarantine", bm.facts.quarantined.length);
+
+    // And the third one is not what its label suggests, which is worth
+    // pinning rather than glossing. The badge beside "Backups" counts
+    // backup SETS, not backups: appNodes.ts's countsNode sums the health
+    // report's per-set totals, deliberately, because nothing computes a
+    // retained-artifact figure server-side and the one the UI used to show
+    // came off the dev-server mock (rclone-manager#211).
+    //
+    // So on this deployment it reads 1 beside a page that lists 3, and
+    // that is the product working as decided. My own first version of this
+    // case asserted the artifact count and was wrong; the mock could not
+    // have told me, because there the two numbers happened to agree.
+    await expect(bm.nav("Backups")).toContainText(String(bm.facts.sets.length));
   });
 
   test("names the platform it is running on", async ({ bm, page }) => {

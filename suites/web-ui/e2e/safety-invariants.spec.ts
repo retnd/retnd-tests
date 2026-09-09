@@ -53,10 +53,29 @@ test.describe("safety invariants", () => {
     }
   });
 
+  /** The product does not perform application restore, and must not offer
+   *  to. What it MAY offer is the same English verb applied to something
+   *  that is not a backup: the settings page has a "Restore default chain"
+   *  button that resets the retention policy, and the first real run found
+   *  it with a bare /^restore/i. The mock's settings page did not render
+   *  it, so an unqualified matcher was accidentally safe.
+   *
+   *  Narrowed rather than loosened, and with the exclusion controlled: the
+   *  zero below would be satisfied by a query that matched nothing at all,
+   *  so the excluded button is asserted to exist first. A rename of it
+   *  turns this red, which is right, because the exclusion would then be
+   *  hiding whatever took its name. */
   test("no page offers restore execution", async ({ page }) => {
+    // The one control this product legitimately spells with that verb,
+    // proven present so the exclusion below cannot be vacuous.
+    await page.goto("/settings");
+    await expect(page.getByRole("button", { name: "Restore default chain" })).toBeVisible();
+
     for (const path of ALL_PAGES) {
       await page.goto(path);
-      await expect(page.getByRole("button", { name: /^restore/i })).toHaveCount(0);
+      await expect(
+        page.getByRole("button", { name: /^restore/i }).filter({ hasNotText: /default chain/i })
+      ).toHaveCount(0);
     }
   });
 
