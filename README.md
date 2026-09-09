@@ -8,7 +8,7 @@ Three suites live here:
 | Suite | What it is | Status |
 |---|---|---|
 | **A. CLI contract** | `rbm` driven black-box: argv in, exit code plus stdout plus stderr plus resulting on-disk state out | built, `make suite-a` |
-| **B. Web UI** | the Playwright suite, migrated out of `rclone-manager`'s `ui/shared/e2e/` | migrated, `make suite-b`, see [`suites/web-ui/README.md`](suites/web-ui/README.md) |
+| **B. Web UI** | the Playwright suite, driving a real deployment: browser to `serve-ui` to the proxy to `serve` to SQLite | built, `make suite-b` against a running rig, see [`suites/web-ui/README.md`](suites/web-ui/README.md) |
 | **C. UI to CLI equivalence** | every backend-affecting UI action proved equal to its CLI equivalent by comparing resulting backend state | built, `make suite-c`, with the matrix in [`suites/equivalence/MATRIX.md`](suites/equivalence/MATRIX.md) |
 
 All three share one fixture layer, which is the main reason they share a
@@ -34,7 +34,7 @@ itself.
 make build           # resolve the pinned build and make it prove its identity
 make suite-a         # the CLI contract suite
 make suite-b-install # once: Playwright and a Chromium
-make suite-b         # the Web UI suite, against RM_UI_DIR or the pin
+make suite-b         # the Web UI suite, against the deployment RM_BASE_URL names
 make suite-c         # UI-to-CLI equivalence, against the real engine
 make gate            # everything that has to be green before a commit here
 ```
@@ -73,8 +73,13 @@ an entirely different commit. A path, a port and a container name can all
 be stale without looking stale. A commit the binary prints about itself
 cannot.
 
-For the same reason, no suite here ever talks to a server it did not
-start itself, on a port it did not pick and prove free.
+For the same reason, no suite here ever talks to a server it cannot name.
+Suites A and C still start their own, on a port they picked and proved
+free. Suite B no longer starts anything at all, because what it drives is
+a running deployment of four containers rather than a dev server, so it
+buys the same property a different way: `RM_BASE_URL` is required, has no
+default, and a run without it stops and says so. A fallback to localhost
+would be the stale dev server above wearing a different hat.
 
 ## How expectations are written
 
@@ -124,7 +129,7 @@ tools/
   statesnap/               normalised backend-state snapshot and diff
 suites/
   cli/                     Suite A: harness, cases, COVERAGE.md
-  web-ui/                  Suite B
+  web-ui/                  Suite B: the browser, against a real deployment
   equivalence/             Suite C
 findings/                  contract-versus-observed discrepancies
 docs/                      pinning, and the CI signal design

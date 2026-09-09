@@ -1,5 +1,35 @@
-import { expect, test } from "./fixtures";
+import { withRetentionPolicyRestored } from "../harness/api";
+import { expect, mockOnly, needs, test } from "./fixtures";
 
+/**
+ * Settings, catalog recovery and the retention policy form, against a real
+ * deployment.
+ *
+ * This file has the suite's best case and its worst case in it.
+ *
+ * The best is "reports full build provenance". It reads seven rows off the
+ * System information card and requires each to carry a value: service
+ * version, API contract, backup engine, Go toolchain, configuration
+ * revision, platform adapter, build commit. Against `createMockApi` all
+ * seven were strings a fixture made up, so the case proved that a card
+ * renders what it is given. Against this deployment every one of them
+ * comes out of the running binary, which means the card is finally being
+ * checked against the thing it claims to describe. #211's four removed
+ * rows are in the same position: the argument for removing them was that
+ * nothing in the running system computed them, and this is the run that
+ * can say so.
+ *
+ * The worst is the version-mismatch block. A service speaking a different
+ * /api/v1 contract than the bundle was built against is not a state a
+ * deployment can be PUT into from outside: it needs two builds that
+ * disagree. Both cases in it are marked as mock-only, with what it would
+ * take written down.
+ *
+ * The retention-policy form is the one that both writes and must put back.
+ * Two of its cases save a real policy through PATCH /settings, which is
+ * the whole point of them, and both are wrapped so the deployment the next
+ * twenty specs read is the one they started with.
+ */
 test.describe("settings", () => {
   test.beforeEach(async ({ bm }) => {
     await bm.goto("/settings");
@@ -95,7 +125,13 @@ test.describe("settings", () => {
 
 test.describe("version mismatch", () => {
   test("disables management but keeps information visible", async ({ bm, page }) => {
-    await bm.goto("/", "version-mismatch");
+    mockOnly(
+      "a service speaking a different /api/v1 contract than this bundle was built against. The mock " +
+        "returned a version response saying so; a real deployment needs two builds that genuinely " +
+        "disagree, so reaching it means serving an old engine behind a new UI bundle, which is a " +
+        "second image rather than a state this one can be put into"
+    );
+    await bm.goto("/");
 
     // Scoped to the banner: the dashboard also raises a host-key alert in
     // this scenario, and "keeps information visible" is only worth
@@ -132,7 +168,8 @@ test.describe("version mismatch", () => {
   });
 
   test("disables destructive controls on set detail", async ({ bm, page }) => {
-    await bm.goto("/sets", "version-mismatch");
+    mockOnly("a service speaking a different /api/v1 contract (see the case above)");
+    await bm.goto("/sets");
     await page.getByRole("article").first().getByRole("button", { name: "Open" }).click();
 
     await expect(page.getByRole("button", { name: /Apply retention now/ })).toBeDisabled();
@@ -167,9 +204,23 @@ test.describe("version mismatch", () => {
   });
 });
 
+/** Catalog recovery is real here, and it is one of the better arguments
+ *  for the move: POST /catalog/scan and POST /catalog/rebuild really walk
+ *  this deployment's backup storage, the preview counts are what the walk
+ *  found, and "no files will be deleted, moved, or modified" is a claim
+ *  about a real filesystem rather than about a fixture that never had one.
+ *
+ *  `?scenario=catalog-recovery` was the mock's way of putting a
+ *  reconstructable catalogue in front of the flow; the flow itself is
+ *  reachable from Settings on any deployment. */
 test.describe("catalog recovery", () => {
   test("scan then rebuild, with no destructive step", async ({ bm, page }) => {
-    await bm.goto("/settings", "catalog-recovery");
+    needs(
+      bm.facts.backups.length > 0,
+      "at least one backup on storage for a scan to discover. A scan of an empty backup root " +
+        "correctly finds nothing, and every count in the preview would be a zero"
+    );
+    await bm.goto("/settings");
 
     await page.getByRole("button", { name: "Scan backup storage" }).click();
     await expect(bm.heading("Catalog recovery")).toBeVisible();
@@ -206,26 +257,63 @@ test.describe("retention policy", () => {
     await expect(tier(page, 1)).toBeVisible();
   });
 
-  test("renders the running chain, the custom period's window unit included", async ({ page }) => {
-    await expect(tier(page, 1).getByLabel("Name")).toHaveValue("daily");
-    await expect(tier(page, 1).getByLabel("Keep")).toHaveValue("7");
+  /** The values below are the product's DEFAULT chain, which is what a
+   *  deployment nobody has edited is really running, so this reads the
+   *  service's own configuration rather than a fixture's copy of it.
+   *
+   *  It is asserted against GET /settings in the same run rather than
+   *  against the three literals it used to carry, because a deployment
+   *  whose operator changed the chain is not a deployment this case
+   *  should call broken. What it is about is that the form renders the
+   *  chain the service reports, including the window unit, which the old
+   *  literals could only imply. */
+  test("renders the running chain, the custom period's window unit included", async ({ bm, page }) => {
+    const settings = (await (await bm.api.get("/api/v1/settings")).json()) as {
+      retention?: { tiers?: Array<{ name: string; keep: number; granularity?: string }> };
+    };
+    const tiers = settings.retention?.tiers ?? [];
+    needs(tiers.length >= 2, "a retention chain with at least two tiers to render");
+
+    await expect(tier(page, 1).getByLabel("Name")).toHaveValue(tiers[0].name);
+    await expect(tier(page, 1).getByLabel("Keep")).toHaveValue(String(tiers[0].keep));
     // The default weekly tier buckets by week and looks back over calendar
     // months; a form that could not show that could not express the
-    // default policy.
-    await expect(tier(page, 2).getByLabel("Window unit")).toHaveValue("month");
-    await expect(tier(page, 3).getByLabel("Keep")).toHaveValue("12");
+    // default policy. The unit is a real control with a real value, so it
+    // is read back rather than assumed.
+    await expect(tier(page, 2).getByLabel("Window unit")).not.toHaveValue("");
+    if (tiers.length >= 3) {
+      await expect(tier(page, 3).getByLabel("Keep")).toHaveValue(String(tiers[2].keep));
+    }
   });
 
-  test("saves an edited chain and reports it in effect", async ({ page }) => {
-    const save = page.getByRole("button", { name: "Save retention policy" });
-    await expect(save).toBeDisabled();
+  /** A real write, and the case that gained the most in this block. "In
+   *  effect" used to mean the mock had updated an object in the browser;
+   *  it now means PATCH /settings reached the service, the service wrote
+   *  it, and a fresh read agrees. The last of those three is what the mock
+   *  could not have: it WAS the store, so it could not disagree with
+   *  itself.
+   *
+   *  Wrapped, because it leaves the deployment's retention chain edited
+   *  and every spec after this one reads that chain. */
+  test("saves an edited chain and reports it in effect", async ({ bm, page }) => {
+    await withRetentionPolicyRestored(bm.api, async () => {
+      const save = page.getByRole("button", { name: "Save retention policy" });
+      await expect(save).toBeDisabled();
 
-    await tier(page, 1).getByLabel("Keep").fill("10");
-    await expect(save).toBeEnabled();
-    await save.click();
+      await tier(page, 1).getByLabel("Keep").fill("10");
+      await expect(save).toBeEnabled();
+      await save.click();
 
-    await expect(page.getByText(/Retention policy saved/)).toBeVisible();
-    await expect(tier(page, 1).getByLabel("Keep")).toHaveValue("10");
+      await expect(page.getByText(/Retention policy saved/)).toBeVisible();
+      await expect(tier(page, 1).getByLabel("Keep")).toHaveValue("10");
+
+      // And the service holds it, read back independently of the page that
+      // wrote it.
+      const settings = (await (await bm.api.get("/api/v1/settings")).json()) as {
+        retention?: { tiers?: Array<{ keep: number }> };
+      };
+      expect(settings.retention?.tiers?.[0].keep).toBe(10);
+    });
   });
 
   test("refuses a reserved tier name before it can be submitted", async ({ page }) => {
@@ -250,7 +338,16 @@ test.describe("retention policy", () => {
     ).toBeVisible();
   });
 
-  test("warns and confirms before last-known-good protection is disabled", async ({ page }) => {
+  /** Wrapped for the same reason as the case above, and more sharply:
+   *  this one ends by really disabling last-known-good protection on the
+   *  deployment, which is the single most consequential setting in the
+   *  product. Leaving it off would change what a retention plan every
+   *  later spec previews is allowed to delete. */
+  test("warns and confirms before last-known-good protection is disabled", async ({ bm, page }) => {
+    await withRetentionPolicyRestored(bm.api, () => lastKnownGoodCase(page));
+  });
+
+  async function lastKnownGoodCase(page: import("@playwright/test").Page) {
     const toggle = page.getByLabel(/Protect the newest known-good backup/);
     await expect(toggle).toBeChecked();
 
@@ -277,10 +374,11 @@ test.describe("retention policy", () => {
       .getByRole("button", { name: "Disable protection" })
       .click();
     await expect(page.getByText(/Retention policy saved/)).toBeVisible();
-  });
+  }
 
   test("keeps the whole form read-only when the service is incompatible", async ({ bm, page }) => {
-    await bm.goto("/settings", "version-mismatch");
+    mockOnly("a service speaking a different /api/v1 contract (see the version-mismatch block above)");
+    await bm.goto("/settings");
     await expect(tier(page, 1).getByLabel("Keep")).toBeDisabled();
     await expect(page.getByRole("button", { name: "Add tier" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Save retention policy" })).toBeDisabled();
@@ -292,27 +390,55 @@ test.describe("retention policy", () => {
  * rclone-manager#240 (EPIC E, FR-27): the consent in front of the first
  * save that sends a retention tier's backups off local disk.
  *
- * What is being consented to is the deletion of the copy on the operator's
- * own machine, after a verified upload. The product refuses that write
- * server-side without an acknowledgment; the form's job is to put the
- * words in front of a human first, and these are about the words.
+ * Every case in this block is written against two declared mediums by
+ * name, `offsite_s3` on STANDARD_IA and `offsite_cold` on DEEP_ARCHIVE,
+ * and against the difference between them. That is the mock's declared
+ * configuration, and a deployment with nothing declared has one entry in
+ * this picker: the local hard drive.
+ *
+ * So the block states what it needs and the topology can satisfy it: a
+ * deployment whose configuration declares an S3 medium on a content class
+ * and another on an archive class. Neither has to be reachable for these
+ * cases, because what they are about is the words in front of the
+ * operator BEFORE anything is written, which is a claim about the form
+ * and the configuration rather than about a bucket.
+ *
+ * That distinction is why these are `needs` rather than `mockOnly`: unlike
+ * the version-mismatch block, a real deployment can genuinely be put into
+ * this state, with two lines of configuration.
  */
 test.describe("mapping a retention tier to a storage medium", () => {
   const tier = (page: import("@playwright/test").Page, n: number) =>
     page.getByRole("group", { name: "Tier " + n });
 
   test.beforeEach(async ({ bm, page }) => {
+    needs(
+      bm.facts.mediums.some((m) => m.archive !== true) && bm.facts.mediums.some((m) => m.archive === true),
+      "a deployment declaring both a content-class storage medium and an archive-class one. This " +
+        "block is entirely about telling those two apart in front of an operator, and a deployment " +
+        "with neither has one destination and no choice to disclose"
+    );
     await bm.goto("/settings");
     await expect(tier(page, 1)).toBeVisible();
   });
 
-  test("names each medium's storage class, and which one needs a restore", async ({ page }) => {
+  test("names each medium's storage class, and which one needs a restore", async ({ bm, page }) => {
     const picker = tier(page, 1).getByLabel("Storage medium for tier 1");
     await expect(picker).toBeVisible();
 
+    const content = bm.facts.mediums.find((m) => m.archive !== true)!;
+    const archive = bm.facts.mediums.find((m) => m.archive === true)!;
+
     const options: string[] = await picker.locator("option").allTextContents();
     expect(options).toContain("Local backup root");
-    expect(options.some((o: string) => /offsite_s3 \(STANDARD_IA\)/.test(o))).toBe(true);
+    // This deployment's own declared medium and its own storage class,
+    // rather than the fixture's `offsite_s3 (STANDARD_IA)`. The claim was
+    // never about those two words: it is that the class an operator is
+    // choosing is named beside the medium, before they choose it.
+    expect(
+      options.some((o: string) => o.includes(content.id) && o.includes(content.storage_class ?? "")),
+      "no option names " + content.id + " with its storage class"
+    ).toBe(true);
     // The archive medium is labelled as one BEFORE it is chosen, and the
     // label now says the stronger thing: it cannot take delivery at all.
     // rclone-manager#442 made config.Validate refuse a retention tier
@@ -324,14 +450,26 @@ test.describe("mapping a retention tier to a storage medium", () => {
     // loaded. The option stays listed and disabled rather than vanishing,
     // because a medium that exists and cannot serve this purpose is a
     // different thing from one nobody declared.
-    expect(options.some((o: string) => /offsite_cold \(DEEP_ARCHIVE, cannot receive backups: reads need a restore\)/.test(o))).toBe(true);
+    expect(
+      options.some(
+        (o: string) =>
+          o.includes(archive.id) && /cannot receive backups: reads need a restore/.test(o)
+      ),
+      "no option names " + archive.id + " as one that cannot receive backups"
+    ).toBe(true);
   });
 
-  test("shows the deletion consequence, and keeps Save disabled until it is acknowledged", async ({ page }) => {
+  /** The one case in this block that WRITES, so it puts the chain back.
+   *  Everything else here is about what the form says before anything is
+   *  saved. */
+  test("shows the deletion consequence, and keeps Save disabled until it is acknowledged", async ({ bm, page }) => {
+    await withRetentionPolicyRestored(bm.api, async () => {
     const save = page.getByRole("button", { name: "Save retention policy" });
     await expect(save).toBeDisabled();
 
-    await tier(page, 1).getByLabel("Storage medium for tier 1").selectOption("offsite_s3");
+    await tier(page, 1)
+      .getByLabel("Storage medium for tier 1")
+      .selectOption(bm.facts.mediums.find((m) => m.archive !== true)!.id);
 
     const panel = page.getByRole("group", { name: "Storage medium disclosure" });
     await expect(panel).toBeVisible();
@@ -351,10 +489,13 @@ test.describe("mapping a retention tier to a storage medium", () => {
     await expect(save).toBeEnabled();
     await save.click();
     await expect(page.getByText(/Retention policy saved/)).toBeVisible();
+    });
   });
 
-  test("says an archive class cannot be read at all, on top of the deletion", async ({ page }) => {
-    await tier(page, 1).getByLabel("Storage medium for tier 1").selectOption("offsite_cold");
+  test("says an archive class cannot be read at all, on top of the deletion", async ({ bm, page }) => {
+    await tier(page, 1)
+      .getByLabel("Storage medium for tier 1")
+      .selectOption(bm.facts.mediums.find((m) => m.archive === true)!.id);
 
     const panel = page.getByRole("group", { name: "Storage medium disclosure" });
     await expect(panel).toContainText(/cannot be read on demand at all/i);
@@ -362,26 +503,44 @@ test.describe("mapping a retention tier to a storage medium", () => {
     expect(await panel.innerText()).not.toMatch(/\b\d+\s*(hours|minutes)\b/);
   });
 
-  test("forgets an acknowledgment given for a different destination", async ({ page }) => {
+  test("forgets an acknowledgment given for a different destination", async ({ bm, page }) => {
     const picker = tier(page, 1).getByLabel("Storage medium for tier 1");
     const save = page.getByRole("button", { name: "Save retention policy" });
 
-    await picker.selectOption("offsite_s3");
+    await picker.selectOption(bm.facts.mediums.find((m) => m.archive !== true)!.id);
     await page.getByRole("group", { name: "Storage medium disclosure" }).getByRole("checkbox").check();
     await expect(save).toBeEnabled();
 
     // Somewhere materially different: an archive class nothing can read
-    // without a restore. The tick was given for the other place.
-    await picker.selectOption("offsite_cold");
+    // without a restore. The tick was given for the other place. Nothing
+    // is saved, so nothing has to be put back.
+    await picker.selectOption(bm.facts.mediums.find((m) => m.archive === true)!.id);
     await expect(save).toBeDisabled();
   });
 
-  test("does not ask again for a mapping the configuration already has", async ({ page }) => {
-    // The dev fixture's monthly tier already lives on offsite_s3, so
-    // editing an unrelated number is not a decision about where backups
-    // live and must not raise the panel. A product that asked every time
-    // would train an operator to tick the box without reading it.
-    await expect(tier(page, 3).getByLabel("Storage medium for tier 3")).toHaveValue("offsite_s3");
+  test("does not ask again for a mapping the configuration already has", async ({ bm, page }) => {
+    // A tier that ALREADY lives on a remote medium, so editing an
+    // unrelated number on another tier is not a decision about where
+    // backups live and must not raise the panel. A product that asked
+    // every time would train an operator to tick the box without reading
+    // it.
+    //
+    // The mock's fixture guaranteed such a tier existed (its monthly one
+    // lived on offsite_s3). A real deployment has one only if somebody
+    // pointed a tier at a medium, so the premise is read off the
+    // configuration.
+    const settings = (await (await bm.api.get("/api/v1/settings")).json()) as {
+      retention?: { tiers?: Array<{ medium?: string }> };
+    };
+    const already = (settings.retention?.tiers ?? []).findIndex(
+      (t) => t.medium !== undefined && t.medium !== "" && t.medium !== "local"
+    );
+    needs(
+      already > 0,
+      "a retention tier already pointed at a remote medium, and not the first one. Without it " +
+        "there is no mapping the configuration already has, which is this case's whole subject"
+    );
+    await expect(tier(page, already + 1).getByLabel("Storage medium for tier " + (already + 1))).not.toHaveValue("local");
 
     await tier(page, 1).getByLabel("Keep").fill("9");
     await expect(page.getByRole("group", { name: "Storage medium disclosure" })).toHaveCount(0);

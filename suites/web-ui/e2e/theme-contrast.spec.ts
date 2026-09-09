@@ -6,7 +6,7 @@ import {
   report,
   unreadable
 } from "./contrast";
-import { expect, test } from "./fixtures";
+import { expect, needs, test } from "./fixtures";
 
 /**
  * rclone-manager#618: dark mode drew black text on native controls, worst
@@ -40,6 +40,21 @@ import { expect, test } from "./fixtures";
  * placed under everything the product legitimately ships. Then all of it
  * again in light mode, because a fix that trades one theme for the other
  * is not a fix.
+ *
+ * # What changed when this stopped driving the mock
+ *
+ * Nothing about the method, and one thing about the reach. Contrast is
+ * computed off what a real browser painted, which was already the whole
+ * point, so the sweep is unaffected by where the data came from. What it
+ * now sweeps is different: real rows, real fingerprints, real state
+ * badges, drawn by the real bundle `serve-ui` embeds rather than by Vite's
+ * dev transform. A control nobody coloured is exactly the kind of thing
+ * that turns up in the parts of a page only real data reaches.
+ *
+ * The SSH wizard cases need a backup set to open and a key in the store to
+ * select, because that is how the wizard's primary button becomes live
+ * rather than disabled, and the accent pairing being read has to be the
+ * one an operator walks through.
  *
  * # What each case is and is not evidence of
  *
@@ -107,6 +122,7 @@ for (const theme of ["dark", "light"] as const) {
     });
 
     test("no page paints text its own background has swallowed", async ({ bm, page }) => {
+      needs(bm.facts.configured, "a configured deployment, so all six pages render their real contents");
       const found: string[] = [];
       for (const path of PAGES) {
         await bm.goto(path);
@@ -120,6 +136,7 @@ for (const theme of ["dark", "light"] as const) {
     });
 
     test("the SSH auth wizard's fields, textarea and buttons are readable", async ({ bm, page }) => {
+      needs(bm.facts.sets.length > 0, "at least one backup set, so the SSH wizard can be opened from it");
       await bm.goto("/sets");
       const dialog = await openSSHWizard(bm);
 
@@ -136,6 +153,7 @@ for (const theme of ["dark", "light"] as const) {
     });
 
     test("the wizard's primary button clears AA on the accent it sits on", async ({ bm }) => {
+      needs(bm.facts.sets.length > 0, "at least one backup set, so the SSH wizard can be opened from it");
       const primary = await primaryButtonReading(bm);
 
       // AA, not the sweep's floor, and deliberately. The sweep's floor is
@@ -190,6 +208,7 @@ for (const theme of ["dark", "light"] as const) {
 
 test.describe("what is written on the accent", () => {
   test("inverts with the theme, because the accent itself does", async ({ bm }) => {
+    needs(bm.facts.sets.length > 0, "at least one backup set, so the SSH wizard can be opened from it");
     // The reason the fix is `var(--surface)` and not a literal white. The
     // accent is not one colour: it is oklch lightness 0.52 in light mode
     // and 0.70 in dark, so it crosses from a dark fill to a light one and

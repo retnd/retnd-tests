@@ -11,5 +11,5 @@
     "esModuleInterop": true,
     "verbatimModuleSyntax": false
   },
-  "include": ["e2e", "harness", "scripts", "playwright.config.ts", "vitest.config.ts"]
+  "include": ["e2e", "harness", "playwright.config.ts", "vitest.config.ts"]
 }

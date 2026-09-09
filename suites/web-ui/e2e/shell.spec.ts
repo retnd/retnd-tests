@@ -1,6 +1,20 @@
-import { expect, test } from "./fixtures";
+import { expect, needs, test } from "./fixtures";
 
+/** The shell, against the real deployment.
+ *
+ *  Every case here was already about the running app rather than about
+ *  data, so all six survive the move unchanged in what they claim. The one
+ *  addition is the precondition: the header's service chip and the nav's
+ *  counts are drawn from GET /system/health and GET /backup-sets, and on
+ *  an instance with no configuration at all every one of those refuses
+ *  with NOT_CONFIGURED. That is a real state with its own real screen (the
+ *  first-run banner), not a broken one, so this file says it is not the
+ *  state it is written for rather than failing in it. */
 test.describe("application shell", () => {
+  test.beforeEach(async ({ bm }) => {
+    needs(bm.facts.configured, "a configured deployment: an instance with no backup set yet has no health to report");
+  });
+
   test("renders the lockup, service chip and every section link", async ({ bm, page }) => {
     await bm.goto("/");
 
@@ -38,6 +52,10 @@ test.describe("application shell", () => {
 
   test("shows counts on sets, backups and quarantine", async ({ bm }) => {
     await bm.goto("/");
+    // Any digit, including a zero, which is what makes this survive a
+    // deployment with an empty quarantine queue. A zero here is the true
+    // reading rather than a placeholder: the mock's fixed fixture was the
+    // only reason this ever saw a number above one.
     await expect(bm.nav("Backup sets")).toContainText(/\d/);
     await expect(bm.nav("Backups")).toContainText(/\d/);
     await expect(bm.nav("Quarantine")).toContainText(/\d/);

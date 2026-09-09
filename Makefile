@@ -16,7 +16,7 @@ help:
 	@echo "make tools       unit tests for the fixture layer and the state differ"
 	@echo "make typecheck   tsc --noEmit over the TypeScript in Suites B and C"
 	@echo "make build       resolve the pinned build under test and run the identity handshake"
-	@echo "make suite-b     the Web UI Playwright suite (needs a browser; see suites/web-ui)"
+	@echo "make suite-b     the Web UI Playwright suite (needs a browser and a running deployment; see suites/web-ui)"
 	@echo "make suite-c     the UI-to-CLI equivalence suite (needs a browser; see suites/equivalence)"
 
 .PHONY: build
@@ -57,13 +57,21 @@ typecheck:
 gate: vet tools selftest suite-a
 	@echo "gate: green"
 
-# RM_UI_DIR names the ui/shared whose dev server the browser drives. Left
-# unset, the suite resolves the pinned build's own checkout, which also runs
-# the identity handshake on the way.
+# Suite B drives a deployment it does not create. RM_BASE_URL names it, and
+# there is no default: the containers come up first (rclone-manager's own
+# scripts/e2e/), and the run refuses to start rather than falling back to
+# localhost and reporting green against nothing.
+#
+#   RM_BASE_URL=http://rclone-manager:8080 \
+#   RM_ADMIN_USERNAME=... RM_ADMIN_PASSWORD=... make suite-b
+#
+# suites/web-ui/README.md has the whole variable list, required and optional.
 .PHONY: suite-b
 suite-b:
 	cd suites/web-ui && npm run e2e
 
+# Needs no deployment: the script passes an unreachable base URL of its own
+# so a listing can never quietly point at a real one.
 .PHONY: suite-b-list
 suite-b-list:
 	cd suites/web-ui && npm run e2e:list

@@ -2,13 +2,12 @@
   "name": "@rclone-manager-tests/web-ui",
   "private": true,
   "type": "module",
-  "description": "Suite B: the Web UI Playwright suite, migrated out of rclone-manager's ui/shared/e2e.",
+  "description": "Suite B: the Web UI Playwright suite, driven against a real rclone-manager deployment.",
   "scripts": {
-    "e2e": "playwright test --project=generic --project=small-window",
-    "e2e:list": "playwright test --list --project=generic --project=small-window",
+    "e2e": "playwright test --project=generic --project=small-window --project=provider",
+    "e2e:list": "RM_BASE_URL=http://a-deployment.invalid RM_ADMIN_USERNAME=list RM_ADMIN_PASSWORD=list-only-no-deployment playwright test --list --project=generic --project=small-window --project=provider",
     "e2e:ui": "playwright test --ui",
-    "e2e:providers": "playwright test --project=providers",
-    "e2e:all-providers": "node scripts/e2e-all-providers.mjs",
+    "e2e:provider": "playwright test --project=provider",
     "unit": "vitest run",
     "typecheck": "tsc --noEmit"
   },

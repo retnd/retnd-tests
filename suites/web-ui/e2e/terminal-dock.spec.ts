@@ -1,4 +1,4 @@
-import { CONTENT_COLUMN, TERMINAL, expect, test } from "./fixtures";
+import { CONTENT_COLUMN, TERMINAL, expect, needs, test } from "./fixtures";
 
 /**
  * rclone-manager#617: the global terminal is pinned to the browser window,
@@ -48,9 +48,19 @@ import { CONTENT_COLUMN, TERMINAL, expect, test } from "./fixtures";
  *  written down with the reason it is that number. */
 const ONE_LINE = 32;
 
-/** A page far taller than the window, so "scrolls" means something. The
- *  dashboard is around three windows deep with the seeded scenario. */
+/** A page far taller than the window, so "scrolls" means something.
+ *
+ *  The dashboard was around three windows deep with the mock's fixture,
+ *  which is where the 400px floor below came from. A real deployment's
+ *  dashboard is as tall as its own contents, so the floor is now a
+ *  PRECONDITION rather than an assumption: a page that fits in the window
+ *  has no scroll to measure, and every case in the first block would be
+ *  true of the arrangement this issue replaced. */
 const LONG_PAGE = "/";
+
+/** How much taller than the window a page has to be before "it scrolls"
+ *  is a measurement rather than a coincidence. */
+const ENOUGH_SCROLL = 400;
 
 interface Geometry {
   /** The terminal's box in viewport coordinates. */
@@ -89,17 +99,24 @@ async function scrollToBottom(page: import("@playwright/test").Page): Promise<vo
 }
 
 test.describe("the terminal is pinned to the browser window", () => {
-  test.beforeEach(async ({ bm }) => {
+  test.beforeEach(async ({ bm, page }) => {
     await bm.goto(LONG_PAGE);
     await expect(bm.terminal()).toBeVisible();
+    // The premise all three cases rest on, checked once and stated as a
+    // skip rather than asserted as a failure. A dashboard that fits in the
+    // window is a correct dashboard on a quiet deployment; it is just not
+    // a page this file can measure a pinned panel against.
+    const g = await geometry(page);
+    needs(
+      g.scrollable > ENOUGH_SCROLL,
+      "a dashboard taller than the window (" + Math.round(g.scrollable) + "px of scroll, wanted more " +
+        "than " + ENOUGH_SCROLL + "). The mock's fixture made this page about three windows deep; a " +
+        "real one is as tall as this deployment's own contents"
+    );
   });
 
   test("sits at the bottom of the window on a page far taller than the window", async ({ page }) => {
     const g = await geometry(page);
-    // The premise first. On a page that fits, everything below is true of
-    // the arrangement this issue replaced as well, and the case would be
-    // reporting on the seeded data rather than on the layout.
-    expect(g.scrollable, "the page under test has to be taller than the window").toBeGreaterThan(400);
     expect(g.scrollY, "measured before anything has been scrolled").toBe(0);
 
     expect(g.dock.bottom).toBeGreaterThan(g.windowHeight - 2);
@@ -110,7 +127,6 @@ test.describe("the terminal is pinned to the browser window", () => {
 
   test("stays at the same place on screen while the page scrolls", async ({ page }) => {
     const before = await geometry(page);
-    expect(before.scrollable).toBeGreaterThan(400);
 
     await scrollToBottom(page);
     const after = await geometry(page);
@@ -209,23 +225,29 @@ test.describe("the room the content column reserves under itself", () => {
 });
 
 test.describe("a table taller than the window it is read in", () => {
-  // Shorter than the project's own window, and deliberately. The seeded
-  // backups table is four rows: at 1440x900 the whole page fits inside the
-  // room reserved for the terminal, so "the last row clears the terminal"
-  // would be true of a build that reserved nothing at all, and the control
-  // below could not fail either. At this height the table genuinely runs
-  // under the bottom edge of the window, which is the shape an operator
-  // with a full table has and the shape the assertion is about.
+  // Shorter than the project's own window, and deliberately. With a
+  // handful of rows, at 1440x900 the whole page fits inside the room
+  // reserved for the terminal, so "the last row clears the terminal" would
+  // be true of a build that reserved nothing at all, and the control below
+  // could not fail either. At this height the table runs under the bottom
+  // edge of the window, which is the shape an operator with a full table
+  // has and the shape the assertion is about.
   test.use({ viewport: { width: 1440, height: 640 } });
 
   test.beforeEach(async ({ bm, page }) => {
+    needs(bm.facts.backups.length > 0, "at least one ingested backup, so a table is drawn at all");
     await bm.goto("/backups");
     await expect(page.getByRole("table")).toBeVisible();
-    // The premise both cases rest on. A page that fits in the window has
-    // no "scrolled to the bottom" worth reading, and the pair below would
-    // be measuring the seeded row count rather than the layout.
+    // The premise both cases rest on, and now a stated skip rather than a
+    // failed assertion: a page that fits in the window has no "scrolled to
+    // the bottom" worth reading, and how many rows this deployment holds
+    // is not something this file gets to decide.
     const g = await geometry(page);
-    expect(g.scrollable, "the backups page has to be taller than this window").toBeGreaterThan(0);
+    needs(
+      g.scrollable > 0,
+      "a backups table taller than a 640px window. This deployment holds " + bm.facts.backups.length +
+        " backup(s), which fit"
+    );
   });
 
   test("its last row can be scrolled entirely clear of the terminal", async ({ page }) => {
