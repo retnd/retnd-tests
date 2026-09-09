@@ -1,6 +1,27 @@
-import { expect, test } from "./fixtures";
+import { expect, needs, test } from "./fixtures";
 
+/**
+ * The backup sets list and one set's detail, against a real deployment.
+ *
+ * Almost all of this came out real, and it is worth saying why: these
+ * cases were mostly written about WHERE a control lives, what its tooltip
+ * says, and which vocabulary a card uses. None of that depends on the data
+ * behind it, and the two renames this file records (#214's and #597's) are
+ * both about a name claiming a scope the API does not have, which is
+ * exactly the class of defect a real backend can finally arbitrate.
+ *
+ * What did depend on the mock is the fleet it described: a card in each
+ * state, one stale set with a missed expectation, one failing set the
+ * manager had halted. A real deployment's sets are healthy unless
+ * something went wrong, so those three cases read the health report and
+ * say which state they were looking for.
+ */
 test.describe("backup sets", () => {
+  test.beforeEach(async ({ bm }) => {
+    needs(bm.facts.configured, "a configured deployment: this page refuses with NOT_CONFIGURED before the first backup set exists");
+    needs(bm.facts.sets.length > 0, "at least one configured backup set");
+  });
+
   test("summarises the fleet in the subtitle", async ({ bm, page }) => {
     await bm.goto("/sets");
     await expect(page.getByText(/healthy .* stale .* failing/)).toBeVisible();
@@ -40,6 +61,12 @@ test.describe("backup sets", () => {
   });
 
   test("a stale set explains the expectation it missed", async ({ bm, page }) => {
+    needs(
+      bm.facts.sets.some((set) => set.state === "STALE"),
+      "a backup set the service has marked STALE. The mock always had one; a real set goes stale " +
+        "only when its own freshness window passes with no verified backup, so reaching it needs " +
+        "either a short stale_after or a deployment left alone for one"
+    );
     await bm.goto("/sets");
     const stale = page.getByRole("article").filter({ hasText: "Stale" }).first();
     await expect(stale).toContainText(/No verified backup received for \d+ hours/);
@@ -82,17 +109,39 @@ test.describe("backup sets", () => {
     const cards = page.getByRole("article");
     await expect(cards.first()).toBeVisible();
     const count = await cards.count();
-    expect(count).toBeGreaterThan(1);
+    // One card is enough to make the claim that the run control is not on
+    // a card. The old `> 1` came from the mock's fixed fleet of several;
+    // pinning it would make this red on a deployment with one set, which
+    // is the deployment a first backup set produces.
+    expect(count).toBeGreaterThan(0);
     for (let i = 0; i < count; i++) {
       await expect(cards.nth(i).getByRole("button", { name: /run/i })).toHaveCount(0);
       // Control for each zero: the same query shape, on a button every
       // card really does carry, finds exactly one.
       await expect(cards.nth(i).getByRole("button", { name: "Open", exact: true })).toHaveCount(1);
     }
+  });
 
-    // A set the manager has stopped still says so, in the sentence that
-    // explains its state rather than in a status word derived from a flag
-    // the service never sends.
+  /** Split out of the case above, because it is about a set STATE rather
+   *  than about where the run control lives, and only one of the two
+   *  depends on what this deployment happens to hold.
+   *
+   *  A set the manager has stopped still says so, in the sentence that
+   *  explains its state rather than in a status word derived from a flag
+   *  the service never sends (#231: that flag was filled with a literal
+   *  false by the HTTP client on every set, so against a real service the
+   *  disabled state the old case asserted never occurred at all). This is
+   *  the first run in which that sentence is being read off a real
+   *  service. */
+  test("a set the manager has halted says so in words", async ({ bm, page }) => {
+    needs(
+      bm.facts.sets.some((set) => set.state === "FAILING" && set.halt_reason !== undefined),
+      "a backup set the service has halted. A real one is halted by its source machine changing " +
+        "host key, refusing its key, or its key file's permissions going wrong, which the topology " +
+        "can arrange on the source container"
+    );
+    await bm.goto("/sets");
+    const cards = page.getByRole("article");
     await expect(cards.filter({ hasText: "Failing" }).first()).toContainText(/halted/i);
   });
 
@@ -106,6 +155,8 @@ test.describe("backup sets", () => {
 
 test.describe("backup set detail", () => {
   test.beforeEach(async ({ bm, page }) => {
+    needs(bm.facts.configured, "a configured deployment");
+    needs(bm.facts.sets.length > 0, "at least one configured backup set to open");
     await bm.goto("/sets");
     await page.getByRole("article").first().getByRole("button", { name: "Open" }).click();
   });
@@ -198,6 +249,10 @@ test.describe("backup set detail", () => {
   });
 
   test("shows the trusted host fingerprint", async ({ page }) => {
+    // A real set has a real pinned known_hosts line, because the wizard
+    // refuses to save one without it. So this fingerprint is the source
+    // machine's own, read back out of the service, rather than a fixture
+    // string, and "Trusted" is a state the deployment is genuinely in.
     await expect(page.getByText(/SHA256:/).first()).toBeVisible();
     await expect(page.getByText("Trusted")).toBeVisible();
   });

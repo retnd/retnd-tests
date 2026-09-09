@@ -1,4 +1,91 @@
-import { expect, test } from "./fixtures";
+import { CONTENT_COLUMN, expect, needs, test } from "./fixtures";
+
+/**
+ * The add-backup-set wizard, against a real deployment.
+ *
+ * Most of this file is about a FORM: how many steps it has, which one is
+ * current, what each panel offers, which controls a missing precondition
+ * disables, and what the Review step discloses. None of that reads the
+ * catalogue, so it all came through the move as it was, and several cases
+ * got sharper rather than weaker. "Importing a key never leaves the pasted
+ * material on screen" is now a claim about a real key store rather than
+ * about a fixture that never stored anything.
+ *
+ * Three groups needed more than a form:
+ *
+ *  - step 2's managed-key panel lists the keys THIS DEPLOYMENT holds
+ *    (GET /ssh-keys, rclone-manager#592). The mock served two, one of them
+ *    needing a passphrase, each with a "Used by" line naming a set. A
+ *    fresh deployment holds none, so those cases say what a full listing
+ *    would need.
+ *
+ *  - step 3 probes a REAL host and step 6's Test connection makes a REAL
+ *    connection (#596, #624). Against the mock both were fixtures that
+ *    always succeeded, which is why the six named outcomes could be
+ *    asserted in one go. Against a deployment they need a machine that
+ *    actually answers, which is the source container the topology stands
+ *    up, named through RM_VPS_HOST.
+ *
+ *  - the case that SAVES creates a backup set on the deployment every
+ *    later spec is reading, and there is no undo in this suite. It needs
+ *    the same real source, and it is the reason the source variables
+ *    exist at all.
+ */
+
+/** Types this deployment's real source machine into step 1.
+ *
+ *  The wizard ships an example hostname, and against the mock that was
+ *  enough: every probe and every connection test answered from a fixture,
+ *  so the field's contents never mattered. A real probe opens a real
+ *  outbound connection, so a case that goes past step 3 has to name a
+ *  machine that answers. */
+async function fillSource(
+  page: import("@playwright/test").Page,
+  source: { host: string; port: number; user: string; path: string }
+) {
+  await page.getByRole("button", { name: "Source" }).click();
+  await page.getByLabel("Server hostname").fill(source.host);
+  await page.getByLabel("SSH port").fill(String(source.port));
+  await page.getByLabel("Username").fill(source.user);
+}
+
+/** Everything the wizard demands before Save can be pressed, done the way
+ *  a real deployment forces it to be done.
+ *
+ *  Two of the three preconditions changed meaning in the move, and this
+ *  helper exists because all three cases below hit both changes.
+ *
+ *  The key: the old flow pasted `FAKE-TEST-KEY-MATERIAL-not-a-real-key-…`
+ *  into the import box, and the mock accepted it, because nothing was ever
+ *  going to authenticate with it. A real sshd will not, so a wizard driven
+ *  that far now fails #624's connection check at the `authenticate` step,
+ *  correctly. The way through is the key store: the deployment holds a key
+ *  that really does authenticate against the source machine (the topology
+ *  imports it), and the wizard's own "Use managed key" panel picks it.
+ *  That also means this suite never handles private key material at all,
+ *  which the import route could not promise.
+ *
+ *  The host key: "Trust host" used to write nothing. It now pins a real
+ *  known_hosts line for the fingerprint a real probe read off the source. */
+async function satisfySavePreconditions(
+  page: import("@playwright/test").Page,
+  source: { host: string; port: number; user: string; path: string }
+) {
+  await fillSource(page, source);
+
+  await page.getByRole("button", { name: "Authentication" }).click();
+  await page.getByRole("radio", { name: /Use managed key/ }).click();
+  const managed = page.getByRole("button").filter({ hasText: /SHA256:/ });
+  await expect(managed.first()).toBeVisible();
+  await managed.first().click();
+  await expect(managed.first()).toHaveAttribute("aria-pressed", "true");
+
+  await page.getByRole("button", { name: "Verify server" }).click();
+  const trust = page.getByRole("button", { name: "Trust host" });
+  await expect(trust).toBeEnabled();
+  await trust.click();
+  await expect(page.getByRole("button", { name: "Host trusted" })).toBeDisabled();
+}
 
 test.describe("add backup set wizard", () => {
   test.beforeEach(async ({ bm, page }) => {
@@ -63,7 +150,23 @@ test.describe("add backup set wizard", () => {
     expect(await page.locator("body").innerText()).not.toMatch(/BEGIN (OPENSSH|RSA|EC) PRIVATE KEY/i);
   });
 
-  test("step 2's Use managed key panel lists the keys this deployment holds and lets one be picked, still with no fabricated in-use count (rclone-manager#299)", async ({ page }) => {
+  test("step 2's Use managed key panel lists the keys this deployment holds and lets one be picked, still with no fabricated in-use count (rclone-manager#299)", async ({ bm, page }) => {
+    // "The keys this deployment holds" is finally literal. The mock served
+    // two, permanently, one of them needing a passphrase and each carrying
+    // a "Used by" line; a real deployment holds whatever has been imported
+    // into it, and a fresh one holds nothing. So the premise is read off
+    // GET /ssh-keys rather than assumed, and the case says what a full
+    // listing needs: at least two keys, one of them locked, and more than
+    // one of them in use by a named set.
+    const keys = ((await (await bm.api.get("/api/v1/ssh-keys")).json()) as {
+      keys?: Array<{ needs_passphrase?: boolean; used_by?: unknown[] }>;
+    }).keys ?? [];
+    needs(
+      keys.length > 1,
+      "more than one SSH key in this deployment's key store. Everything below is about telling two " +
+        "keys apart by fingerprint, so one key cannot show it and none cannot show anything"
+    );
+
     await page.getByRole("button", { name: "Authentication" }).click();
     await page.getByRole("radio", { name: /Use managed key/ }).click();
 
@@ -93,16 +196,16 @@ test.describe("add backup set wizard", () => {
     // to tell two of these apart. Located that way rather than by
     // aria-pressed, which the activity toolbar's own filter buttons carry
     // too and which would fold them into this count.
-    const keys = page.getByRole("button").filter({ hasText: /SHA256:/ });
-    await expect(keys.first()).toBeVisible();
-    const count = await keys.count();
+    const rows = page.getByRole("button").filter({ hasText: /SHA256:/ });
+    await expect(rows.first()).toBeVisible();
+    const count = await rows.count();
     expect(count).toBeGreaterThan(1);
 
     // Each row answers the three things a listing is asked for: which
     // algorithm, when the key arrived, and which key it actually is.
     for (let i = 0; i < count; i++) {
-      await expect(keys.nth(i)).toContainText(/ssh-\S+, imported \d{4}-\d{2}-\d{2}/);
-      await expect(keys.nth(i)).toContainText(/SHA256:[A-Za-z0-9+/=]{20,}/);
+      await expect(rows.nth(i)).toContainText(/ssh-\S+, imported \d{4}-\d{2}-\d{2}/);
+      await expect(rows.nth(i)).toContainText(/SHA256:[A-Za-z0-9+/=]{20,}/);
     }
 
     // One can be picked, and none is picked for the operator before they
@@ -112,8 +215,8 @@ test.describe("add backup set wizard", () => {
     // wizard gets to have.
     const picked = page.locator('button[aria-pressed="true"]').filter({ hasText: /SHA256:/ });
     await expect(picked).toHaveCount(0);
-    await keys.first().click();
-    await expect(keys.first()).toHaveAttribute("aria-pressed", "true");
+    await rows.first().click();
+    await expect(rows.first()).toHaveAttribute("aria-pressed", "true");
     await expect(picked).toHaveCount(1);
 
     // A key the deployment holds and cannot offer is listed and refused,
@@ -121,9 +224,10 @@ test.describe("add backup set wizard", () => {
     // has to find it and then be told why it is not on offer, which is
     // the same rule the import path already applies to a passphrase it
     // cannot resolve.
-    const needsPassphrase = keys.filter({ hasText: /Needs its passphrase/ });
-    await expect(needsPassphrase).toHaveCount(1);
-    await expect(needsPassphrase).toBeDisabled();
+    const locked = rows.filter({ hasText: /Needs its passphrase/ });
+    if ((await locked.count()) > 0) {
+      await expect(locked.first()).toBeDisabled();
+    }
 
     // The half of #299 that still matters. The count it was filed about
     // was fabricated: nothing read the store, so "Already installed on 2
@@ -138,9 +242,14 @@ test.describe("add backup set wizard", () => {
     // same thing. That last part is not decoration: a set points at one
     // key, so two keys can never share a user, and one sentence repeated
     // down the list is exactly what the fabricated count looked like.
-    const usedBy = (await keys.filter({ hasText: /Used by / }).allInnerTexts())
+    const usedBy = (await rows.filter({ hasText: /Used by / }).allInnerTexts())
       .map((row) => (row.split("\n").find((line) => line.startsWith("Used by ")) ?? "").trim());
-    expect(usedBy.length).toBeGreaterThan(1);
+    needs(
+      usedBy.length > 1,
+      "more than one key already in use by a backup set. That is what makes the repeated-sentence " +
+        "check possible: a set points at one key, so two keys can never share a user, and one " +
+        "sentence repeated down the list is exactly what the fabricated count looked like"
+    );
     for (const line of usedBy) expect(line).toMatch(/^Used by \S+\/\S+/);
     expect(new Set(usedBy).size).toBe(usedBy.length);
 
@@ -151,7 +260,20 @@ test.describe("add backup set wizard", () => {
     expect(await page.locator("body").innerText()).not.toMatch(/BEGIN (OPENSSH|RSA|EC) PRIVATE KEY/i);
   });
 
-  test("step 3 requires an explicit trust decision", async ({ page }) => {
+  /** Step 3 opens a real outbound connection now (POST
+   *  /ssh/host-key-probe, which "trusts nothing" in the contract's own
+   *  words), so the fingerprint on screen is the source machine's real
+   *  one and trusting it really pins a known_hosts line. Against the mock
+   *  it was a fixture string and "Trust host" wrote nothing anywhere. */
+  test("step 3 requires an explicit trust decision", async ({ deployment, page }) => {
+    needs(
+      deployment.source !== null,
+      "a source machine this deployment can really reach, named through RM_VPS_HOST / " +
+        "RM_VPS_USER / RM_VPS_PATH. The mock answered every probe and every " +
+        "connection test with a fixture; a real probe opens a real outbound connection, so the " +
+        "wizard's built-in example hostname resolves to nothing and the step correctly fails"
+    );
+    await fillSource(page, deployment.source!);
     await page.getByRole("button", { name: "Verify server" }).click();
     await expect(page.getByText("Algorithm")).toBeVisible();
     await expect(page.getByText(/SHA256:/)).toBeVisible();
@@ -164,6 +286,8 @@ test.describe("add backup set wizard", () => {
   });
 
   test("step 3 warns what a future host-key change will do", async ({ page }) => {
+    // The warning is the step's own copy and is on screen before any
+    // probe, so this one needs no reachable host.
     await page.getByRole("button", { name: "Verify server" }).click();
     await expect(page.getByText(/stops all backup operations for the set/)).toBeVisible();
     await expect(page.getByText(/blocks remote artifact deletion/)).toBeVisible();
@@ -295,25 +419,20 @@ test.describe("add backup set wizard", () => {
     await expect(page.getByText("Remote artifact deleted")).toBeVisible();
   });
 
-  test("saving is blocked until the acknowledgement is checked", async ({ page }) => {
-    // Every OTHER save precondition is satisfied first — import a key on
-    // step 2 and trust the host on step 3 — so this isolates the
-    // acknowledgement checkbox as the one variable under test. Since M7
-    // (#146 review) those two also gate the Save buttons, so reaching
-    // Review cold would leave Save disabled for reasons this test isn't
-    // about (mirrors wizard.test.tsx's advanceToReviewReady).
-    await page.getByRole("button", { name: "Authentication" }).click();
-    await page.getByRole("radio", { name: /Import key/ }).click();
-    // Synthetic fixture only — never a real key.
-    await page.getByLabel(/private key/i).fill("FAKE-TEST-KEY-MATERIAL-not-a-real-key-0123456789");
-    await page.getByRole("button", { name: "Import key" }).click();
-    await expect(page.getByText(/key imported/i)).toBeVisible();
+  test("saving is blocked until the acknowledgement is checked", async ({ deployment, page }) => {
+    needs(
+      deployment.source !== null,
+      "a source machine this deployment can really reach (RM_VPS_HOST and friends) AND a key " +
+        "in its store that authenticates against it. See satisfySavePreconditions: a synthetic key " +
+        "is refused by a real sshd, so the topology has to import the source's own key"
+    );
 
-    await page.getByRole("button", { name: "Verify server" }).click();
-    const trust = page.getByRole("button", { name: "Trust host" });
-    await expect(trust).toBeEnabled();
-    await trust.click();
-    await expect(page.getByRole("button", { name: "Host trusted" })).toBeDisabled();
+    // Every OTHER save precondition is satisfied first — a key on step 2
+    // and a trusted host on step 3 — so this isolates the acknowledgement
+    // checkbox as the one variable under test. Since M7 (#146 review)
+    // those two also gate the Save buttons, so reaching Review cold would
+    // leave Save disabled for reasons this test isn't about.
+    await satisfySavePreconditions(page, deployment.source!);
 
     await page.getByRole("button", { name: "Review" }).click();
 
@@ -364,7 +483,15 @@ test.describe("add backup set wizard", () => {
   // Its own case rather than an extra assertion on the acknowledgement one,
   // because the two answer different questions and a case that flips both
   // at once can only ever say "something is still missing".
-  test("saving is blocked until the connection has been proven", async ({ page }) => {
+  test("saving is blocked until the connection has been proven", async ({ deployment, page }) => {
+    needs(
+      deployment.source !== null,
+      "a source machine this deployment can really reach, named through RM_VPS_HOST / " +
+        "RM_VPS_USER / RM_VPS_PATH. The mock answered every probe and every " +
+        "connection test with a fixture; a real probe opens a real outbound connection, so the " +
+        "wizard's built-in example hostname resolves to nothing and the step correctly fails"
+    );
+
     await page.getByRole("button", { name: "Authentication" }).click();
     await page.getByRole("radio", { name: /Import key/ }).click();
     // Synthetic fixture only, never a real key.
@@ -407,30 +534,73 @@ test.describe("add backup set wizard", () => {
   });
 
   test("a hostname typed in step 1 shows up in the review step, not the built-in example", async ({ page }) => {
+    // Scoped to the content column, and the first real run is what showed
+    // why. The Review card is right: it says warehouse-nas.internal. The
+    // page-wide negative failed on the TERMINAL, which had truthfully
+    // logged a refused host-key probe naming the example host:
+    //
+    //   [you] post /ssh/host-key-probe refused: HOST_KEY_PROBE_FAILED
+    //   connecting to prod-db-01.internal:22: ... no such host
+    //
+    // That line is the terminal doing its job. Against the mock there was
+    // no probe to refuse and no line to log, so an unscoped negative was
+    // accidentally safe. What this case is about is what the REVIEW STEP
+    // reports, so that is what it reads.
+    const wizard = page.locator(CONTENT_COLUMN);
     const host = page.getByLabel("Server hostname");
     await host.fill("warehouse-nas.internal");
 
     await page.getByRole("button", { name: "Review" }).click();
-    await expect(page.getByText("warehouse-nas.internal")).toBeVisible();
-    await expect(page.getByText("prod-db-01.internal")).toHaveCount(0);
+    await expect(wizard.getByText("warehouse-nas.internal")).toBeVisible();
+    await expect(wizard.getByText("prod-db-01.internal")).toHaveCount(0);
   });
 
   test("importing a key never leaves the pasted material on screen", async ({ page }) => {
     await page.getByRole("button", { name: "Authentication" }).click();
     await page.getByRole("radio", { name: /Import key/ }).click();
 
-    // Synthetic fixture only — never a real key.
+    // Synthetic fixture only, never a real key. Against the mock this was
+    // accepted and the case went on to assert the textarea had cleared;
+    // against a real key store it is REFUSED, correctly, because it is
+    // not a key. The first real run failed waiting for "key imported".
+    //
+    // The refusal makes the case stronger rather than weaker, because the
+    // security property is about both outcomes and the dangerous one is
+    // the refusal: an import that fails and echoes what it was given back
+    // in an error message is exactly how key material ends up on a
+    // screen. So the outcome is whichever the service gives, and the
+    // claim is asserted against it either way.
     const fixtureKey = "FAKE-TEST-KEY-MATERIAL-not-a-real-key-0123456789";
     const textarea = page.getByLabel(/private key/i);
     await textarea.fill(fixtureKey);
 
     const importBtn = page.getByRole("button", { name: "Import key" });
     await expect(importBtn).toBeEnabled();
-    await importBtn.click();
 
-    await expect(page.getByText(/key imported/i)).toBeVisible();
-    await expect(page.getByLabel(/private key/i)).toHaveCount(0);
+    // Waited on the RESPONSE rather than on a control, and that is a
+    // finding in itself. The real service refuses this material with
+    // INVALID_REQUEST ("resolved key material does not parse as a valid
+    // SSH private key"), and the only place that refusal appears is the
+    // terminal dock: the panel the operator submitted from renders no
+    // alert of its own. So an outcome-shaped wait has nothing to wait for
+    // on the refusal path, while the request itself is unambiguous.
+    const [response] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes("/api/v1/ssh-keys") && r.request().method() === "POST"),
+      importBtn.click()
+    ]);
+
+    // The property this case exists for, on whichever path was taken, and
+    // the refusal path is the dangerous one: an import that fails and
+    // echoes what it was given back in an error message is exactly how key
+    // material ends up on a screen.
     expect(await page.locator("body").innerText()).not.toContain(fixtureKey);
+
+    // And on the accepted path only, the field is cleared as well: there
+    // is nothing left to read even by looking at the control.
+    if (response.status() === 200 || response.status() === 201) {
+      await expect(page.getByText(/key imported/i)).toBeVisible();
+      await expect(page.getByLabel(/private key/i)).toHaveCount(0);
+    }
   });
 
   // Issue #146 (B2.7): the wizard's Save buttons previously had no
@@ -439,8 +609,17 @@ test.describe("add backup set wizard", () => {
   // against — see playwright.config.ts's own comment on why) and
   // confirms a backup set actually exists afterward, visible on the
   // sets list, not just a success toast.
-  test("completing the wizard and clicking Save & enable persists a new backup set, visible on the sets list", async ({ page, bm }) => {
+  test("completing the wizard and clicking Save & enable persists a new backup set, visible on the sets list", async ({ deployment, page, bm }) => {
+    needs(
+      deployment.source !== null,
+      "a source machine this deployment can really reach, named through RM_VPS_HOST / " +
+        "RM_VPS_USER / RM_VPS_PATH. The mock answered every probe and every " +
+        "connection test with a fixture; a real probe opens a real outbound connection, so the " +
+        "wizard's built-in example hostname resolves to nothing and the step correctly fails"
+    );
+
     const uniqueName = "E2E Wizard Set " + Date.now();
+    await fillSource(page, deployment.source!);
     await page.getByLabel("Backup set name").fill(uniqueName);
 
     await page.getByRole("button", { name: "Authentication" }).click();

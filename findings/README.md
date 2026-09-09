@@ -37,6 +37,7 @@ observed behaviour, and links its filed issue and its pinned case.
 | DISC-007 | [#211](https://github.com/spdrman/rclone-manager/issues/211) | the Web UI's API client calls fourteen `/api/v1` operations neither the contract nor the engine has, so four pages cannot load against a real backend |
 | DISC-008 | [#633](https://github.com/spdrman/rclone-manager/issues/633) | the mock API's CANDIDATE test connection hands its `archive` boolean to the report builder's `deliverable` parameter, so an ordinary storage class is reported as unable to take delivery and no destination can be saved in the browser, while the one class a retention tier is refused for would be waved through |
 | DISC-009 | [#634](https://github.com/spdrman/rclone-manager/issues/634) | a retention tier created after the default destination is moved starts on the old one, because the two cards on the settings page hold separate reads of it; and a tier added to a backup set's own policy never consults the default at all |
+| DISC-010 | to be filed | clicking a backup lands an operator on the Dashboard: an artifact id is three URL segments and `/backups/:artifactId` is one, so the detail page and everything on it is unreachable in a browser. The same defect was found and fixed on the neighbouring backup-set route in #285 |
 
 ## Resolved
 

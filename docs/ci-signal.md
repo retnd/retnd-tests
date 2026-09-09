@@ -60,9 +60,20 @@ out where they occur.
      `commit none` and the identity handshake refuses the run, which is
      the handshake doing its job rather than a problem to work around.
 
-   - runs Suite B too, with `RM_UI_DIR` pointing at the working tree's
-     `ui/shared`, so the app under test is the commit being made rather
-     than the pinned release.
+   - runs Suite B too. This step is the one that changed shape when the
+     browser suite stopped driving a Vite dev server: `RM_UI_DIR` named a
+     `ui/shared` checkout to serve, and there is nothing to serve any
+     more. Suite B drives a deployment it did not create, so the step has
+     to stand the containers up first and hand the suite `RM_BASE_URL`,
+     `RM_ADMIN_USERNAME` and `RM_ADMIN_PASSWORD`. The rig lives in
+     `rclone-manager`'s own `scripts/e2e/`, and wiring the gate step to
+     it is that repository's half of the change: this one only pins the
+     specs.
+
+     What the suite gives back in exchange is the thing the dev server
+     could not: the app under test is the image the commit builds,
+     answering through the same reverse-proxy hop an operator's browser
+     goes through, over a real session, reading a real database.
 
 3. **Who triggers it, against which build, and how red blocks.** The
    pre-commit hook triggers it on every commit. The build under test is

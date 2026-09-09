@@ -64,11 +64,8 @@ done
 # to be because Suite B's e2e/ was byte-identical to rclone-manager's
 # ui/shared/e2e/ and editing it here to satisfy a check here would have
 # traded the migration's proof for something weaker. That reason expired
-# with rclone-manager #217, which deleted the upstream directory, so the
-# one unused binding in there (e2e/shell.spec.ts, an unused `page`
-# fixture) is now this repository's to fix and these two options are this
-# repository's to turn on. Still open, in a change of its own: see
-# suites/web-ui/README.md.
+# with rclone-manager #217, which deleted the upstream directory, so both
+# options are this repository's to turn on, in a change of its own.
 echo "==> Suite B and Suite C type checks"
 (cd suites/web-ui && npm run --silent typecheck)
 (cd suites/equivalence && npm run --silent typecheck)
