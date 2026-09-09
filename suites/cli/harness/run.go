@@ -19,7 +19,7 @@ import (
 
 // Runner executes cases against one build under test.
 type Runner struct {
-	// CLI is the absolute path to the backup-manager binary, already
+	// CLI is the absolute path to the rbm binary, already
 	// through the identity handshake.
 	CLI string
 	// ScenarioDir is fixtures/scenarios.
@@ -30,6 +30,11 @@ type Runner struct {
 	// materialises, so a case and its fixture agree about what "90 days
 	// ago" meant.
 	Now time.Time
+	// AliasDir is where a case's `invoke_as` link is made. It is outside
+	// every case's work directory on purpose: a link to a 30MB binary
+	// sitting inside the tree statesnap walks would be digested twice per
+	// case, and would put a file in the fixture that no fixture declares.
+	AliasDir string
 }
 
 // Result is everything one case produced, in all four dimensions.
@@ -38,7 +43,13 @@ type Result struct {
 	Manifest fixtures.Manifest
 	Norm     *Normalizer
 
-	Argv     []string
+	Argv []string
+	// Binary is the path the argv under test was actually executed
+	// through. It is the build under test either way; it differs from
+	// Runner.CLI only for a case carrying `invoke_as`, and it is recorded
+	// so a self-test can prove that field did something rather than
+	// nothing.
+	Binary   string
 	Exit     int
 	Stdout   string
 	Stderr   string
@@ -82,7 +93,7 @@ func (r *Runner) Run(work string, c Case) (Result, error) {
 	res.Norm = NewNormalizer(manifest)
 
 	for _, argv := range c.Setup {
-		inv, err := r.invoke(res.Norm, expandAll(res.Norm, argv), c, false)
+		inv, err := r.invoke(r.CLI, res.Norm, expandAll(res.Norm, argv), c, false)
 		if err != nil {
 			return res, err
 		}
@@ -111,7 +122,7 @@ func (r *Runner) Run(work string, c Case) (Result, error) {
 	}
 
 	for _, argv := range c.SetupAfterMutate {
-		inv, err := r.invoke(res.Norm, expandAll(res.Norm, argv), c, false)
+		inv, err := r.invoke(r.CLI, res.Norm, expandAll(res.Norm, argv), c, false)
 		if err != nil {
 			return res, err
 		}
@@ -122,6 +133,17 @@ func (r *Runner) Run(work string, c Case) (Result, error) {
 		}
 	}
 
+	// Only the argv under test goes through the alias. Setup runs the
+	// build under its resolved name, because a setup step is how the case
+	// reaches the state it describes and not part of the claim it makes.
+	res.Binary = r.CLI
+	if c.InvokeAs != "" {
+		res.Binary, err = r.alias(c.InvokeAs)
+		if err != nil {
+			return res, err
+		}
+	}
+
 	res.Before, err = statesnap.Take(manifest.Work, manifest.StateDB)
 	if err != nil {
 		return res, fmt.Errorf("snapshotting before the run: %w", err)
@@ -129,7 +151,7 @@ func (r *Runner) Run(work string, c Case) (Result, error) {
 
 	res.Argv = expandAll(res.Norm, c.Argv)
 	started := time.Now()
-	inv, err := r.invoke(res.Norm, res.Argv, c, true)
+	inv, err := r.invoke(res.Binary, res.Norm, res.Argv, c, true)
 	res.Duration = time.Since(started)
 	if err != nil {
 		return res, err
@@ -144,7 +166,7 @@ func (r *Runner) Run(work string, c Case) (Result, error) {
 	return res, nil
 }
 
-func (r *Runner) invoke(n *Normalizer, argv []string, c Case, underTest bool) (Invocation, error) {
+func (r *Runner) invoke(bin string, n *Normalizer, argv []string, c Case, underTest bool) (Invocation, error) {
 	timeout := r.DefaultTimeout
 	if timeout == 0 {
 		timeout = 60 * time.Second
@@ -157,7 +179,7 @@ func (r *Runner) invoke(n *Normalizer, argv []string, c Case, underTest bool) (I
 	defer cancel()
 
 	var stdout, stderr bytes.Buffer
-	cmd := exec.CommandContext(ctx, r.CLI, argv...)
+	cmd := exec.CommandContext(ctx, bin, argv...)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	// TZ is pinned so any date the product renders is rendered the same
 	// way on a developer's laptop and on a build host. LC_ALL is pinned
@@ -186,6 +208,40 @@ func (r *Runner) invoke(n *Normalizer, argv []string, c Case, underTest bool) (I
 		return inv, fmt.Errorf("running %v: timed out after %s", argv, timeout)
 	}
 	return inv, nil
+}
+
+// alias makes a second filename for the build under test and hands back
+// the path to it, so a case can drive the same binary the way an operator
+// who has not read the release notes still does.
+//
+// It is a link rather than a copy so the two names are the same binary by
+// construction, which is the arrangement the image makes and the only one
+// worth asserting against: two independently copied files could drift and
+// the case would not notice.
+//
+// The link is rebuilt on every use. A stale one pointing at the previous
+// pin's binary would be exactly the failure this repository refuses
+// everywhere else, a run certifying a build nobody meant to test, and it
+// would be invisible because the case's own output would look right.
+func (r *Runner) alias(name string) (string, error) {
+	if name != filepath.Base(name) || name == "" || name == "." || name == ".." {
+		return "", fmt.Errorf("invoke_as %q: expected a bare filename, not a path", name)
+	}
+	dir := r.AliasDir
+	if dir == "" {
+		return "", errors.New("invoke_as needs a Runner with an AliasDir; build the runner with FromPin")
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	path := filepath.Join(dir, name)
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return "", err
+	}
+	if err := os.Symlink(r.CLI, path); err != nil {
+		return "", fmt.Errorf("linking %s as %s: %w", r.CLI, path, err)
+	}
+	return path, nil
 }
 
 // invokeWithSignal gives `daemon` a bounded run: start it, let it do the
@@ -365,5 +421,6 @@ func FromPin(scenarioDir string) (*Runner, error) {
 		ScenarioDir:    filepath.Join(root, "fixtures", "scenarios"),
 		DefaultTimeout: 120 * time.Second,
 		Now:            time.Now(),
+		AliasDir:       filepath.Join(root, ".work", "aliases"),
 	}, nil
 }

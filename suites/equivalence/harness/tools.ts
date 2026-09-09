@@ -41,7 +41,7 @@ export function resolveBuild(): Build {
   const build = JSON.parse(raw) as Build;
   if (!build.web) {
     throw new Error(
-      "the resolved build has no backup-manager-web binary, so there is no engine to drive the Web UI against. " +
+      "the resolved build has no rbm-web binary, so there is no engine to drive the Web UI against. " +
         "source mode's go builder produces one; local mode needs RM_WEB_BINARY."
     );
   }

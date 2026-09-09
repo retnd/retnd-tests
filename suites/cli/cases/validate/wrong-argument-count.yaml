@@ -6,7 +6,7 @@ argv: [validate, --config, "${CONFIG}"]
 exit: 2
 stdout: empty
 stderr:
-  - line: "backup-manager: validate takes exactly one argument: <source/backup-set/artifact>"
+  - line: "rbm: validate takes exactly one argument: <source/backup-set/artifact>"
 state: unchanged
 contract:
   - "usage text: validate <source/backup-set/artifact>"

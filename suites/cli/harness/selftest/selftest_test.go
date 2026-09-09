@@ -329,3 +329,79 @@ func TestReadOnlyMutationRemovesWritePermissionAndGivesItBack(t *testing.T) {
 			"os.RemoveAll cannot empty it and every case using this verb would leave its fixture behind", info.Mode().Perm())
 	}
 }
+
+// TestInvokeAsRunsTheSameBinaryUnderAnotherName is the positive control
+// for `invoke_as`, and it is the whole reason that field is observable at
+// all.
+//
+// A case carrying `invoke_as: backup-manager` asserts that the build
+// under test behaves the same however it was reached. The failure mode
+// that assertion has is not going red, it is going green while running
+// the binary under its ordinary name: the field silently ignored, the
+// link never made, the case passing on the strength of an invocation
+// identical to the one `version/happy` already covers, and the promise it
+// was written for untested. From outside there would be nothing to see,
+// because the output is the same either way. That is the point.
+//
+// So this reaches past the four assertion dimensions and requires the two
+// things the case itself cannot say: the path that ran is called
+// `backup-manager` and is not the one the pin resolved, and it is the
+// same file underneath rather than a second copy that could drift.
+func TestInvokeAsRunsTheSameBinaryUnderAnotherName(t *testing.T) {
+	c := baseline()
+	c.Name = "selftest/invoke-as"
+	c.Scenario = "no-fixture"
+	c.InvokeAs = "backup-manager"
+	c.Argv = []string{"version"}
+	c.Stdout = harness.Stream{Mode: "ignored"}
+
+	work := workDir(t)
+	res, err := runner.Run(work, c)
+	if err != nil {
+		t.Fatalf("running the case: %v", err)
+	}
+	if got := harness.Evaluate(c, res); len(got) != 0 {
+		t.Fatalf("`version` through the old name should behave exactly as it does through the new one, got %d mismatch(es):\n%v", len(got), got)
+	}
+
+	if base := filepath.Base(res.Binary); base != "backup-manager" {
+		t.Fatalf("the argv under test ran as %q, want backup-manager: invoke_as did nothing and the case asserting it proves nothing", base)
+	}
+	if res.Binary == runner.CLI {
+		t.Fatalf("invoke_as handed back the pin's own path %s, so the case never left the name it was trying to get away from", res.Binary)
+	}
+
+	resolved, err := filepath.EvalSymlinks(res.Binary)
+	if err != nil {
+		t.Fatalf("resolving %s: %v", res.Binary, err)
+	}
+	want, err := filepath.EvalSymlinks(runner.CLI)
+	if err != nil {
+		t.Fatalf("resolving %s: %v", runner.CLI, err)
+	}
+	if resolved != want {
+		t.Fatalf("the alias resolves to %s but the build under test is %s: two names have to be one binary, "+
+			"or a case comparing them is comparing two builds", resolved, want)
+	}
+}
+
+// TestInvokeAsRefusesAPath keeps the field from being a way to point a
+// case at some other binary on the machine. `invoke_as` names how the
+// build under test is reached, not which build is under test, and the pin
+// is the only thing allowed to answer the second question.
+func TestInvokeAsRefusesAPath(t *testing.T) {
+	for _, name := range []string{"../backup-manager", "/bin/echo", "sub/dir"} {
+		t.Run(name, func(t *testing.T) {
+			c := baseline()
+			c.Name = "selftest/invoke-as-path"
+			c.Scenario = "no-fixture"
+			c.InvokeAs = name
+			c.Argv = []string{"version"}
+			c.Stdout = harness.Stream{Mode: "ignored"}
+
+			if _, err := runner.Run(workDir(t), c); err == nil {
+				t.Fatalf("invoke_as %q was accepted; a case has to be unable to choose the binary", name)
+			}
+		})
+	}
+}

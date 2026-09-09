@@ -4,7 +4,7 @@ argv: [retention, --config, "${CONFIG}", --daily-days, "-1"]
 exit: 1
 stdout: empty
 stderr:
-  - contains: "backup-manager: "
+  - contains: "rbm: "
   - contains: "retention.daily_days"
 state: unchanged
 contract:

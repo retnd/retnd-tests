@@ -6,11 +6,11 @@ argv: [check, --config, "${WORK}/no-such-config.yaml"]
 exit: 1
 stdout: empty
 stderr:
-  - contains: "backup-manager: "
+  - contains: "rbm: "
   - contains: "${WORK}/no-such-config.yaml"
   - contains: "no such file or directory"
 state: unchanged
 contract:
   - "usage text: every command except version accepts --config"
-  - "exit-code convention: 1 is an operational failure, prefixed backup-manager: "
+  - "exit-code convention: 1 is an operational failure, prefixed rbm: "
 tags: [smoke]

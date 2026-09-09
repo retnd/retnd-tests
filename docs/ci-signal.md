@@ -51,8 +51,8 @@ out where they occur.
 
      ```sh
      go build -ldflags "-X main.version=$(git rev-parse --short HEAD) -X main.commit=$(git rev-parse HEAD)" \
-       -o "$tmp/backup-manager" ./core/cmd/backup-manager
-     RM_MODE=local RM_BINARY="$tmp/backup-manager" RM_SOURCE_DIR="$PWD" \
+       -o "$tmp/rbm" ./core/cmd/backup-manager
+     RM_MODE=local RM_BINARY="$tmp/rbm" RM_SOURCE_DIR="$PWD" \
        make -C "$gate_checkout" smoke
      ```
 

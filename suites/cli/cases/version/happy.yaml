@@ -8,7 +8,7 @@ scenario: no-fixture
 argv: [version]
 exit: 0
 stdout:
-  - re: "backup-manager \\S+"
+  - re: "rbm \\S+"
   - re: "rclone v\\d+\\.\\d+\\.\\d+\\S*"
   - re: "go go\\d+\\.\\d+(\\.\\d+)?"
   - re: "commit [0-9a-f]{7,40}(-dirty)?"
