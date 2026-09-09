@@ -4,7 +4,7 @@ argv: [medium, list, --config, "${WORK}/no-such-config.yaml"]
 exit: 1
 stdout: ignored
 stderr:
-  - contains: "backup-manager: "
+  - contains: "rbm: "
   - contains: "${WORK}/no-such-config.yaml"
 state: unchanged
 contract:

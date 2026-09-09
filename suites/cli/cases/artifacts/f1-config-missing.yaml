@@ -4,7 +4,7 @@ argv: [artifacts, --config, "${WORK}/no-such-config.yaml"]
 exit: 1
 stdout: empty
 stderr:
-  - contains: "backup-manager: "
+  - contains: "rbm: "
   - contains: "${WORK}/no-such-config.yaml"
 state: unchanged
 contract:

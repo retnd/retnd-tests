@@ -258,13 +258,13 @@ test.describe("the storage destinations list", () => {
     // remove local`, because a row that taught a command the engine
     // refuses would be worse than a row that taught none.
     const local = row(page, "local");
-    await expect(local).toContainText("backup-manager medium test-connection local");
-    await expect(local).not.toContainText("backup-manager medium remove local");
+    await expect(local).toContainText("rbm medium test-connection local");
+    await expect(local).not.toContainText("rbm medium remove local");
 
-    await expect(row(page, "offsite_s3")).toContainText("backup-manager medium default offsite_s3");
+    await expect(row(page, "offsite_s3")).toContainText("rbm medium default offsite_s3");
     // And the destination that already carries the mark does not print a
     // line that would change nothing.
-    await expect(local).not.toContainText("backup-manager medium default local");
+    await expect(local).not.toContainText("rbm medium default local");
   });
 });
 
@@ -362,11 +362,11 @@ test.describe("picking a destination under a retention tier", () => {
     // refused as acknowledging a write that needs no acknowledgment.
     await picker(page, 1).selectOption("offsite_s3");
     await expect(tier(page, 1)).toContainText(
-      "backup-manager settings patch --tier-medium daily=offsite_s3 --acknowledge-medium-disclosure"
+      "rbm settings patch --tier-medium daily=offsite_s3 --acknowledge-medium-disclosure"
     );
 
     await picker(page, 1).selectOption("local");
-    await expect(tier(page, 1)).toContainText("backup-manager settings patch --tier-medium daily=local");
+    await expect(tier(page, 1)).toContainText("rbm settings patch --tier-medium daily=local");
     await expect(tier(page, 1)).not.toContainText("--tier-medium daily=local --acknowledge-medium-disclosure");
   });
 
@@ -417,7 +417,7 @@ test.describe("picking a destination under a retention tier", () => {
       await expect(wizard.getByText(step, { exact: true })).toBeVisible();
     }
     await expect(wizard).toContainText(
-      "backup-manager medium test-connection --candidate nearline_eu"
+      "rbm medium test-connection --candidate nearline_eu"
     );
     await expect(wizard.getByRole("button", { name: "Test connection again" })).toBeVisible();
     await expect(wizard.getByRole("button", { name: "Verify" })).toHaveCount(0);

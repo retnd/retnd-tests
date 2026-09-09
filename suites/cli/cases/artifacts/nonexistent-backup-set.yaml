@@ -13,7 +13,7 @@ argv: [artifacts, --config, "${CONFIG}", --source, production, --backup-set, no-
 exit: 1
 stdout: empty
 stderr:
-  - line: "backup-manager: app: no configured backup set named production/no-such-set"
+  - line: "rbm: app: no configured backup set named production/no-such-set"
 state: unchanged
 contract:
   - "usage text: artifacts [--source S] [--backup-set B] - list journal artifacts"

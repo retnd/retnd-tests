@@ -8,7 +8,7 @@ argv: [artifacts, --config, "${CONFIG}", not-an-id]
 exit: 1
 stdout: ignored
 stderr:
-  - contains: "backup-manager: "
+  - contains: "rbm: "
   - contains: "source/backup-set/name"
 state: unchanged
 contract:

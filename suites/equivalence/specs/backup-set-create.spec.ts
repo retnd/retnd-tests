@@ -12,7 +12,7 @@ import { compareState, runCli } from "../harness/tools";
 // one, written as though it were a feature. The Web UI and the API could
 // both create a backup set and the CLI could not, so the row recorded a
 // capability that existed on two surfaces and not on the third.
-// rclone-manager#356 added `backup-manager backup-set create`, and this is
+// rclone-manager#356 added `rbm backup-set create`, and this is
 // what turns that into a proved row rather than a claim.
 //
 // # Why this drives the API rather than the wizard
