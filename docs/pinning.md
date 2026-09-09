@@ -25,7 +25,9 @@ nothing has been pushed to `ghcr.io/spdrman/backup-manager` yet.
 `source_builder` chooses how:
 
 - **`go`** compiles `./cmd/backup-manager` directly. Seconds, no Docker,
-  and enough for the CLI contract, which is what Suite A tests.
+  and enough for the CLI contract, which is what Suite A tests. The
+  package path keeps the old spelling; the command it produces calls
+  itself `rbm`.
 - **`docker`** builds `container/Dockerfile` and copies `/backup-manager`
   and `/backup-manager-web` out of the resulting image. Slower, and the
   only route that produces the artefact operators actually receive, so it
@@ -36,6 +38,30 @@ implemented both and defaulted to `go`, because Suite A does not need the
 image and a multi-minute image build in front of a twelve-second suite
 would get skipped rather than run. The choice is a field in the pin, so
 switching is a data change and both routes are covered.
+
+**The `docker` route and the rename.** From 0.3.3 the image's binaries are
+`/rbm` and `/rbm-web`, and `/backup-manager` and `/backup-manager-web`
+are symbolic links beside them so an operator's existing scripts keep
+working. Extraction still asks for the two old paths, and it now passes
+`docker cp -L`, because `docker cp` copies a link *as a link*: without
+the flag what lands on the host is a four-byte dangling link to `/rbm`,
+and the next thing that happens is the identity handshake trying to exec
+it. Measured on a two-line image with that exact layout, not reasoned
+about: `docker cp` produced a symlink of size 4, `docker cp -L` produced
+the binary. Following a link is a no-op on a pre-rename image, where both
+paths are ordinary files, so the one flag spans both sides of the rename
+and the extraction still needs to know nothing about which name is which.
+
+What that does **not** check is that the image contains both names at
+all. A `/backup-manager` that stopped being built would fail this
+extraction outright, which is a loud enough signal; a `/rbm` that never
+appeared would not, because nothing here asks for it by that name. The
+honest check is to extract both and require them to be the same bytes,
+and it is not written, because the pin is allowed to point either side of
+the rename and a check that has to ask which side it is looking at is not
+a check. `suites/cli/cases/global/g6-…` and `g7-…` cover the half that
+does not need an image: the binary behaves identically however it was
+reached.
 
 ### `registry`
 
@@ -62,7 +88,7 @@ being made and a pin would be pointing at the wrong thing.
 
 ```sh
 RM_MODE=local \
-RM_BINARY=/path/to/rclone-manager/core/backup-manager \
+RM_BINARY=/path/to/rclone-manager/core/rbm \
 RM_SOURCE_DIR=/path/to/rclone-manager \
 make suite-a
 ```
@@ -76,8 +102,11 @@ nobody meant to test.
 ## The identity handshake
 
 Before a single case runs, in every mode, the harness invokes
-`backup-manager version` and compares the commit it prints against what
-the pin promised. A mismatch aborts the run.
+`rbm version` and compares the commit it prints against what the pin
+promised. It reads the first line under either name the command has had,
+so a pin pointing back at a pre-0.3.3 build can still say which commit it
+is; the printed name itself is asserted where an assertion belongs, in
+`suites/cli/cases/version/happy.yaml`. A mismatch aborts the run.
 
 This is not ceremony. This project has already had a control report green
 against a stale dev server on a shared port, built from an entirely
@@ -95,8 +124,8 @@ suffix on a build made from a modified tree.
 | Variable | Effect |
 |---|---|
 | `RM_MODE` | force a mode, ignoring the pin's own |
-| `RM_BINARY` | `local`: the `backup-manager` binary to test |
-| `RM_WEB_BINARY` | `local`: the `backup-manager-web` binary, optional |
+| `RM_BINARY` | `local`: the `rbm` binary to test |
+| `RM_WEB_BINARY` | `local`: the `rbm-web` binary, optional |
 | `RM_COMMIT` | `local`: the commit that binary claims to be |
 | `RM_SOURCE_DIR` | `local`: a checkout to read `HEAD` from when `RM_COMMIT` is unset |
 | `RM_SOURCE_REPO` | `source`: clone from here instead of GitHub; a local checkout path works and is much faster |
