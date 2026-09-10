@@ -1,22 +1,33 @@
 doc: >
-  The drive this deployment's backups land on cannot be un-declared,
-  because it was never declared
-  (spdrman/rclone-manager#622).
+  The drive this deployment's backups land on is refused for the reason
+  it actually has: copies are on it
+  (spdrman/rclone-manager#670, FR-30).
 
-  This is the invariant "there is never zero destinations", stated rather
-  than left to follow from the fact that local is always present. #622
-  asks for exactly that: the rule should be tested rather than inherited
-  as a side effect, and the way to test it is to try the one command that
-  could break it.
+  This case used to assert that local "was never declared" and so "cannot
+  be un-declared". That was true when it was written (#622) and stopped
+  being true with #670: local is a DECLARED destination now, instance
+  zero of the local_volume backend, written into storage_mediums at first
+  boot and proven before it is written. Its undeletability is no longer a
+  fact about its name — it falls out of the same two general rules every
+  other destination gets, which is what #670 asks for in as many words.
 
-  The refusal explains both halves, and both are asserted. It is not a
-  storage_mediums entry, so there is nothing to take out of the file; and
-  every retention tier that names no destination means this one, so a
-  deployment without it is not a state this product can be in.
+  So this asserts the rule that actually stops the removal here. The
+  scenario has a backup on the local drive, and FR-30 refuses to
+  un-declare a destination artifacts already live on: removing the
+  declaration would not delete them, it would leave this deployment with
+  no way to confirm they exist. The refusal names the count and the
+  backup set, because "1 copy affected" with nothing named is a number
+  rather than something an operator can act on.
 
-  It refuses even though local is not always the marked default, which is
-  what makes this a different rule from the case beside it rather than the
-  same one reaching the same destination.
+  The default is deliberately moved OFF local in the setup, and that is
+  what makes this case about FR-30 rather than about the mark. Before
+  #670 that step made no difference, because the refusal was about the id
+  either way. Now it does: the destination that carries the mark is
+  refused by the case beside this one, and local with the mark moved away
+  is an ordinary destination refused by an ordinary rule. A local drive
+  with nothing on it and no mark on it is removable, which is #670's own
+  acceptance and not something this case can assert without a scenario
+  that has never taken a backup.
 scenario: storage-destinations
 setup:
   - [medium, default, offsite_s3, --config, "${CONFIG}"]
@@ -25,12 +36,12 @@ exit: 1
 stdout:
   - contains: "mode: direct"
 stderr:
-  - contains: "local is the drive this deployment's backups land on"
-  - contains: "It is not declared in the configuration and cannot be un-declared"
-  - contains: "a deployment with no destination at all is not a state this product can be in"
+  - contains: "storage medium still holds copies"
+  - contains: "1 copy on storage medium \"local\""
+  - contains: "production/postgres-primary"
+  - contains: "the only confirmed copy of their artifact anywhere"
 state: unchanged
 contract:
-  - "usage text: medium remove <medium-id> - un-declare a destination"
-  - "usage text: medium default <medium-id> - removing down to one destination makes that one the default (#622)"
-  - "spdrman/rclone-manager#622: there is never zero destinations"
+  - "usage text: medium remove <medium-id> - un-declare a destination. Refused while any copy names it"
+  - "spdrman/rclone-manager#670: local is a declared destination, undeletable by the general rules rather than by its name"
 tags: [smoke]
