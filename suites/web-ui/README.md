@@ -22,10 +22,10 @@ scripts/e2e/three-machine-web-ui.sh --suite ../rclone-manager-tests/suites/web-u
 ```
 
 Against the rig as it stands (one backup set, three ingested artifacts, a
-healthy deployment with nothing declared), that is **191 passed, 69
-skipped, 8 expected failures**, green, in about ten minutes. The eight
-expected failures are all `findings/DISC-010.md`, and the run ends by
-printing every skipped case with the reason it declined.
+healthy deployment with nothing declared), that is green in about ten
+minutes, with the eight cases that used to carry `expectedToFailOnDISC010()`
+now asserting for real. The run ends by printing every skipped case with
+the reason it declined.
 
 ## Why it moved
 
@@ -195,16 +195,18 @@ Worth recording, because it is the answer to "was this worth doing".
 The first run against the rig was 173 passed, 24 failed. Every one of the
 24 was a real finding about something, and they sorted into three kinds.
 
-**A product bug nothing could have caught.** Clicking a backup lands an
+**A product bug nothing could have caught.** Clicking a backup landed an
 operator on the Dashboard. An artifact id is three slash-separated
-segments (`e2e/vps/notes.txt`) and `BackupsPage` navigates with
+segments (`e2e/vps/notes.txt`) and `BackupsPage` navigated with
 `"/backups/" + a.id` against a route declared as one segment, so the URL
-matches nothing and App.tsx's catch-all takes it. The detail page, the
-lifecycle timeline and the whole Copies card are unreachable in a browser
-on any real deployment. The mock's ids were `art_01J9C1XY7T09`, one
-segment, so the route matched and five cases asserted their way through a
-page nobody could open. `findings/DISC-010.md`, and App.tsx fixed this
-exact defect on the neighbouring backup-set route in #285.
+matched nothing and App.tsx's catch-all took it. The detail page, the
+lifecycle timeline and the whole Copies card were unreachable in a
+browser on any real deployment. The mock's ids were `art_01J9C1XY7T09`,
+one segment, so the route matched and five cases asserted their way
+through a page nobody could open. Filed and fixed as
+[rclone-manager#677](https://github.com/spdrman/rclone-manager/issues/677);
+App.tsx had already fixed this exact defect on the neighbouring
+backup-set route in #285.
 
 **Two cases that had learned something untrue from the fixture.** The
 storage-critical case asserted that a full disk escalates the headline;
