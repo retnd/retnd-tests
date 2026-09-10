@@ -28,42 +28,7 @@ import type { BackupManager } from "./fixtures";
  * None of them was deleted, and none was loosened into a shape that
  * cannot fail. A case about telling "unreachable" from "gone" is worth
  * nothing if it is rewritten to accept either.
- *
- * # DISC-010: none of this is reachable in a browser today
- *
- * The first run of this suite against a real deployment found that a
- * backup's detail page cannot be opened at all. An artifact id is three
- * slash-separated segments (`e2e/vps/notes.txt`, model.ArtifactID.String)
- * and BackupsPage navigates with `"/backups/" + a.id`, against a route
- * declared as one segment. The URL matches nothing, App.tsx's catch-all
- * takes it, and the operator lands on the Dashboard.
- *
- * The mock could not see it: its ids were `art_01J9C1XY7T09`, one
- * segment, so the route matched perfectly and five cases asserted their
- * way through a page nobody could reach.
- *
- * findings/DISC-010.md has the whole thing, including that App.tsx fixed
- * this exact defect on the neighbouring backup-set route in #285, with a
- * comment four lines above the artifact route explaining why. The cases
- * below carry `expectedToFailOnDISC010()` rather than being skipped or
- * loosened, which is this repository's strict expected-failure shape: red
- * while the defect stands, and red on purpose the moment somebody fixes
- * the route and forgets to remove the marker.
  */
-
-/** Marks a case as one DISC-010 currently prevents from passing.
- *
- *  Deliberately not a `needs()`: a skip says "this deployment is not in
- *  the state the case is about", and that is not what is happening here.
- *  The deployment is in exactly the right state; the product cannot show
- *  it. */
-function expectedToFailOnDISC010() {
-  test.fail(
-    true,
-    "DISC-010: a backup's detail page is unreachable, because an artifact id is three URL " +
-      "segments and /backups/:artifactId is one. See findings/DISC-010.md"
-  );
-}
 
 test.describe("backups table", () => {
   test.beforeEach(async ({ bm }) => {
@@ -175,7 +140,6 @@ test.describe("backups table", () => {
   });
 
   test("row click opens the artifact detail", async ({ page }) => {
-    expectedToFailOnDISC010();
     await page.getByRole("row").nth(1).click();
     await expect(page.getByText("Artifact ID")).toBeVisible();
   });
@@ -208,7 +172,6 @@ test.describe("backup detail", () => {
   });
 
   test("shows every documented artifact field", async ({ page }) => {
-    expectedToFailOnDISC010();
     // "Ingestion path", not "Local path". The old label read as "this is
     // where your backup is", which the field has never meant: it is where
     // ingestion landed, and it stays populated for a transfer still
@@ -238,7 +201,6 @@ test.describe("backup detail", () => {
    *  than about all six being present. Remote deletion after commit is
    *  the rule, and a timeline missing remote deletion has not broken it. */
   test("renders the lifecycle in the only correct order", async ({ page }) => {
-    expectedToFailOnDISC010();
     const timeline = page.getByRole("region", { name: "Lifecycle" }).or(page.locator("ol").last());
     const text = await timeline.innerText();
 
@@ -264,13 +226,11 @@ test.describe("backup detail", () => {
   });
 
   test("timestamps every reached phase", async ({ page }) => {
-    expectedToFailOnDISC010();
     const timeline = page.locator("ol").last();
     await expect(timeline).toContainText(/\d{2}:\d{2}:\d{2}/);
   });
 
   test("frames remote deletion as a consequence, not an action", async ({ page }) => {
-    expectedToFailOnDISC010();
     await expect(
       page.getByText(/lifecycle consequence of a proven NAS copy .* never an independent file operation/)
     ).toBeVisible();
@@ -278,7 +238,6 @@ test.describe("backup detail", () => {
   });
 
   test("returns to the table", async ({ bm, page }) => {
-    expectedToFailOnDISC010();
     await page.getByRole("button", { name: /Backups/ }).first().click();
     await expect(bm.heading("Backups")).toBeVisible();
   });
@@ -303,9 +262,6 @@ test.describe("where a backup's copies are", () => {
     page.getByRole("region", { name: "Copies" });
 
   async function openBackup(bm: BackupManager, page: import("@playwright/test").Page, filename: string) {
-    // Every case in this block reaches its subject through here, so this
-    // is where DISC-010 stops all of them.
-    expectedToFailOnDISC010();
     await bm.goto("/backups");
     await page.getByRole("row").filter({ hasText: filename }).click();
     await expect(copies(page)).toBeVisible();
@@ -528,7 +484,6 @@ test.describe("a deployment that never heard of storage mediums", () => {
 
   test("still says where each backup's one copy is", async ({ bm, page }) => {
     needs(bm.facts.backups.some((b) => (b.placements ?? []).length > 0), "at least one backup with a copy recorded");
-    expectedToFailOnDISC010();
     await bm.goto("/backups");
     await page.getByRole("row").nth(1).click();
 
