@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo-mark.svg" alt="backupd mark: a broken ring standing for a transfer cycle in progress" width="72">
+</p>
+
 # backupd-tests
 
 End-to-end test suites for [`backupd`](https://github.com/backupdproject/backupd),
