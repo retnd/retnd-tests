@@ -15,8 +15,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spdrman/backupd-tests/suites/cli/harness"
-	"github.com/spdrman/backupd-tests/tools/getbuild"
+	"github.com/backupdproject/backupd-tests/suites/cli/harness"
+	"github.com/backupdproject/backupd-tests/tools/getbuild"
 )
 
 var (

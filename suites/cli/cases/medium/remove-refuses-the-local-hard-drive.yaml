@@ -1,7 +1,7 @@
 doc: >
   The drive this deployment's backups land on is refused for the reason
   it actually has: copies are on it
-  (spdrman/backupd#670, FR-30).
+  (backupdproject/backupd#670, FR-30).
 
   This case used to assert that local "was never declared" and so "cannot
   be un-declared". That was true when it was written (#622) and stopped
@@ -43,5 +43,5 @@ stderr:
 state: unchanged
 contract:
   - "usage text: medium remove <medium-id> - un-declare a destination. Refused while any copy names it"
-  - "spdrman/backupd#670: local is a declared destination, undeletable by the general rules rather than by its name"
+  - "backupdproject/backupd#670: local is a declared destination, undeletable by the general rules rather than by its name"
 tags: [smoke]

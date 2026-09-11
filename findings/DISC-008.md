@@ -1,6 +1,6 @@
 # DISC-008: the mock API's candidate test connection has its verdict inverted, so no destination can be saved in the browser
 
-- **Filed as**: [spdrman/backupd#633](https://github.com/spdrman/backupd/issues/633)
+- **Filed as**: [backupdproject/backupd#633](https://github.com/backupdproject/backupd/issues/633)
 - **Pinned by**: `suites/web-ui/e2e/storage-destinations.spec.ts`, "opens a
   destination wizard inside the tier, and tests the candidate from there",
   which drives everything up to the inverted step and stops there
