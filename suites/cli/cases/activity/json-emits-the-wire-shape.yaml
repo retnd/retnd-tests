@@ -1,7 +1,7 @@
 doc: >
   `--json` emits the objects the API contract declares, unchanged, so a
   script parses the contract rather than this binary's column layout
-  (rclone-manager#598). The field names are the claim: they are
+  (backupd#598). The field names are the claim: they are
   `ListActivityResponse`'s own, so a change to the table above is free and
   a change to these is a wire break somebody has to justify.
 

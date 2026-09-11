@@ -1,5 +1,5 @@
 import { destructive, expect, needs, test } from "./fixtures";
-import type { BackupManager } from "./fixtures";
+import type { Backupd } from "./fixtures";
 import type { Locator, Page } from "@playwright/test";
 
 /**
@@ -7,7 +7,7 @@ import type { Locator, Page } from "@playwright/test";
  * land on as an entry of its own, the mark that says where a NEW
  * retention tier starts, and the picker under every tier in both editors.
  *
- * rclone-manager#622 (H2.2), under EPIC H. The issue's complaint was that
+ * backupd#622 (H2.2), under EPIC H. The issue's complaint was that
  * the feature was half-built: a tier could already name a destination and
  * there was no way to pick one, the settings list showed declared S3
  * mediums only so the one destination every deployment has appeared
@@ -89,13 +89,13 @@ const card = (page: Page) => page.getByRole("region", { name: "Storage destinati
  *  cases are about is the difference between a class that can take
  *  delivery and one that cannot, never those two names, and a deployment
  *  is free to call them anything. */
-const contentMedium = (bm: BackupManager) => bm.facts.mediums.find((m) => m.archive !== true)!;
-const archiveMedium = (bm: BackupManager) => bm.facts.mediums.find((m) => m.archive === true)!;
+const contentMedium = (bm: Backupd) => bm.facts.mediums.find((m) => m.archive !== true)!;
+const archiveMedium = (bm: Backupd) => bm.facts.mediums.find((m) => m.archive === true)!;
 
 /** The precondition every block in this file shares. Stated once, and in
  *  terms of what the topology would have to declare rather than in terms
  *  of what the mock happened to. */
-function needsTwoKindsOfDestination(bm: BackupManager) {
+function needsTwoKindsOfDestination(bm: Backupd) {
   needs(
     bm.facts.mediums.some((m) => m.archive !== true) && bm.facts.mediums.some((m) => m.archive === true),
     "a deployment declaring both a content-class storage medium and an archive-class one. Every " +
@@ -281,7 +281,7 @@ test.describe("the storage destinations list", () => {
 
     // The second is refused, by the rule that predates this issue: copies
     // are recorded there, and un-declaring it would leave this deployment
-    // with no way to reach them (FR-30, rclone-manager#594). The refusal
+    // with no way to reach them (FR-30, backupd#594). The refusal
     // stays a refusal, which #622 says explicitly it is not replacing.
     const holdsCopies = contentMedium(bm).id;
     await row(page, holdsCopies).getByRole("button", { name: "Remove" }).click();
@@ -336,15 +336,15 @@ test.describe("the storage destinations list", () => {
     // remove local`, because a row that taught a command the engine
     // refuses would be worse than a row that taught none.
     const local = row(page, "local");
-    await expect(local).toContainText("rbm medium test-connection local");
-    await expect(local).not.toContainText("rbm medium remove local");
+    await expect(local).toContainText("backupd medium test-connection local");
+    await expect(local).not.toContainText("backupd medium remove local");
 
     await expect(row(page, contentMedium(bm).id)).toContainText(
-      "rbm medium default " + contentMedium(bm).id
+      "backupd medium default " + contentMedium(bm).id
     );
     // And the destination that already carries the mark does not print a
     // line that would change nothing.
-    await expect(local).not.toContainText("rbm medium default local");
+    await expect(local).not.toContainText("backupd medium default local");
   });
 });
 
@@ -471,11 +471,11 @@ test.describe("picking a destination under a retention tier", () => {
 
     await picker(page, 1).selectOption(away);
     await expect(tier(page, 1)).toContainText(
-      "rbm settings patch --tier-medium " + tierName + "=" + away + " --acknowledge-medium-disclosure"
+      "backupd settings patch --tier-medium " + tierName + "=" + away + " --acknowledge-medium-disclosure"
     );
 
     await picker(page, 1).selectOption("local");
-    await expect(tier(page, 1)).toContainText("rbm settings patch --tier-medium " + tierName + "=local");
+    await expect(tier(page, 1)).toContainText("backupd settings patch --tier-medium " + tierName + "=local");
     await expect(tier(page, 1)).not.toContainText(
       "--tier-medium " + tierName + "=local --acknowledge-medium-disclosure"
     );
@@ -532,7 +532,7 @@ test.describe("picking a destination under a retention tier", () => {
       await expect(wizard.getByText(step, { exact: true })).toBeVisible();
     }
     await expect(wizard).toContainText(
-      "rbm medium test-connection --candidate nearline_eu"
+      "backupd medium test-connection --candidate nearline_eu"
     );
     await expect(wizard.getByRole("button", { name: "Test connection again" })).toBeVisible();
     await expect(wizard.getByRole("button", { name: "Verify" })).toHaveCount(0);

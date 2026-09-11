@@ -1,8 +1,8 @@
 {
-  "name": "@rclone-manager-tests/web-ui",
+  "name": "@backupd-tests/web-ui",
   "private": true,
   "type": "module",
-  "description": "Suite B: the Web UI Playwright suite, driven against a real rclone-manager deployment.",
+  "description": "Suite B: the Web UI Playwright suite, driven against a real backupd deployment.",
   "scripts": {
     "e2e": "playwright test --project=generic --project=small-window --project=provider",
     "e2e:list": "RM_BASE_URL=http://a-deployment.invalid RM_ADMIN_USERNAME=list RM_ADMIN_PASSWORD=list-only-no-deployment playwright test --list --project=generic --project=small-window --project=provider",

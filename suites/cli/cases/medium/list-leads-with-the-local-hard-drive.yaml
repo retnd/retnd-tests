@@ -1,7 +1,7 @@
 doc: >
   `medium list` names every destination this deployment has, and the first
   of them is the drive its backups land on
-  (spdrman/rclone-manager#622).
+  (spdrman/backupd#622).
 
   The issue's complaint was that this list showed declared S3 mediums
   only, so the one destination every deployment has appeared nowhere and
@@ -40,5 +40,5 @@ state: unchanged
 contract:
   - "usage text: medium list - list every storage destination this deployment declares, in declaration order. No credential is reported, not even which of the three sources a destination reads (#594)"
   - "usage text: medium test-connection - It also answers for \"local\", the drive this deployment's backups land on"
-  - "spdrman/rclone-manager#622: settings always lists a local hard drive entry naming the drive it writes to"
+  - "spdrman/backupd#622: settings always lists a local hard drive entry naming the drive it writes to"
 tags: [smoke]

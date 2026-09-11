@@ -1,6 +1,6 @@
 doc: >
   `medium preflight` goes on working, and answers exactly what `medium
-  test-connection` answers (spdrman/rclone-manager#622).
+  test-connection` answers (spdrman/backupd#622).
 
   The rename is the point of the issue's naming half: the same idea was
   called "Verify" in the web UI, `preflight` here and "Test connection" on
@@ -33,5 +33,5 @@ stderr: empty
 state: unchanged
 contract:
   - "usage text: medium test-connection - One check, two verbs, one implementation: preflight is kept as an alias so anything scripted against it goes on working"
-  - "spdrman/rclone-manager#622: test connection is called \"Test connection\" wherever it appears, with `preflight` kept as a CLI alias"
+  - "spdrman/backupd#622: test connection is called \"Test connection\" wherever it appears, with `preflight` kept as a CLI alias"
 tags: [smoke]

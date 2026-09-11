@@ -5,7 +5,7 @@ no_arguments: true
 exit: 2
 stdout: empty
 stderr:
-  - line: "usage: rbm <command> [flags]"
+  - line: "usage: backupd <command> [flags]"
 state: unchanged
 contract:
   - "usage text: the binary's own usage banner"

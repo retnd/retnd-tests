@@ -9,7 +9,7 @@ argv: [retention, --config, "${CONFIG}", --timezone, "Nowhere/Nothing"]
 exit: 1
 stdout: empty
 stderr:
-  - contains: "rbm: "
+  - contains: "backupd: "
   - contains: "retention.timezone"
   - contains: "Nowhere/Nothing"
 state: unchanged

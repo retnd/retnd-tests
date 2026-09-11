@@ -1,4 +1,4 @@
-module github.com/spdrman/rclone-manager-tests
+module github.com/spdrman/backupd-tests
 
 go 1.27.0
 

@@ -16,7 +16,7 @@ argv:
 exit: 2
 stdout: empty
 stderr:
-  - line: "rbm: artifacts takes at most one argument: <source/backup-set/name>"
+  - line: "backupd: artifacts takes at most one argument: <source/backup-set/name>"
 state: unchanged
 contract:
   - "usage text: artifacts <source/backup-set/name> - print full detail for one artifact"

@@ -15,8 +15,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spdrman/rclone-manager-tests/suites/cli/harness"
-	"github.com/spdrman/rclone-manager-tests/tools/getbuild"
+	"github.com/spdrman/backupd-tests/suites/cli/harness"
+	"github.com/spdrman/backupd-tests/tools/getbuild"
 )
 
 var (

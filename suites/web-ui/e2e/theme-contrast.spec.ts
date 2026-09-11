@@ -9,7 +9,7 @@ import {
 import { expect, needs, test } from "./fixtures";
 
 /**
- * rclone-manager#618: dark mode drew black text on native controls, worst
+ * backupd#618: dark mode drew black text on native controls, worst
  * in the SSH auth wizard.
  *
  * # Why this needs a browser at all
@@ -82,7 +82,7 @@ const PAGES = ["/", "/sets", "/backups", "/activity", "/quarantine", "/settings"
 /** Opens the wizard the issue is named for, on the first backup set, and
  *  leaves a key selected so its primary button is live rather than
  *  disabled. */
-async function openSSHWizard(bm: import("./fixtures").BackupManager) {
+async function openSSHWizard(bm: import("./fixtures").Backupd) {
   const page = bm.page;
   await page.getByRole("article").first().getByRole("button", { name: "Open" }).click();
   await page.getByRole("button", { name: "Change SSH authentication" }).click();
@@ -98,7 +98,7 @@ async function openSSHWizard(bm: import("./fixtures").BackupManager) {
 /** The reading for the wizard's primary button, with the wizard opened
  *  from scratch. Its own function because two cases need it and one of
  *  them needs it twice, once per theme. */
-async function primaryButtonReading(bm: import("./fixtures").BackupManager) {
+async function primaryButtonReading(bm: import("./fixtures").Backupd) {
   await bm.goto("/sets");
   await openSSHWizard(bm);
   const readings = await contrastReadings(bm.page, "[role='dialog']");

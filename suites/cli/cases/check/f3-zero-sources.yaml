@@ -8,7 +8,7 @@ argv: [check, --config, "${CONFIG}"]
 exit: 1
 stdout: empty
 stderr:
-  - contains: "rbm: "
+  - contains: "backupd: "
   - contains: "sources"
 state: unchanged
 contract:

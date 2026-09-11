@@ -1,5 +1,5 @@
 {
-  "name": "@rclone-manager-tests/equivalence",
+  "name": "@backupd-tests/equivalence",
   "private": true,
   "type": "module",
   "description": "Suite C: every backend-affecting Web UI action proved equal to its CLI equivalent by comparing resulting backend state.",

@@ -7,7 +7,7 @@ argv: [fetch, --config, "${CONFIG}"]
 exit: 2
 stdout: empty
 stderr:
-  - line: "rbm: fetch requires --source and --backup-set"
+  - line: "backupd: fetch requires --source and --backup-set"
 state: unchanged
 contract:
   - "usage text: fetch --source S --backup-set B [--dry-run]"

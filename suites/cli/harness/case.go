@@ -1,4 +1,4 @@
-// Package harness runs one rbm invocation against one fixture
+// Package harness runs one backupd invocation against one fixture
 // and decides whether the result matched a checked-in expectation.
 //
 // # Why there is no golden mode
@@ -17,7 +17,7 @@
 // specific lines, each of which someone had to derive from a document,
 // and every case names its source in its own `contract:` list. When
 // derivation and observation disagree, that is a finding to file against
-// rclone-manager (see findings/), recorded as a known_discrepancy which
+// backupd (see findings/), recorded as a known_discrepancy which
 // this runner treats as a strict expected-failure: the case stays red
 // while the issue is open, and goes red again the moment it starts
 // passing, so a fix forces the marker's removal.
@@ -69,8 +69,8 @@ type Case struct {
 	Argv []string `yaml:"argv"`
 	// InvokeAs runs the argv under test through a second filename for the
 	// same binary, rather than through the name the pin resolved. It is
-	// how the old command name gets asserted from outside: `rbm` was
-	// `backup-manager` until 0.3.3 and the old spelling still has to
+	// how the old command name gets asserted from outside: `backupd` was
+	// `backupd` until 0.3.3 and the old spelling still has to
 	// work, and a promise like that is exactly the kind that rots
 	// silently because nothing an operator runs ever proves it.
 	//
@@ -109,7 +109,7 @@ type Case struct {
 	Contract []string `yaml:"contract"`
 
 	// Tags select subsets. "smoke" is the slice cheap enough to run on
-	// every rclone-manager commit; "docker" marks cases needing a
+	// every backupd commit; "docker" marks cases needing a
 	// container.
 	Tags []string `yaml:"tags"`
 

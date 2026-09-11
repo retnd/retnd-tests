@@ -1,4 +1,4 @@
-// Command getbuild resolves the pinned rclone-manager build, runs the
+// Command getbuild resolves the pinned backupd build, runs the
 // identity handshake against it, and prints where the binaries landed.
 //
 // It is the one-command answer to "which build would the suites test
@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spdrman/rclone-manager-tests/tools/getbuild"
+	"github.com/spdrman/backupd-tests/tools/getbuild"
 )
 
 func main() {

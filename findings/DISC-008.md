@@ -1,10 +1,10 @@
 # DISC-008: the mock API's candidate test connection has its verdict inverted, so no destination can be saved in the browser
 
-- **Filed as**: [spdrman/rclone-manager#633](https://github.com/spdrman/rclone-manager/issues/633)
+- **Filed as**: [spdrman/backupd#633](https://github.com/spdrman/backupd/issues/633)
 - **Pinned by**: `suites/web-ui/e2e/storage-destinations.spec.ts`, "opens a
   destination wizard inside the tier, and tests the candidate from there",
   which drives everything up to the inverted step and stops there
-- **Build**: observed on `rclone-manager` at
+- **Build**: observed on `backupd` at
   `87a9dc72dab2eb3161072b738bd29b0ccfb3b811`, which is the pin, and
   unchanged on `fix/622-storage-destinations`. It predates both.
 - **Kind**: a fixture defect that inverts a safety answer, found by driving
@@ -21,7 +21,7 @@
 
 An archive class is `GLACIER` or `DEEP_ARCHIVE`. `STANDARD` and
 `STANDARD_IA` read on demand and can take delivery, which is what
-`config.Validate` enforces one layer down: rclone-manager#442 refuses a
+`config.Validate` enforces one layer down: backupd#442 refuses a
 retention tier bound to an archive class outright, because the move can
 never reach VERIFIED.
 
@@ -92,5 +92,5 @@ Driving Save by declaring `DEEP_ARCHIVE` would work today and is exactly
 what must not be written: it would be a case that only passes while the
 bug is there, and it would go red on the fix. So the "a destination
 created under a tier is selected by that tier" half of
-rclone-manager#622 has no browser coverage until this is closed, and
+backupd#622 has no browser coverage until this is closed, and
 saying so here is the whole point of this file.

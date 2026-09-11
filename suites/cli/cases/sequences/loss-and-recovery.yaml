@@ -23,5 +23,5 @@ state: ignored
 contract:
   - "docs/EPIC-B-multi-nas.md 19.3 (catalog reconstruction from sidecar recovery manifests)"
   - "docs/recovery.md (state-loss recovery)"
-  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (backupd#536, #544)'
 tags: [smoke]
