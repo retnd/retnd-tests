@@ -19,7 +19,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/spdrman/rclone-manager-tests/tools/equivstate"
+	"github.com/spdrman/backupd-tests/tools/equivstate"
 )
 
 type list []string
@@ -29,7 +29,7 @@ func (l *list) Set(v string) error { *l = append(*l, v); return nil }
 
 func main() {
 	fs := flag.NewFlagSet("compare", flag.ContinueOnError)
-	cli := fs.String("cli", "", "the rbm binary both sides are read with")
+	cli := fs.String("cli", "", "the backupd binary both sides are read with")
 	a := fs.String("a", "", "the work directory driven through the Web UI")
 	b := fs.String("b", "", "the work directory driven through the CLI")
 	mask := fs.Bool("mask-volatile", false, "mask timestamps, durations, relative times and the host free-space reading, in the read surface and in text file content")

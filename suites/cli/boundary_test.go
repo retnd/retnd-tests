@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spdrman/rclone-manager-tests/suites/cli/harness"
+	"github.com/spdrman/backupd-tests/suites/cli/harness"
 )
 
 // TestRetentionOverrideItemisationSurvivesTheUTCMidnightBoundary is the
@@ -25,7 +25,7 @@ import (
 // midnight while the retention command's own "today" has already ticked
 // over, which pushes pg-06's producer placement out of a tier window
 // narrowed to exactly "today" (--daily-days 1 here) and flips that tier's
-// attribution to discovery-only. See rclone-manager#270.
+// attribution to discovery-only. See backupd#270.
 //
 // This test forces that exact crossing on every run, on every day of the
 // year, without needing to run at an actual midnight: it builds its own

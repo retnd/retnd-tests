@@ -85,7 +85,7 @@ test.describe("quarantine", () => {
     ).toBeVisible();
   });
 
-  /** Four since rclone-manager #229, which shipped the button for the
+  /** Four since backupd #229, which shipped the button for the
    *  reinstatement path #220 had already built end to end. Named rather than
    *  counted: a bare count says nothing about WHICH actions a row offers, so
    *  swapping one for another used to pass it. */
@@ -104,7 +104,7 @@ test.describe("quarantine", () => {
   });
 
   /** Reinstating is the only one of the four that cannot be undone: it
-   *  permanently forfeits the backup's remote deletion (rclone-manager ADR
+   *  permanently forfeits the backup's remote deletion (backupd ADR
    *  0004, FR-15), so the remote source is preserved for good. It must
    *  therefore not read as a fourth Retry ingestion, and this pins the
    *  difference rather than trusting the label to carry it. */
@@ -298,7 +298,7 @@ test.describe("activity", () => {
     }
   });
 
-  test("offers the two real filters, and no longer the decorative Time range select (rclone-manager#299)", async ({ page }) => {
+  test("offers the two real filters, and no longer the decorative Time range select (backupd#299)", async ({ page }) => {
     await expect(page.getByLabel("Backup set")).toBeVisible();
     await expect(page.getByLabel("Severity")).toBeVisible();
     // Time range used to sit here, `defaultValue="24"` with no `onChange`

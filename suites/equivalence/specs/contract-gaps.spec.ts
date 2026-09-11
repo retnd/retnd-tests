@@ -25,7 +25,7 @@ import { expect, signIn, test } from "../harness/fixtures";
 // Most of what this file was filed for is now closed. DISC-007 recorded
 // fourteen pairs the client called that neither the contract nor the
 // router had, which left the Dashboard, Backups, Activity and Quarantine
-// pages unable to load against a real backend. rclone-manager#214
+// pages unable to load against a real backend. backupd#214
 // (aba87b7) added them, and this repository saw it when the pin moved
 // from 612b48c to 6a93b96. Two pairs remain absent, and they are the
 // ones where the client is simply calling the wrong path: GET /version
@@ -58,7 +58,7 @@ const UI_CALLS: {
   { path: "/validators", method: "GET", served: true, status: 200, note: "wizard picklist" },
   { path: "/auth/session", method: "GET", served: true, status: 200, note: "session probe" },
 
-  // Closed by rclone-manager#214 (aba87b7), which landed inside this
+  // Closed by backupd#214 (aba87b7), which landed inside this
   // repository's 612b48c -> 6a93b96 pin move: every one of these is now
   // registered in apps/common/webhost/router.go AND declared in
   // api/v1/openapi.json. MATRIX.md's rows moved with them.
@@ -104,12 +104,12 @@ const CLI_VERBS: { verb: string; present: boolean; note: string }[] = [
   {
     verb: "backup-set patch",
     present: true,
-    note: "landed in rclone-manager#350; the edit row moved from gap to unproved with it"
+    note: "landed in backupd#350; the edit row moved from gap to unproved with it"
   },
   {
     verb: "backup-set retention",
     present: true,
-    note: "landed in rclone-manager#333; the per-set retention row was added for it"
+    note: "landed in backupd#333; the per-set retention row was added for it"
   },
   { verb: "settings patch", present: true, note: "the settings row's CLI half" },
   { verb: "quarantine", present: true, note: "the revalidate half of the quarantine row" },
@@ -117,7 +117,7 @@ const CLI_VERBS: { verb: string; present: boolean; note: string }[] = [
   {
     verb: "backup-set remove",
     present: true,
-    note: "the remove row's CLI half, landed by rclone-manager#391. This entry used to read `backup-set delete` and `present: false`, which is the mistake the exhaustiveness case below exists to stop repeating"
+    note: "the remove row's CLI half, landed by backupd#391. This entry used to read `backup-set delete` and `present: false`, which is the mistake the exhaustiveness case below exists to stop repeating"
   },
   {
     verb: "backup-set enable",
@@ -244,7 +244,7 @@ test.describe("the matrix's gap rows", () => {
     expect(declared.has("GET /system/version")).toBe(true);
     // And the pair really is the unit rather than the path. /operations
     // used to make this point, declared for POST while the UI client
-    // called GET on it, but rclone-manager#214 declared the GET too and
+    // called GET on it, but backupd#214 declared the GET too and
     // the example stopped being asymmetric. /backup-sets/test-connection
     // still is: POST is declared, GET is not, so a path-only comparison
     // would report agreement about a method nobody serves.
@@ -265,7 +265,7 @@ test.describe("the matrix's gap rows", () => {
     // would let every assertion below pass by finding nothing.
     expect(
       usage.length,
-      "rbm printed no usage at all, so this case compared nothing"
+      "backupd printed no usage at all, so this case compared nothing"
     ).toBeGreaterThan(200);
     expect(
       usage,
@@ -323,7 +323,7 @@ test.describe("the matrix's gap rows", () => {
         unpinned.join(", "),
         `${family} offers ${unpinned.map((s) => `"${family} ${s}"`).join(", ")} and this matrix has no entry for it. ` +
           `A verb can ship under a name nobody pinned, which is how the remove row stayed a gap after ` +
-          `rclone-manager#391 closed it. Add an entry and check the MATRIX.md row that verb belongs to`
+          `backupd#391 closed it. Add an entry and check the MATRIX.md row that verb belongs to`
       ).toEqual("");
     }
   });

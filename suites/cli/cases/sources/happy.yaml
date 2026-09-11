@@ -19,5 +19,5 @@ contract:
   - "usage text: sources - list configured sources and backup sets"
   - "docs/EPIC.md FR-7 (backup-set isolation: identity is source plus set)"
   - "docs/EPIC.md FR-5 (remote, remote_path, local_path, stale_after per backup set)"
-  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (backupd#536, #544)'
 tags: [smoke]

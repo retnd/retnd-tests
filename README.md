@@ -1,13 +1,13 @@
-# rclone-manager-tests
+# backupd-tests
 
-End-to-end test suites for [`rclone-manager`](https://github.com/spdrman/rclone-manager),
+End-to-end test suites for [`backupd`](https://github.com/spdrman/backupd),
 run from outside it, against a build it has already released.
 
 Three suites live here:
 
 | Suite | What it is | Status |
 |---|---|---|
-| **A. CLI contract** | `rbm` driven black-box: argv in, exit code plus stdout plus stderr plus resulting on-disk state out | built, `make suite-a` |
+| **A. CLI contract** | `backupd` driven black-box: argv in, exit code plus stdout plus stderr plus resulting on-disk state out | built, `make suite-a` |
 | **B. Web UI** | the Playwright suite, driving a real deployment: browser to `serve-ui` to the proxy to `serve` to SQLite | built, `make suite-b` against a running rig, see [`suites/web-ui/README.md`](suites/web-ui/README.md) |
 | **C. UI to CLI equivalence** | every backend-affecting UI action proved equal to its CLI equivalent by comparing resulting backend state | built, `make suite-c`, with the matrix in [`suites/equivalence/MATRIX.md`](suites/equivalence/MATRIX.md) |
 
@@ -17,14 +17,14 @@ backend seeded with the same artifacts, states and config that the
 equivalent CLI test needs, and maintaining that twice would guarantee the
 two drift.
 
-## Why these live outside `rclone-manager`
+## Why these live outside `backupd`
 
 Because a test that can call the product's exported Go functions is not
 testing what an operator has. From out here, a suite has exactly what a
 real deployment has: a binary, a YAML config file, a state directory,
 exit codes, printed output, and a browser. That is what catches a
 contract break, and it is why **nothing in this repository may import
-`github.com/spdrman/rclone-manager/core/...`**. The moment it does, it
+`github.com/spdrman/backupd/core/...`**. The moment it does, it
 stops being an outside consumer and starts checking the product against
 itself.
 
@@ -40,7 +40,7 @@ make gate            # everything that has to be green before a commit here
 ```
 
 Suite A needs Go and nothing else. No browser, no Docker, no network
-beyond the one clone of `rclone-manager` that the pin resolves, which is
+beyond the one clone of `backupd` that the pin resolves, which is
 cached per commit. Most fixtures use `remote.type: local` (FR-4), so a
 checked-in directory tree is a valid remote and there is no SSH endpoint
 to stand up.
@@ -51,16 +51,16 @@ to stand up.
 what a run certifies. See [`docs/pinning.md`](docs/pinning.md) for the
 three modes and how to point the suites at a newer build in one command.
 
-The command is `rbm` from 0.3.3
-([rclone-manager#648](https://github.com/spdrman/rclone-manager/issues/648)),
-and was `backup-manager` before it. The old name still runs, because the
+The command is `backupd` from 0.3.3
+([backupd#648](https://github.com/spdrman/backupd/issues/648)),
+and was `backupd` before it. The old name still runs, because the
 image links it beside the new one, so this repository has to be able to
-tell the two apart: what the binary *prints* is asserted as `rbm` in
+tell the two apart: what the binary *prints* is asserted as `backupd` in
 every case, what an operator *types* is asserted under both names in
 `global/g6-…` and `global/g7-…`, and the three things merely named after
-the old command (the config directory `/etc/backup-manager`, the image
-`ghcr.io/spdrman/backup-manager`, the Go package path
-`core/cmd/backup-manager`) did not move and are still spelled that way
+the old command (the config directory `/etc/backupd`, the image
+`ghcr.io/spdrman/backupd`, the Go package path
+`core/cmd/backupd`) did not move and are still spelled that way
 throughout.
 
 Every run, in every mode, starts by asking the binary `version` and
@@ -100,7 +100,7 @@ holds.
 
 When derivation and observation disagree, the expectation does not move.
 The disagreement is written up in [`findings/`](findings/README.md),
-filed against `rclone-manager`, and the case is marked
+filed against `backupd`, and the case is marked
 `known_discrepancy`, which the runner treats as a strict expected
 failure: red while the issue is open, and red again the moment it starts
 passing, so a fix forces the marker's removal. Three entries are open
@@ -108,9 +108,9 @@ today, and no contract question is. (This line said two while the table
 in `findings/` had one row in it, which is what a hand-maintained count
 does; it is derived from that table now, and DISC-008 and DISC-009 are
 the two that made the drift visible.) Five have been retired: four when
-[#209](https://github.com/spdrman/rclone-manager/pull/209) answered them,
+[#209](https://github.com/spdrman/backupd/pull/209) answered them,
 and DISC-006's FR-18 bucket-key question when
-[#215](https://github.com/spdrman/rclone-manager/pull/215) wrote the
+[#215](https://github.com/spdrman/backupd/pull/215) wrote the
 missing rule into the requirement. Each time the pin moved onto the
 answer in the same change, which is the mechanism working rather than an
 exception to it: the cases stayed and now assert the contract with no
@@ -119,7 +119,7 @@ marker to relax them.
 ## Layout
 
 ```
-build-under-test.json      the pin: which rclone-manager build a run certifies
+build-under-test.json      the pin: which backupd build a run certifies
 fixtures/
   scenarios/<name>/        declarative scenario definitions
   lib/                     materialisation, seeding by replay
@@ -144,7 +144,7 @@ git config core.hooksPath .husky
 That wires `.husky/pre-commit` to `scripts/gate-local.sh`, which is the
 gate: `gofmt`, `go vet`, the fixture and state-differ unit tests, the
 harness self-tests, Suite A in full, `tsc --noEmit` over both TypeScript
-suites, and Suite B's own unit tests. It mirrors how `rclone-manager`
+suites, and Suite B's own unit tests. It mirrors how `backupd`
 gates itself, and for the same reason: the merge signal in this estate is
 local, so a red gate has to refuse the commit rather than annotate it
 afterwards.
@@ -158,7 +158,7 @@ Playwright transpiles types away without checking them, so before the
 type check went in, nothing in this repository ever read the types in
 Suites B and C at all. What the check does not turn on is
 `noUnusedLocals`/`noUnusedParameters`, and the reason has changed: while
-`suites/web-ui/e2e/` was byte-identical to `rclone-manager`'s
+`suites/web-ui/e2e/` was byte-identical to `backupd`'s
 `ui/shared/e2e/` the one unused binding in there belonged upstream, but
 #217 deleted that directory, so it is this repository's to fix and these
 options are this repository's to turn on, in a change of its own. Real
@@ -167,7 +167,7 @@ ESLint is absent for the same reason, spelled out in
 
 ## The CI signal
 
-Moving the Playwright suite out of `rclone-manager` would take away the
+Moving the Playwright suite out of `backupd` would take away the
 e2e feedback that repository's pull requests currently rely on, so the
 replacement has to land in the same change. The design is in
 [`docs/ci-signal.md`](docs/ci-signal.md), including the part that has not

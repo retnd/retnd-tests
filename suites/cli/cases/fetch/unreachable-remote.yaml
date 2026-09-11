@@ -9,7 +9,7 @@ exit: 1
 stdout:
   - ndjson: {event: startup}
 stderr:
-  - contains: "rbm: "
+  - contains: "backupd: "
 state:
   mode: changed
 contract:

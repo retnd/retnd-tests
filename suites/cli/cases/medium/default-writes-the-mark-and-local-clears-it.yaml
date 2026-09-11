@@ -1,6 +1,6 @@
 doc: >
   The on-disk half of `medium default`, in both directions
-  (spdrman/rclone-manager#622).
+  (spdrman/backupd#622).
 
   Moving the mark out to a bucket writes one top-level key. Moving it back
   to the drive REMOVES that key rather than writing `local` into it, and

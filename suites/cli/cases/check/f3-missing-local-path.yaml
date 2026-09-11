@@ -7,7 +7,7 @@ argv: [check, --config, "${CONFIG}"]
 exit: 1
 stdout: empty
 stderr:
-  - contains: "rbm: "
+  - contains: "backupd: "
   - contains: "local_path"
 state: unchanged
 contract:

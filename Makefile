@@ -1,6 +1,6 @@
 # Entry points for the three suites. Every target that runs Go tests
 # passes -count=1: the binary under test, the fixtures' replay output and
-# the rclone-manager checkout all live outside this module, and Go's test
+# the backupd checkout all live outside this module, and Go's test
 # cache cannot see any of them change.
 
 GO ?= go
@@ -11,7 +11,7 @@ help:
 	@echo "                 scripts/gate-local.sh is the one the pre-commit hook runs,"
 	@echo "                 and it adds the two type checks and Suite B's unit tests"
 	@echo "make suite-a     the CLI contract suite (no browser, no Docker)"
-	@echo "make smoke       the fast slice of Suite A, for rclone-manager's own per-commit gate"
+	@echo "make smoke       the fast slice of Suite A, for backupd's own per-commit gate"
 	@echo "make selftest    prove the harness can fail, per assertion dimension"
 	@echo "make tools       unit tests for the fixture layer and the state differ"
 	@echo "make typecheck   tsc --noEmit over the TypeScript in Suites B and C"
@@ -58,11 +58,11 @@ gate: vet tools selftest suite-a
 	@echo "gate: green"
 
 # Suite B drives a deployment it does not create. RM_BASE_URL names it, and
-# there is no default: the containers come up first (rclone-manager's own
+# there is no default: the containers come up first (backupd's own
 # scripts/e2e/), and the run refuses to start rather than falling back to
 # localhost and reporting green against nothing.
 #
-#   RM_BASE_URL=http://rclone-manager:8080 \
+#   RM_BASE_URL=http://backupd:8080 \
 #   RM_ADMIN_USERNAME=... RM_ADMIN_PASSWORD=... make suite-b
 #
 # suites/web-ui/README.md has the whole variable list, required and optional.

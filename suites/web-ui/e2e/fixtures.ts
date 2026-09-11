@@ -49,7 +49,7 @@ import { type SessionCookies, sessionIsLive, signIn } from "../harness/session";
  * it into a stated skip rather than a silent pass.
  */
 
-/** The same two elements as `BackupManager.terminal()` and the content
+/** The same two elements as `Backupd.terminal()` and the content
  *  column, as selectors, for the geometry a locator cannot express: a
  *  measurement that compares two boxes has to read both inside ONE page
  *  evaluation, or it is comparing a layout to itself one paint later. */
@@ -82,7 +82,7 @@ class SessionStore {
 
 /** Page-object surface. Keeps the specs readable and stops selector drift
  *  from spreading across the suite. */
-export class BackupManager {
+export class Backupd {
   constructor(
     readonly page: Page,
     private readonly session: SessionStore,
@@ -126,7 +126,7 @@ export class BackupManager {
     return this.page.getByRole("region", { name: label });
   }
 
-  /** The global terminal (rclone-manager#599). A <section> with an
+  /** The global terminal (backupd#599). A <section> with an
    *  accessible name, so it answers to the region role like every other
    *  card here, and #617 pinned it to the bottom of the browser window. */
   terminal() {
@@ -180,7 +180,7 @@ export class BackupManager {
 }
 
 export const test = base.extend<
-  { signedIn: boolean; bm: BackupManager },
+  { signedIn: boolean; bm: Backupd },
   { deployment: Deployment; sessionStore: SessionStore; facts: DeploymentFacts }
 >({
   /** Whether this test's browser carries a session.
@@ -263,7 +263,7 @@ export const test = base.extend<
           await context.addCookies([...(await sessionStore.cookiesForContext())]);
         }
       }
-      await use(new BackupManager(page, sessionStore, context.request, facts));
+      await use(new Backupd(page, sessionStore, context.request, facts));
     },
     { auto: true }
   ]

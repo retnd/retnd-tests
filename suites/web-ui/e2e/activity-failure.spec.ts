@@ -1,8 +1,8 @@
 import { expect, needs, test } from "./fixtures";
 
 /**
- * rclone-manager#598: the Activity page failing on a real 0.3.2 NAS with
- * "Backup Manager could not complete that request." and, under Advanced
+ * backupd#598: the Activity page failing on a real 0.3.2 NAS with
+ * "Backupd could not complete that request." and, under Advanced
  * details, the literal string "correlation id unavailable".
  *
  * # This file is the reason the suite moved, and it is the file that
@@ -55,7 +55,7 @@ const NOT_AN_ID = "correlation id unavailable";
  *
  *  A 200 with `application/json` and a body that is not JSON. The client
  *  (ui/shared/src/api/client.ts) calls `response.json()` on it and gets a
- *  plain `SyntaxError`, not a `BackupManagerError`, which is the whole
+ *  plain `SyntaxError`, not a `BackupdError`, which is the whole
  *  root cause: nothing typed it, so every surface running that call said
  *  one fixed sentence and quoted a correlation id that appears in no log.
  *

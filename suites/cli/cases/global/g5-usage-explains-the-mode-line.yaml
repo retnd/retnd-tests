@@ -39,6 +39,6 @@ stderr:
 state: unchanged
 contract:
   - "usage text: the binary's own usage banner, the paragraph on what status, sources, artifacts and retention announce"
-  - "rclone-manager#544 (a read says which world its answer came from, and refuses when a serving engine disagrees)"
-  - "rclone-manager#536 (one engine per deployment, announced by the process that is serving it)"
+  - "backupd#544 (a read says which world its answer came from, and refuses when a serving engine disagrees)"
+  - "backupd#536 (one engine per deployment, announced by the process that is serving it)"
 tags: [smoke]

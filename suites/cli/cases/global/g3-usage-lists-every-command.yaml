@@ -7,7 +7,7 @@ doc: >
   An entry whose description runs past one line ends in ${ANY} rather than
   pinning where it wraps. `daemon` gained a second sentence about being
   refused while another process serves the same state database
-  (rclone-manager#536, #538), and the column its first line breaks at is a
+  (backupd#536, #538), and the column its first line breaks at is a
   rendering detail of the same kind ${SP} exists for. What this case
   claims is that the command is listed and described, not how wide the
   terminal was when somebody captured it.

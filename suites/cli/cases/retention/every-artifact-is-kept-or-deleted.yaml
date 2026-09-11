@@ -17,7 +17,7 @@ doc: >
   calendar buckets and never said which timestamp put an artifact in one,
   the backup's own date or the moment this manager received it, and the
   two readings gave different answers for this fixture. That question was
-  filed as spdrman/rclone-manager#192 and settled by #215: FR-18 now
+  filed as spdrman/backupd#192 and settled by #215: FR-18 now
   places every artifact twice and unions the results, and this fixture's
   six artifacts no longer collapse into one bucket.
 
@@ -52,5 +52,5 @@ contract:
   - "docs/EPIC.md FR-18 (KEEP is the union of tier selections plus the protected term; DELETE is everything managed and complete that the union did not claim)"
   - "docs/EPIC.md FR-19 (the newest known-good restore point SHALL NOT be deleted solely for age, and the reason carries the resolved date and its provenance)"
   - "usage text: retention [--dry-run] ... preview GFS/last-known-good retention decisions"
-  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (backupd#536, #544)'
 tags: [smoke]

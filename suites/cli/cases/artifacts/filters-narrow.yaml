@@ -17,5 +17,5 @@ stderr:
 state: unchanged
 contract:
   - "usage text: artifacts [--source S] [--backup-set B] - list journal artifacts"
-  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (backupd#536, #544)'
 tags: [smoke]

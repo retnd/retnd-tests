@@ -6,7 +6,7 @@ argv: [catalog]
 exit: 2
 stdout: empty
 stderr:
-  - line: 'rbm: catalog: missing subcommand (expected "rebuild")'
+  - line: 'backupd: catalog: missing subcommand (expected "rebuild")'
 state: unchanged
 contract:
   - "usage text: catalog rebuild [--dry-run]"

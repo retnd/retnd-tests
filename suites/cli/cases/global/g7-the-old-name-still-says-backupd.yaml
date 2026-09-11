@@ -2,7 +2,7 @@ doc: >
   The same binary reached under the old name, on the path where it has
   most to say about itself: an unrecognised command, which prints the
   diagnostic prefix and then the whole usage banner. Both name the
-  command, and both have to name `rbm` even though `backup-manager` is
+  command, and both have to name `backupd` even though `backupd` is
   what was typed.
 
   This is the case that would go red on the reasonable-looking change
@@ -12,13 +12,13 @@ doc: >
   `global/g2-unknown-command` beside this one would stay green throughout,
   because it drives the binary under the name the pin resolved.
 scenario: no-fixture
-invoke_as: backup-manager
+invoke_as: backupd
 argv: [frobnicate]
 exit: 2
 stdout: empty
 stderr:
-  - line: 'rbm: unknown command "frobnicate"'
-  - line: "usage: rbm <command> [flags]"
+  - line: 'backupd: unknown command "frobnicate"'
+  - line: "usage: backupd <command> [flags]"
 state: unchanged
 contract:
   - "core/cliecho/cliname.go: what this binary calls itself is a fact about the build, not about how somebody reached it; taking the printed name from argv[0] would make two spellings print differently in two shells on the same host"

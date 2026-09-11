@@ -14,7 +14,7 @@ export interface Pair {
    *
    *  "Nothing serves it" used to be a description of the setup and is now
    *  a claim worth defending, because the CLI can put its questions to a
-   *  running engine (rclone-manager#543, #544) and would give a different
+   *  running engine (backupd#543, #544) and would give a different
    *  answer if one were serving this directory. Two things keep it in the
    *  no-engine case, and both are structural rather than lucky.
    *
@@ -52,7 +52,7 @@ export async function signIn(page: Page, stack: Stack): Promise<void> {
   await page.goto(stack.uiUrl + "/");
   await page.getByLabel("Username").fill(stack.username);
   // Exact, because the login form's password field is about to gain a
-  // "Show password" toggle button beside it (rclone-manager#344) and an
+  // "Show password" toggle button beside it (backupd#344) and an
   // unanchored substring match would resolve to both. The login page has no
   // validation text growing into this field's label the way enrolment's
   // does, so exact is safe here where a prefix regex is needed there.
@@ -92,7 +92,7 @@ export const test = base.extend<{ pair: Pair }, { scenario: string }>({
     // not identical, and two that straddle a second boundary produce
     // artifacts whose remote mtimes differ by a second. That was
     // invisible until FR-19's reason line started printing the artifact's
-    // resolved date (spdrman/rclone-manager#215): after it, the two
+    // resolved date (spdrman/backupd#215): after it, the two
     // sides' retention previews disagreed on that line whenever the
     // boundary fell between the two calls, which is a coin flip weighted
     // by how long one materialisation takes. Both sides are anchored to

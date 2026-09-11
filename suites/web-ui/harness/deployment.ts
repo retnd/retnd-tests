@@ -6,7 +6,7 @@
 // because the run's job was to start a Vite dev server over the mock API
 // and point a browser at it. This one resolves a URL, because the run's
 // job is now to drive a deployment somebody else already stood up: a
-// browser in one container, `rbm-web serve-ui` in another, a real sshd in
+// browser in one container, `backupd-web serve-ui` in another, a real sshd in
 // a third, all on a private Docker network, with SQLite behind the whole
 // thing.
 //
@@ -44,7 +44,7 @@ export interface SourceMachine {
 
 export interface Deployment {
   /** Where the Web UI answers, on the private network the runner is on.
-   *  A container name and a port, e.g. `http://rclone-manager:8080`. */
+   *  A container name and a port, e.g. `http://backupd:8080`. */
   baseURL: string;
   /** The throwaway administrator this run signs in as. Held in memory for
    *  the length of the run and written nowhere. */
@@ -114,7 +114,7 @@ export function resolveBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
     env,
     BASE_URL_VAR,
     "It names the container serving the Web UI on the private Docker network, " +
-      "resolved by Docker's embedded DNS, e.g. http://rclone-manager:8080."
+      "resolved by Docker's embedded DNS, e.g. http://backupd:8080."
   );
 
   let parsed: URL;
@@ -122,13 +122,13 @@ export function resolveBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
     parsed = new URL(raw);
   } catch {
     throw new Error(
-      BASE_URL_VAR + " is not a URL. It wants a scheme and a host, e.g. http://rclone-manager:8080."
+      BASE_URL_VAR + " is not a URL. It wants a scheme and a host, e.g. http://backupd:8080."
     );
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    // A bare `rclone-manager:8080` lands here rather than in the catch
+    // A bare `backupd:8080` lands here rather than in the catch
     // above, because URL parses it happily as a scheme called
-    // `rclone-manager`. So the message names the likely mistake as well as
+    // `backupd`. So the message names the likely mistake as well as
     // the rule: what is missing is `http://`, not the host.
     throw new Error(
       BASE_URL_VAR + "=" + JSON.stringify(raw) + " is not a URL a browser can be pointed at: " +

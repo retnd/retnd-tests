@@ -22,15 +22,15 @@ npm run e2e:all-providers       # provider treatment across all seven
 | `backups.spec.ts` | table semantics, all seven columns, multi-classification, filtering, artifact detail, lifecycle ordering |
 | `retention.spec.ts` | server-issued plan id, keep/delete itemisation, stale-plan refusal, consequence-named confirm, safe default focus, Escape |
 | `quarantine-activity.spec.ts` | three safe actions only, no "delete anyway", event vocabulary, filters |
-| `activity-failure.spec.ts` | the failure path the block above structurally cannot see: a `listActivity` that throws something untyped, and what an operator is told about it (rclone-manager#598). Names the exception, offers no invented correlation id, offers a way to copy it, and holds the dashboard's Recent activity panel to the same rule rather than letting it draw empty |
+| `activity-failure.spec.ts` | the failure path the block above structurally cannot see: a `listActivity` that throws something untyped, and what an operator is told about it (backupd#598). Names the exception, offers no invented correlation id, offers a way to copy it, and holds the dashboard's Recent activity panel to the same rule rather than letting it draw empty |
 | `settings-recovery.spec.ts` | service settings, capability honesty, build provenance, version-mismatch read-only mode, non-destructive catalog rebuild |
 | `auth.spec.ts` | login is not a NAS system login, enrolment validation, password never echoed |
 | `provider-treatment.spec.ts` | per-provider identity, shared IA, accent token, chrome/picker/notifications only where supported |
 | `responsive.spec.ts` | small app window: no clipped table column, no page-level horizontal scroll, dialogs fully visible |
 | `accessibility.spec.ts` | one h1 per page, every control labelled, no colour-only status, focus visibility, dialog semantics, zero console errors |
 | `safety-invariants.spec.ts` | no remote/file delete anywhere, no private key, no "restore point", no stack traces, no vague destructive labels |
-| `terminal-dock.spec.ts` | the global terminal is pinned to the browser window rather than riding the end of the document, content passes behind it, and the content column reserves the room it takes so the last row of a long table can still be scrolled clear (rclone-manager#617) |
-| `theme-contrast.spec.ts` | a computed-contrast sweep of the rendered tree in both themes, the SSH auth wizard's own controls, the primary button on the accent, and the `color-scheme` declaration that makes native controls follow the theme (rclone-manager#618) |
+| `terminal-dock.spec.ts` | the global terminal is pinned to the browser window rather than riding the end of the document, content passes behind it, and the content column reserves the room it takes so the last row of a long table can still be scrolled clear (backupd#617) |
+| `theme-contrast.spec.ts` | a computed-contrast sweep of the rendered tree in both themes, the SSH auth wizard's own controls, the primary button on the accent, and the `color-scheme` declaration that makes native controls follow the theme (backupd#618) |
 
 Two files in here are not specs. `fixtures.ts` is the page object, and
 `contrast.ts` is the sweep `theme-contrast.spec.ts` runs: it walks the

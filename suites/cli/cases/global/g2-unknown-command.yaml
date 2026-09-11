@@ -4,8 +4,8 @@ argv: [frobnicate]
 exit: 2
 stdout: empty
 stderr:
-  - line: 'rbm: unknown command "frobnicate"'
-  - line: "usage: rbm <command> [flags]"
+  - line: 'backupd: unknown command "frobnicate"'
+  - line: "usage: backupd <command> [flags]"
 state: unchanged
 contract:
   - "usage text: the binary's own usage banner"
