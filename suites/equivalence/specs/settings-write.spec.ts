@@ -43,7 +43,7 @@ test.describe("settings write: last-known-good protection", () => {
 
     // ---- the CLI side: FR-5 says the config file is the CLI's write
     // surface for policy, and `check` is how it is validated afterwards.
-    // There is no `rbm settings set`; the matrix says so rather
+    // There is no `backupd settings set`; the matrix says so rather
     // than inventing one.
     const config = pair.cli.config;
     const edited = readFileSync(config, "utf8").replace("protect_last_known_good: true", "protect_last_known_good: false");
@@ -67,7 +67,7 @@ test.describe("settings write: last-known-good protection", () => {
       // because a browser has to sign in and the CLI has no equivalent to
       // enrol one with. Setup asymmetry, named rather than absorbed.
       // local-auth.json.lock for the same reason harness.spec.ts names it:
-      // a process-lifetime advisory flock (rclone-manager#322), so its
+      // a process-lifetime advisory flock (backupd#322), so its
       // presence says which side still had a server up, not what either
       // side wrote.
       ignoreFiles: ["config.yaml", "local-auth.json", "local-auth.json.lock"],

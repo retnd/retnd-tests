@@ -94,5 +94,5 @@ contract:
   - "docs/EPIC.md FR-18 (an ingested backlog keeps its real shape; an artifact older than the longest configured window is still a DELETE candidate)"
   - "docs/EPIC.md FR-18 (default chain: daily over 7 days, weekly over 3 calendar months, monthly over 12 calendar months)"
   - "docs/EPIC.md FR-19 (newest means newest by the artifact's own retention date, and the reason carries the resolved date and says which timestamp produced it)"
-  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (backupd#536, #544)'
 tags: [smoke]

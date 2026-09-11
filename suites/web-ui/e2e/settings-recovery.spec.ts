@@ -41,7 +41,7 @@ test.describe("settings", () => {
     // writable Retention policy card asserted in its own describe below.
     //
     // "Polling interval" and "Log level" used to be here too, both
-    // decorative selects wired to nothing (rclone-manager#299). Neither
+    // decorative selects wired to nothing (backupd#299). Neither
     // is on the page any more: poll_interval is a real config key but a
     // duration in minutes, not the 15/30/60 seconds that select offered,
     // and there is no log-level concept in config.Config to wire the
@@ -81,7 +81,7 @@ test.describe("settings", () => {
     // Scoped to the card, so a label that turns up elsewhere on the page
     // does not count as provenance, and so the negatives below can be
     // about this card rather than about the whole app (the shell's own
-    // logo reads "rclone-manager", which a page-wide /rclone/ would hit).
+    // logo reads "backupd", which a page-wide /rclone/ would hit).
     // The card is a plain <section> with an <h2>, not a landmark, so it is
     // located by its heading.
     const provenance = page
@@ -112,7 +112,7 @@ test.describe("settings", () => {
     // because the public contract does not name the implementation, and
     // it is asserted above.
     for (const gone of [
-      "Backup Manager version", "Core version", "Database schema", "Architecture"
+      "Backupd version", "Core version", "Database schema", "Architecture"
     ]) {
       await expect(provenance.getByText(gone, { exact: true })).toHaveCount(0);
     }
@@ -136,7 +136,7 @@ test.describe("version mismatch", () => {
     // Scoped to the banner: the dashboard also raises a host-key alert in
     // this scenario, and "keeps information visible" is only worth
     // anything if the refusal it asserts is the version one.
-    const banner = page.getByRole("alert").filter({ hasText: "Backup Manager update required" });
+    const banner = page.getByRole("alert").filter({ hasText: "Backupd update required" });
     await expect(banner).toBeVisible();
     await expect(banner).toContainText(/management actions have been disabled/);
 
@@ -387,7 +387,7 @@ test.describe("retention policy", () => {
 });
 
 /**
- * rclone-manager#240 (EPIC E, FR-27): the consent in front of the first
+ * backupd#240 (EPIC E, FR-27): the consent in front of the first
  * save that sends a retention tier's backups off local disk.
  *
  * Every case in this block is written against two declared mediums by
@@ -441,7 +441,7 @@ test.describe("mapping a retention tier to a storage medium", () => {
     ).toBe(true);
     // The archive medium is labelled as one BEFORE it is chosen, and the
     // label now says the stronger thing: it cannot take delivery at all.
-    // rclone-manager#442 made config.Validate refuse a retention tier
+    // backupd#442 made config.Validate refuse a retention tier
     // bound to an archive class, because the move can never reach VERIFIED
     // (an archived copy's ceiling is existence) and FR-30 needs a content
     // -class ACTIVE placement it can never hold. So "needs a restore to
@@ -476,7 +476,7 @@ test.describe("mapping a retention tier to a storage medium", () => {
     await expect(panel).toContainText(/I delete the copy on this machine/i);
     await expect(panel).toContainText(/billed by your provider/i);
     // No figure comes with it: this product holds no price list, so a
-    // number here could only be one it invented (rclone-manager#211).
+    // number here could only be one it invented (backupd#211).
     const words = await panel.innerText();
     expect(words).not.toMatch(/\$\s?\d/);
     expect(words).not.toMatch(/per\s+(GB|TB|gigabyte)/i);

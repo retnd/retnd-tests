@@ -1,6 +1,6 @@
 doc: >
   `medium default <id>` moves the destination a NEWLY CREATED retention
-  tier starts on (spdrman/rclone-manager#622), and moves
+  tier starts on (spdrman/backupd#622), and moves
   nothing else.
 
   That second half is the one that matters and the one this case is built

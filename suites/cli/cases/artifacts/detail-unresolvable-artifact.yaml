@@ -7,7 +7,7 @@ argv: [artifacts, --config, "${CONFIG}", "production/postgres-primary/no-such-ar
 exit: 1
 stdout: ignored
 stderr:
-  - contains: "rbm: "
+  - contains: "backupd: "
   - contains: "production/postgres-primary/no-such-artifact.dump"
 state: unchanged
 contract:

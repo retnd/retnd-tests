@@ -14,7 +14,7 @@ import { CONTENT_COLUMN, expect, needs, test } from "./fixtures";
  * Three groups needed more than a form:
  *
  *  - step 2's managed-key panel lists the keys THIS DEPLOYMENT holds
- *    (GET /ssh-keys, rclone-manager#592). The mock served two, one of them
+ *    (GET /ssh-keys, backupd#592). The mock served two, one of them
  *    needing a passphrase, each with a "Used by" line naming a set. A
  *    fresh deployment holds none, so those cases say what a full listing
  *    would need.
@@ -127,7 +127,7 @@ test.describe("add backup set wizard", () => {
     }
   });
 
-  test("step 2 offers three key sources, and Generate says plainly it can't be saved yet (rclone-manager#299)", async ({ page }) => {
+  test("step 2 offers three key sources, and Generate says plainly it can't be saved yet (backupd#299)", async ({ page }) => {
     await page.getByRole("button", { name: "Authentication" }).click();
     await expect(page.getByRole("radio")).toHaveCount(3);
     await expect(page.getByText("Generate dedicated SSH key")).toBeVisible();
@@ -150,7 +150,7 @@ test.describe("add backup set wizard", () => {
     expect(await page.locator("body").innerText()).not.toMatch(/BEGIN (OPENSSH|RSA|EC) PRIVATE KEY/i);
   });
 
-  test("step 2's Use managed key panel lists the keys this deployment holds and lets one be picked, still with no fabricated in-use count (rclone-manager#299)", async ({ bm, page }) => {
+  test("step 2's Use managed key panel lists the keys this deployment holds and lets one be picked, still with no fabricated in-use count (backupd#299)", async ({ bm, page }) => {
     // "The keys this deployment holds" is finally literal. The mock served
     // two, permanently, one of them needing a passphrase and each carrying
     // a "Used by" line; a real deployment holds whatever has been imported
@@ -179,7 +179,7 @@ test.describe("add backup set wizard", () => {
     // behind either, and stripped the panel down to that one sentence.
     // What made a real picklist impossible then was that nothing could
     // list the keys this deployment holds: an id came back once from the
-    // import and was never shown again. rclone-manager#592 added GET
+    // import and was never shown again. backupd#592 added GET
     // /ssh-keys, so the radio has a real listing behind it and can be
     // saved, and the honest assertion is the listing rather than the
     // refusal it replaced.
@@ -311,7 +311,7 @@ test.describe("add backup set wizard", () => {
     ).toBeVisible();
   });
 
-  test("step 5 no longer draws its own per-set retention fields (rclone-manager#299)", async ({ page }) => {
+  test("step 5 no longer draws its own per-set retention fields (backupd#299)", async ({ page }) => {
     await page.getByRole("button", { name: "Storage & validation" }).click();
     // Daily/Weekly/Monthly/Week-starts and their own always-checked
     // "protect newest known-good" toggle used to sit here, drawing a
@@ -334,7 +334,7 @@ test.describe("add backup set wizard", () => {
     await expect(page.getByRole("checkbox", { name: /Protect newest known-good/ })).toHaveCount(0);
   });
 
-  test("step 5 lists the two validation layers that still exist, and no longer the fake Checksum toggle (rclone-manager#299)", async ({ page }) => {
+  test("step 5 lists the two validation layers that still exist, and no longer the fake Checksum toggle (backupd#299)", async ({ page }) => {
     await page.getByRole("button", { name: "Storage & validation" }).click();
     const transferVerification = page.getByRole("checkbox", { name: /Transfer verification/ });
     await expect(transferVerification).toBeChecked();
@@ -366,7 +366,7 @@ test.describe("add backup set wizard", () => {
     await expect(validator).toBeEnabled();
     // Off by default: transfer verification is on unconditionally,
     // application validation is opt-in. "and checksum" dropped from this
-    // option's own text by rclone-manager#299, alongside the Checksum
+    // option's own text by backupd#299, alongside the Checksum
     // verification toggle above: Hash: "" means checksum verification
     // never actually runs, so the old wording claimed a step that
     // doesn't happen.
@@ -389,7 +389,7 @@ test.describe("add backup set wizard", () => {
     await expect(validator.getByRole("option", { name: "trailer-marker", exact: true })).toHaveCount(1);
   });
 
-  test("step 6 summarises source, destination and validation, and no longer a hardcoded retention card (rclone-manager#299)", async ({ page }) => {
+  test("step 6 summarises source, destination and validation, and no longer a hardcoded retention card (backupd#299)", async ({ page }) => {
     await page.getByRole("button", { name: "Review" }).click();
     for (const label of ["Source", "Destination", "Validation"]) {
       await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
@@ -444,7 +444,7 @@ test.describe("add backup set wizard", () => {
 
     await page.getByRole("checkbox", { name: /remote backup will be removed only after/i }).check();
 
-    // rclone-manager#624 added a fourth precondition after the
+    // backupd#624 added a fourth precondition after the
     // acknowledgement: the connection itself has to have been proven. A
     // trusted host key settles which machine answers and settles nothing
     // about whether the key authenticates or whether the account can read
@@ -471,7 +471,7 @@ test.describe("add backup set wizard", () => {
     await expect(page.getByRole("button", { name: "Save disabled" })).toBeEnabled();
   });
 
-  // rclone-manager#624: a source is not relied on until it has been proven.
+  // backupd#624: a source is not relied on until it has been proven.
   //
   // The wizard's Save was gated on a pinned known_hosts line and an
   // imported key, which is host IDENTITY: it settles that the machine
@@ -517,7 +517,7 @@ test.describe("add backup set wizard", () => {
 
     await page.getByRole("button", { name: /^Test connection$/ }).click();
 
-    // Six named outcomes, never one verdict. rclone-manager#596 split DNS,
+    // Six named outcomes, never one verdict. backupd#596 split DNS,
     // the connect, the host key, the key material, the authentication and
     // the listing apart precisely because one boolean made a typo'd
     // hostname, an unauthorised key, a rotated host key and a missing path
@@ -636,7 +636,7 @@ test.describe("add backup set wizard", () => {
 
     await page.getByRole("button", { name: "Review" }).click();
     await page.getByRole("checkbox", { name: /remote backup will be removed only after/i }).check();
-    // rclone-manager#624: the source has to be proven before it can be
+    // backupd#624: the source has to be proven before it can be
     // saved. See the acknowledgement case above for why.
     await page.getByRole("button", { name: /^Test connection$/ }).click();
     await expect(page.getByText(/This source has been proven/i)).toBeVisible();
@@ -648,7 +648,7 @@ test.describe("add backup set wizard", () => {
     // page reload — the shared setsNode refresh (appNodes.ts/
     // resource.ts's fetchResource) this wizard triggers on success.
     await expect(bm.heading("Backup sets")).toBeVisible();
-    // Exact, because rclone-manager#97 gave each row more than one place the
+    // Exact, because backupd#97 gave each row more than one place the
     // set's name appears: the card title, a mono line carrying the full
     // source/set identity that the typed removal confirmation asks you to
     // retype, and the visually-hidden continuations that give the per-row

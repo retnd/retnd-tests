@@ -41,7 +41,7 @@ export function resolveBuild(): Build {
   const build = JSON.parse(raw) as Build;
   if (!build.web) {
     throw new Error(
-      "the resolved build has no rbm-web binary, so there is no engine to drive the Web UI against. " +
+      "the resolved build has no backupd-web binary, so there is no engine to drive the Web UI against. " +
         "source mode's go builder produces one; local mode needs RM_WEB_BINARY."
     );
   }
@@ -105,7 +105,7 @@ export interface CliResult {
  *
  *  `version` is the one command that has to opt out, with `config: false`.
  *  The usage banner says every command *except* version accepts --config,
- *  and since spdrman/rclone-manager#189 the binary means it: version
+ *  and since spdrman/backupd#189 the binary means it: version
  *  answers an undefined flag the way every other command does, with exit 2
  *  and the flag package's own complaint. Suite A pins that as
  *  `version/no-config-flag`. Appending --config unconditionally therefore

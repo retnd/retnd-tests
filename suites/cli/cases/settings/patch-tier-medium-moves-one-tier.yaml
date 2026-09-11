@@ -1,7 +1,7 @@
 doc: >
   `settings patch --tier-medium NAME=MEDIUM_ID` points ONE retention tier
   at a storage destination and leaves the rest of the chain exactly as it
-  is (spdrman/rclone-manager#622).
+  is (spdrman/backupd#622).
 
   "Leaves the rest as it is" is the load-bearing half, and it is not
   free. A settings save REPLACES the whole retention chain on the wire
@@ -32,5 +32,5 @@ state: changed
 contract:
   - "usage text: settings patch --tier-medium NAME=MEDIUM_ID - point one retention tier at a storage destination and leave the rest of the chain exactly as it is"
   - "usage text: settings patch --tier-medium - This is the command the picker under a tier in the web UI echoes (#622)"
-  - "spdrman/rclone-manager#622: CLI parity for setting a tier's destination"
+  - "spdrman/backupd#622: CLI parity for setting a tier's destination"
 tags: [smoke]

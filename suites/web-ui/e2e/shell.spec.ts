@@ -18,15 +18,15 @@ test.describe("application shell", () => {
   test("renders the lockup, service chip and every section link", async ({ bm, page }) => {
     await bm.goto("/");
 
-    await expect(page.getByRole("img", { name: "Backup Manager" })).toBeVisible();
+    await expect(page.getByRole("img", { name: "Backupd" })).toBeVisible();
     // Scoped to the header rather than `.first()`, because this case is
     // about the LOCKUP. Against a real deployment the product name is on
-    // the page twice (the header, and the footer's "Backup Manager
+    // the page twice (the header, and the footer's "Backupd
     // running on ..."), which resolved two elements and failed strict
     // mode on the first real run; the mock's page had fewer of them.
     // `.first()` would have made it pass by picking whichever came first
     // in the DOM, which is not the same claim.
-    await expect(page.getByRole("banner").getByText("rclone-manager")).toBeVisible();
+    await expect(page.getByRole("banner").getByText("backupd")).toBeVisible();
     // Scoped to the header (role "banner") — the dashboard body's own
     // health summary widget repeats "Service running" with a different
     // suffix (uptime, not version), so an unscoped match is ambiguous once
@@ -87,7 +87,7 @@ test.describe("application shell", () => {
     // backup SETS, not backups: appNodes.ts's countsNode sums the health
     // report's per-set totals, deliberately, because nothing computes a
     // retained-artifact figure server-side and the one the UI used to show
-    // came off the dev-server mock (rclone-manager#211).
+    // came off the dev-server mock (backupd#211).
     //
     // So on this deployment it reads 1 beside a page that lists 3, and
     // that is the product working as decided. My own first version of this
@@ -98,7 +98,7 @@ test.describe("application shell", () => {
 
   test("names the platform it is running on", async ({ bm, page }) => {
     await bm.goto("/");
-    // exact: true — the footer line ("Backup Manager running on <platform>")
+    // exact: true — the footer line ("Backupd running on <platform>")
     // otherwise makes this an ambiguous substring match too.
     await expect(page.getByText("Running on", { exact: true })).toBeVisible();
   });

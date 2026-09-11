@@ -29,7 +29,7 @@ import {
  *  breaks exactly one thing, so a failure names the thing it broke. */
 function env(overrides: Record<string, string | undefined> = {}): NodeJS.ProcessEnv {
   return {
-    RM_BASE_URL: "http://rclone-manager:8080",
+    RM_BASE_URL: "http://backupd:8080",
     RM_ADMIN_USERNAME: "e2e-admin",
     // Not a credential: this file never talks to anything, and the string
     // exists only so the resolver has a non-empty value to carry.
@@ -40,7 +40,7 @@ function env(overrides: Record<string, string | undefined> = {}): NodeJS.Process
 
 describe("the base URL", () => {
   it("is taken as given, so a container name resolves through Docker's DNS", () => {
-    expect(resolveBaseUrl(env())).toBe("http://rclone-manager:8080");
+    expect(resolveBaseUrl(env())).toBe("http://backupd:8080");
   });
 
   it("refuses to default, and says why there is no default", () => {
@@ -58,22 +58,22 @@ describe("the base URL", () => {
   });
 
   // The commonest way to get this wrong, and the reason the refusal names
-  // the fix. `rclone-manager:8080` is not rejected as unparseable: URL
-  // reads it as a scheme called `rclone-manager`, so without this check it
+  // the fix. `backupd:8080` is not rejected as unparseable: URL
+  // reads it as a scheme called `backupd`, so without this check it
   // would sail through and reach page.goto as nonsense.
   it("refuses a host and port with no scheme in front of it", () => {
-    expect(() => resolveBaseUrl(env({ RM_BASE_URL: "rclone-manager:8080" }))).toThrow(
+    expect(() => resolveBaseUrl(env({ RM_BASE_URL: "backupd:8080" }))).toThrow(
       /write http:\/\/host:port/
     );
   });
 
   it("refuses a scheme a browser cannot be pointed at", () => {
-    expect(() => resolveBaseUrl(env({ RM_BASE_URL: "ftp://rclone-manager" }))).toThrow(/http or https/);
+    expect(() => resolveBaseUrl(env({ RM_BASE_URL: "ftp://backupd" }))).toThrow(/http or https/);
   });
 
   it("trims a trailing slash, so a path is appended once", () => {
-    expect(resolveBaseUrl(env({ RM_BASE_URL: "http://rclone-manager:8080/" }))).toBe(
-      "http://rclone-manager:8080"
+    expect(resolveBaseUrl(env({ RM_BASE_URL: "http://backupd:8080/" }))).toBe(
+      "http://backupd:8080"
     );
   });
 });
@@ -219,7 +219,7 @@ describe("where the evidence goes", () => {
 describe("the whole deployment", () => {
   it("resolves every field a run needs from one call", () => {
     const deployment = resolveDeployment(env({ RM_ALLOW_DESTRUCTIVE: "1" }));
-    expect(deployment.baseURL).toBe("http://rclone-manager:8080");
+    expect(deployment.baseURL).toBe("http://backupd:8080");
     expect(deployment.credentials.username).toBe("e2e-admin");
     expect(deployment.platform).toBe("generic");
     expect(deployment.allowDestructive).toBe(true);

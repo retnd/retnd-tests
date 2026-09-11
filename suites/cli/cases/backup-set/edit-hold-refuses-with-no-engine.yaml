@@ -1,7 +1,7 @@
 doc: >
   `backup-set edit-hold` reads and releases the hold that stops a cycle
   running against a backup set while somebody is editing it
-  (rclone-manager#350, #600). Until rclone-manager#598 nothing outside a
+  (backupd#350, #600). Until backupd#598 nothing outside a
   browser could reach those routes at all, so a hold taken by accident
   could be given back from exactly one place.
 

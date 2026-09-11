@@ -35,7 +35,7 @@ export async function freePort(): Promise<number> {
 }
 
 /** The ui/shared whose production bundle the browser loads. RM_UI_DIR when
- *  the caller names one (rclone-manager's own gate does), otherwise the
+ *  the caller names one (backupd's own gate does), otherwise the
  *  pinned build's own checkout, so the page and the engine come from one
  *  commit rather than two independently chosen ones. */
 export function resolveUiDir(build: Build): string {

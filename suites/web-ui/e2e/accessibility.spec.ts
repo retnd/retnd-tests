@@ -15,7 +15,7 @@ import { expect, needs, test } from "./fixtures";
  *  table. Both say so.
  *
  *  "No console errors on any page" is the case worth watching after this
- *  move. rclone-manager#598 was a page erroring in a browser against a
+ *  move. backupd#598 was a page erroring in a browser against a
  *  server answering 200, which is precisely the class of failure that
  *  reaches the console and reaches nothing else, and this is the first
  *  time this sweep has run against a service that can answer that way. */

@@ -1,6 +1,6 @@
 doc: >
   `medium test-connection local` really tests the drive this deployment's
-  backups land on (spdrman/rclone-manager#622).
+  backups land on (spdrman/backupd#622).
 
   Before it, the local destination had nothing to check: `medium
   preflight local` refused with "this configuration does not declare that
@@ -42,5 +42,5 @@ state: unchanged
 contract:
   - "usage text: medium test-connection <medium-id> - the same check as medium preflight, under the name the rest of this product uses for it"
   - "usage text: medium test-connection - It also answers for \"local\", the drive this deployment's backups land on"
-  - "spdrman/rclone-manager#622: it works on the local hard drive entry and reports a missing path, a permission problem and a full filesystem distinctly"
+  - "spdrman/backupd#622: it works on the local hard drive entry and reports a missing path, a permission problem and a full filesystem distinctly"
 tags: [smoke]

@@ -1,10 +1,10 @@
-// Package getbuild resolves the rclone-manager build that a suite run
+// Package getbuild resolves the backupd build that a suite run
 // tests against, from the single checked-in pin in build-under-test.json.
 //
 // The point of the pin is that "which build did this suite certify" is a
 // property of the repository, not of whoever happened to run it. Every
 // mode below therefore ends in the same place: a Build value naming an
-// absolute path to an rbm binary plus the commit that binary is
+// absolute path to an backupd binary plus the commit that binary is
 // supposed to have been built from. The suites then make the binary prove
 // that claim itself (see Handshake), because a path on disk is not
 // evidence of provenance.
@@ -25,16 +25,16 @@ type Pin struct {
 	// Mode is source, registry or local. See the package doc and
 	// docs/pinning.md for what each one promises.
 	Mode string `json:"mode"`
-	// Commit is the full rclone-manager sha the build must report.
+	// Commit is the full backupd sha the build must report.
 	Commit string `json:"commit"`
 	// Version is what the build's -X main.version was set to. Informational
 	// in every mode; the commit is what the handshake checks.
 	Version string `json:"version"`
 	// SourceBuilder selects how source mode turns a checkout into binaries:
-	// "go" compiles ./cmd/backup-manager directly (seconds, and enough for
+	// "go" compiles ./cmd/backupd directly (seconds, and enough for
 	// the CLI contract), "docker" builds container/Dockerfile and extracts
 	// the CLI from the image operators actually receive. The package path
-	// keeps the old spelling; the command it produces is `rbm`.
+	// keeps the old spelling; the command it produces is `backupd`.
 	SourceBuilder string `json:"source_builder"`
 	Image         string `json:"image"`
 	Notes         string `json:"notes"`
@@ -42,9 +42,9 @@ type Pin struct {
 
 // Build is a resolved build under test.
 type Build struct {
-	// CLI is the absolute path to the rbm binary.
+	// CLI is the absolute path to the backupd binary.
 	CLI string
-	// Web is the absolute path to rbm-web, empty when the
+	// Web is the absolute path to backupd-web, empty when the
 	// resolution route did not produce one (go-builder source mode does
 	// not, since Suite A never needs it).
 	Web string
@@ -54,7 +54,7 @@ type Build struct {
 	Mode string
 	// Provenance is a one-line human description of where it came from.
 	Provenance string
-	// Checkout is the rclone-manager source tree this build came from,
+	// Checkout is the backupd source tree this build came from,
 	// empty when the route did not involve one. Suite B needs it: the
 	// browser suite serves the app from that tree's ui/shared, so the page
 	// under test and the binary under test come from the same commit
@@ -62,10 +62,10 @@ type Build struct {
 	Checkout string
 }
 
-// DefaultRepoURL is where source mode clones rclone-manager from when
+// DefaultRepoURL is where source mode clones backupd from when
 // RM_SOURCE_REPO does not override it. A local checkout path works there
 // too and is much faster, which is what the gate scripts use.
-const DefaultRepoURL = "https://github.com/spdrman/rclone-manager.git"
+const DefaultRepoURL = "https://github.com/spdrman/backupd.git"
 
 // LoadPin reads build-under-test.json from repoRoot.
 func LoadPin(repoRoot string) (Pin, error) {
@@ -92,8 +92,8 @@ func LoadPin(repoRoot string) (Pin, error) {
 // Environment overrides, all documented in docs/pinning.md:
 //
 //	RM_MODE          force a mode, ignoring the pin's own
-//	RM_BINARY        local mode: the rbm binary to test
-//	RM_WEB_BINARY    local mode: the rbm-web binary, optional
+//	RM_BINARY        local mode: the backupd binary to test
+//	RM_WEB_BINARY    local mode: the backupd-web binary, optional
 //	RM_COMMIT        local mode: the commit that binary claims to be
 //	RM_SOURCE_DIR    local mode: a checkout to read HEAD from when RM_COMMIT is unset
 //	RM_SOURCE_REPO   source mode: clone from here instead of DefaultRepoURL
@@ -110,7 +110,7 @@ func Resolve(repoRoot string, pin Pin) (Build, error) {
 		return resolveSource(pin)
 	case "registry":
 		return Build{}, errors.New(
-			"registry mode is not usable yet: nothing has been pushed to ghcr.io/spdrman/backup-manager. " +
+			"registry mode is not usable yet: nothing has been pushed to ghcr.io/spdrman/backupd. " +
 				"See docs/pinning.md; use source or local mode until the first push exists")
 	default:
 		return Build{}, fmt.Errorf("unsupported mode %q", mode)
@@ -120,7 +120,7 @@ func Resolve(repoRoot string, pin Pin) (Build, error) {
 func resolveLocal() (Build, error) {
 	bin := os.Getenv("RM_BINARY")
 	if bin == "" {
-		return Build{}, errors.New("local mode needs RM_BINARY pointing at an rbm binary")
+		return Build{}, errors.New("local mode needs RM_BINARY pointing at an backupd binary")
 	}
 	abs, err := filepath.Abs(bin)
 	if err != nil {
@@ -189,12 +189,12 @@ func resolveSource(pin Pin) (Build, error) {
 	// way anyway, so that the one case that DOES care which name it typed
 	// (cases/global/g6-…, through Case.InvokeAs) is reaching a second
 	// name rather than the one it was already using.
-	cli := filepath.Join(binDir, "rbm")
+	cli := filepath.Join(binDir, "backupd")
 	web := ""
 
 	switch builder {
 	case "go":
-		web = filepath.Join(binDir, "rbm-web")
+		web = filepath.Join(binDir, "backupd-web")
 		version := pin.Version
 		if version == "" {
 			version = pin.Commit[:7]
@@ -204,8 +204,8 @@ func resolveSource(pin Pin) (Build, error) {
 		// answering through the CLI and through the web engine, and two
 		// independently chosen builds would make that claim about nothing.
 		for _, target := range []struct{ out, module, pkg string }{
-			{cli, "core", "./cmd/backup-manager"},
-			{web, "apps/generic", "./cmd/backup-manager-web"},
+			{cli, "core", "./cmd/backupd"},
+			{web, "apps/generic", "./cmd/backupd-web"},
 		} {
 			if _, err := os.Stat(target.out); err == nil {
 				continue
@@ -252,8 +252,8 @@ func resolveSource(pin Pin) (Build, error) {
 // the resulting image, so a run can test the artifact operators actually
 // receive rather than a host compile of the same source.
 func dockerBuild(checkout, binDir string, pin Pin) (cli, web string, err error) {
-	cli = filepath.Join(binDir, "rbm")
-	web = filepath.Join(binDir, "rbm-web")
+	cli = filepath.Join(binDir, "backupd")
+	web = filepath.Join(binDir, "backupd-web")
 	if _, statErr := os.Stat(cli); statErr == nil {
 		if _, statErr := os.Stat(web); statErr == nil {
 			return cli, web, nil
@@ -263,7 +263,7 @@ func dockerBuild(checkout, binDir string, pin Pin) (cli, web string, err error) 
 		return "", "", err
 	}
 
-	tag := "rclone-manager-tests/but:" + pin.Commit[:12]
+	tag := "backupd-tests/but:" + pin.Commit[:12]
 	version := pin.Version
 	if version == "" {
 		version = pin.Commit[:7]
@@ -287,16 +287,16 @@ func dockerBuild(checkout, binDir string, pin Pin) (cli, web string, err error) 
 	defer func() { _ = exec.Command("docker", "rm", "-f", container).Run() }()
 
 	// -L, and it is load-bearing from 0.3.3 on. The image's binaries are
-	// /rbm and /rbm-web now, and /backup-manager and /backup-manager-web
+	// /backupd and /backupd-web now, and /backupd and /backupd-web
 	// are symbolic links beside them so an operator's existing scripts
 	// keep working (container/Dockerfile). `docker cp` copies a link AS a
 	// link unless told otherwise, so without this flag what lands here is
-	// a four-byte dangling symlink to /rbm, and the first thing that
+	// a four-byte dangling symlink to /backupd, and the first thing that
 	// happens next is the identity handshake trying to exec it. Following
 	// the link is a no-op on a pre-rename image, where these two paths
 	// are ordinary files, so one flag covers both sides of the rename and
 	// this extraction needs to know nothing about which name is which.
-	for src, dst := range map[string]string{"/backup-manager": cli, "/backup-manager-web": web} {
+	for src, dst := range map[string]string{"/backupd": cli, "/backupd-web": web} {
 		cp := exec.Command("docker", "cp", "-L", container+":"+src, dst)
 		cp.Stderr = os.Stderr
 		if err := cp.Run(); err != nil {
@@ -318,10 +318,10 @@ func cacheDir() string {
 		return v
 	}
 	if v := os.Getenv("XDG_CACHE_HOME"); v != "" {
-		return filepath.Join(v, "rclone-manager-tests")
+		return filepath.Join(v, "backupd-tests")
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".cache", "rclone-manager-tests")
+	return filepath.Join(home, ".cache", "backupd-tests")
 }
 
 // ensureCheckout makes dir a checkout of exactly commit, cloning it on

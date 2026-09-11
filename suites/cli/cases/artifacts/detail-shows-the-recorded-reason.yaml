@@ -56,5 +56,5 @@ contract:
   - "docs/EPIC.md FR-13 (verification)"
   - "docs/EPIC.md FR-10 (QUARANTINED_LOST is an explicit exceptional state)"
   - "the sibling case's control: validate/corrupted-local-copy.yaml proves the same corruption quarantines the artifact at all"
-  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (backupd#536, #544)'
 tags: [smoke]

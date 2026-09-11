@@ -40,7 +40,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/spdrman/rclone-manager-tests/tools/statesnap"
+	"github.com/spdrman/backupd-tests/tools/statesnap"
 )
 
 // ReadCommands are the read-only invocations the comparison runs against
@@ -56,7 +56,7 @@ var ReadCommands = [][]string{
 
 // Options controls one comparison.
 type Options struct {
-	// CLI is the rbm binary both sides are read with. One
+	// CLI is the backupd binary both sides are read with. One
 	// binary, not two: the claim is about two work directories, and a
 	// second binary would put a second variable in it.
 	CLI string
@@ -320,7 +320,7 @@ func Render(r Result) string {
 		}
 	}
 	for _, d := range r.ReadDiffs {
-		fmt.Fprintf(&b, "`rbm %s` differs between the two sides", strings.Join(d.Argv, " "))
+		fmt.Fprintf(&b, "`backupd %s` differs between the two sides", strings.Join(d.Argv, " "))
 		if d.Note != "" {
 			fmt.Fprintf(&b, ": %s\n", d.Note)
 			continue

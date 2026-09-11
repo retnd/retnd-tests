@@ -352,7 +352,7 @@ test.describe("a deployment with nothing configured yet", () => {
   test("shows an actionable empty state", async ({ bm, page }) => {
     await bm.goto("/");
     await expect(page.getByText("No backup sets yet")).toBeVisible();
-    await expect(page.getByText(/Connect Backup Manager to your first server/)).toBeVisible();
+    await expect(page.getByText(/Connect Backupd to your first server/)).toBeVisible();
     await page.getByRole("button", { name: "Add backup set" }).click();
     await expect(bm.heading("Add backup set")).toBeVisible();
   });
@@ -370,9 +370,9 @@ test.describe("a deployment with nothing configured yet", () => {
 });
 
 /**
- * rclone-manager#240: what the last finished run cycle actually got done.
+ * backupd#240: what the last finished run cycle actually got done.
  *
- * rclone-manager#361 was a cycle that backed nothing up and told its cron
+ * backupd#361 was a cycle that backed nothing up and told its cron
  * job it had succeeded. #368 recorded the two counts that tell a barren
  * cycle from a good one, and nothing rendered them, so the same
  * indistinguishability survived on this page.
@@ -424,7 +424,7 @@ test.describe("the last run cycle", () => {
     await bm.goto("/");
 
     // A cycle discovers what it will find as it goes, so there is no
-    // honest denominator for the whole until it ends. rclone-manager#211
+    // honest denominator for the whole until it ends. backupd#211
     // removed nine invented figures from this UI; a success rate here
     // would be the tenth.
     const words = await page.getByRole("region", { name: "Last run cycle" }).innerText();

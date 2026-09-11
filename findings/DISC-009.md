@@ -1,11 +1,11 @@
 # DISC-009: a newly created retention tier does not always start on the default destination
 
-- **Filed as**: [spdrman/rclone-manager#634](https://github.com/spdrman/rclone-manager/issues/634)
+- **Filed as**: [spdrman/backupd#634](https://github.com/spdrman/backupd/issues/634)
 - **Pinned by**: nothing yet, deliberately. See "What the suite does about
   it" below; `suites/web-ui/e2e/storage-destinations.spec.ts`'s "gives a
   newly added tier a destination of its own, named rather than left empty"
   carries the argument in its own comment.
-- **Build**: observed on `rclone-manager` at `939da2f9`, the head of
+- **Build**: observed on `backupd` at `939da2f9`, the head of
   `fix/622-storage-destinations`. The feature is that branch's, so this
   cannot be older than it.
 - **Kind**: a divergence between what the issue says the default governs
@@ -13,7 +13,7 @@
 
 ## Contract
 
-spdrman/rclone-manager#622, on what "default" means:
+spdrman/backupd#622, on what "default" means:
 
 > "Default" is new. It is not currently in the model, and it needs to say
 > what it governs: the destination a newly created tier starts on.
@@ -88,7 +88,7 @@ passes today, passes on the fix, and pins nothing either way.
 
 So what is pinned is the part that holds under both readings and that the
 pinned build gets wrong: a newly added tier NAMES a destination, by id,
-at the moment it appears, where before rclone-manager#622 its draft
+at the moment it appears, where before backupd#622 its draft
 carried `""` and the picker rendered blank. The rest is written down
 here, and the case's own comment says so where somebody reading it will
 be wondering.

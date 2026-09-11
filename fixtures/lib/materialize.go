@@ -54,7 +54,7 @@ type Options struct {
 	// Work is the directory to build into. It must already exist and
 	// should be empty; a test's t.TempDir() is the intended caller.
 	Work string
-	// CLI is the rbm binary used for replay seeding. Required
+	// CLI is the backupd binary used for replay seeding. Required
 	// when the scenario's state is "replay".
 	CLI string
 	// Now anchors every relative mtime. Zero means time.Now().

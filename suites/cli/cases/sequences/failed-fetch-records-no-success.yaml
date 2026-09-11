@@ -21,5 +21,5 @@ state: unchanged
 contract:
   - "docs/EPIC.md FR-10 (lifecycle transitions are durable; a cycle that failed records no success)"
   - "docs/EPIC.md FR-22 (retry and error classification)"
-  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (backupd#536, #544)'
 tags: [smoke]

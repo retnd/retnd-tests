@@ -1,6 +1,6 @@
 import { retentionClasses } from "../harness/api";
 import { expect, mockOnly, needs, test } from "./fixtures";
-import type { BackupManager } from "./fixtures";
+import type { Backupd } from "./fixtures";
 
 /**
  * The backups table and one backup's detail, against a real deployment.
@@ -244,14 +244,14 @@ test.describe("backup detail", () => {
 });
 
 /**
- * rclone-manager#240 (EPIC E, FR-34): where a backup's copies actually
+ * backupd#240 (EPIC E, FR-34): where a backup's copies actually
  * are, and which of them anybody can read.
  *
  * Everything below is one question asked in different words: does this
  * surface tell "there is no copy" apart from "there is a copy nobody can
  * confirm" apart from "there is a copy nobody has checked"?
  *
- * That is not a stylistic worry. rclone-manager#361 was a run cycle that
+ * That is not a stylistic worry. backupd#361 was a run cycle that
  * backed nothing up and reported success. A row reading "stored on
  * offsite_s3" for an unconfirmable copy, or a tick beside an unverified
  * one, is the same defect rendered in HTML, and an operator finds out it
@@ -261,7 +261,7 @@ test.describe("where a backup's copies are", () => {
   const copies = (page: import("@playwright/test").Page) =>
     page.getByRole("region", { name: "Copies" });
 
-  async function openBackup(bm: BackupManager, page: import("@playwright/test").Page, filename: string) {
+  async function openBackup(bm: Backupd, page: import("@playwright/test").Page, filename: string) {
     await bm.goto("/backups");
     await page.getByRole("row").filter({ hasText: filename }).click();
     await expect(copies(page)).toBeVisible();
@@ -275,7 +275,7 @@ test.describe("where a backup's copies are", () => {
    *  drives the page to it. A deployment that has no such backup gets the
    *  reading printed instead of a green tick. */
   const withPlacement = (
-    bm: BackupManager,
+    bm: Backupd,
     matches: (p: NonNullable<(typeof bm.facts.backups)[number]["placements"]>[number]) => boolean
   ) => bm.facts.backups.find((b) => (b.placements ?? []).some(matches));
 
@@ -408,7 +408,7 @@ test.describe("where a backup's copies are", () => {
     await openBackup(bm, page, artifact!.name);
 
     await expect(copies(page).getByText(/billed by your provider/i)).toBeVisible();
-    // rclone-manager#211's rule: this product holds no price list and
+    // backupd#211's rule: this product holds no price list and
     // does not know what an operator negotiated, so a figure would be one
     // it made up.
     const text = await page.locator("body").innerText();
@@ -446,7 +446,7 @@ test.describe("where a backup's copies are", () => {
  * storage medium gets the pages it already had, and this is the only place
  * that can be checked end to end rather than argued.
  *
- * The line moved once, and only on one surface. rclone-manager#622 made
+ * The line moved once, and only on one surface. backupd#622 made
  * the local hard drive a destination in its own right, so "declares
  * nothing" stopped meaning "has nowhere to send a backup" and started
  * meaning "has exactly one place, the drive it already writes to". The
@@ -503,7 +503,7 @@ test.describe("a deployment that never heard of storage mediums", () => {
    *
    * The claim was "a deployment that declares nothing gets no destination
    * picker", on the reasoning that with nowhere else to send a backup a
-   * picker offers no choice. rclone-manager#622 reverses that on purpose:
+   * picker offers no choice. backupd#622 reverses that on purpose:
    * with the control absent there was no way to SEE where a tier's
    * backups go, so the only tier that could ever be pointed at S3 was one
    * edited outside the product, and the local hard drive is a destination

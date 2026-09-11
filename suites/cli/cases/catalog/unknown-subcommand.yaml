@@ -4,7 +4,7 @@ argv: [catalog, frobnicate]
 exit: 2
 stdout: empty
 stderr:
-  - line: 'rbm: catalog: unknown subcommand "frobnicate" (expected "rebuild")'
+  - line: 'backupd: catalog: unknown subcommand "frobnicate" (expected "rebuild")'
 state: unchanged
 contract:
   - "usage text: catalog rebuild [--dry-run]"

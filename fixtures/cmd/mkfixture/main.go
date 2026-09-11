@@ -18,9 +18,9 @@ import (
 	"path/filepath"
 	"time"
 
-	getbuild "github.com/spdrman/rclone-manager-tests/tools/getbuild"
+	getbuild "github.com/spdrman/backupd-tests/tools/getbuild"
 
-	fixtures "github.com/spdrman/rclone-manager-tests/fixtures/lib"
+	fixtures "github.com/spdrman/backupd-tests/fixtures/lib"
 )
 
 func main() {
@@ -33,7 +33,7 @@ func main() {
 func run() error {
 	scenario := flag.String("scenario", "", "scenario name under fixtures/scenarios")
 	work := flag.String("work", "", "directory to materialise into (must exist)")
-	cli := flag.String("cli", "", "rbm binary used for replay seeding; resolved from the pin when empty")
+	cli := flag.String("cli", "", "backupd binary used for replay seeding; resolved from the pin when empty")
 	// --now anchors every relative mtime in the scenario. It exists for
 	// callers that materialise the same scenario more than once and need
 	// the copies to be identical rather than merely equivalent: Suite C

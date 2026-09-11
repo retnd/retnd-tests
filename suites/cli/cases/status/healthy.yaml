@@ -8,7 +8,7 @@ scenario: seeded-local
 argv: [status, --config, "${CONFIG}"]
 exit: 0
 stdout:
-  - line: "process: rbm ${ANY}, go ${ANY}, rclone ${ANY}"
+  - line: "process: backupd ${ANY}, go ${ANY}, rclone ${ANY}"
   - line: "production/postgres-primary: HEALTHY"
   - line: "production/app-uploads: HEALTHY"
   - line: "  newest known-good backup: ${DUR}"
@@ -26,5 +26,5 @@ state: unchanged
 contract:
   - "docs/EPIC.md FR-24 (health: the HEALTHY/DEGRADED/STALE/FAILING vocabulary and the exposed fields)"
   - "usage text: status - report process and backup-set health (FR-24)"
-  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (backupd#536, #544)'
 tags: [smoke]
