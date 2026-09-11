@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spdrman/backupd-tests/tools/getbuild"
+	"github.com/backupdproject/backupd-tests/tools/getbuild"
 )
 
 func main() {

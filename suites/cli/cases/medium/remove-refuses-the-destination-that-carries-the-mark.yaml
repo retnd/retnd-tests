@@ -1,6 +1,6 @@
 doc: >
   The destination a new retention tier starts on cannot be un-declared
-  (spdrman/backupd#622), and the refusal says what to
+  (backupdproject/backupd#622), and the refusal says what to
   do about it.
 
   It is its own refusal beside the in-use one, and the reason is that the
@@ -31,5 +31,5 @@ state: unchanged
 contract:
   - "usage text: medium default <medium-id> - The destination that is the default cannot be removed"
   - "usage text: medium remove <medium-id> - un-declare a destination. Refused while any copy names it"
-  - "spdrman/backupd#622: the destination marked default cannot be deleted"
+  - "backupdproject/backupd#622: the destination marked default cannot be deleted"
 tags: [smoke]

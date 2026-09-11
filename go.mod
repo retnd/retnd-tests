@@ -1,4 +1,4 @@
-module github.com/spdrman/backupd-tests
+module github.com/backupdproject/backupd-tests
 
 go 1.27.0
 

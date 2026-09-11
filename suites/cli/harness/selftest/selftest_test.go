@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spdrman/backupd-tests/suites/cli/harness"
+	"github.com/backupdproject/backupd-tests/suites/cli/harness"
 )
 
 var runner *harness.Runner
@@ -284,7 +284,7 @@ func workDir(t *testing.T) string {
 // It can under-do its job. A chmod that did not take, or that landed on a
 // directory nothing writes into, leaves the check under test passing, and
 // the case built on it goes green while proving nothing about a
-// permission refusal. That is the shape spdrman/backupd#622's
+// permission refusal. That is the shape backupdproject/backupd#622's
 // local test connection cares about most, so it is worth a control of its
 // own rather than being inferred from a case whose green it would fake.
 //

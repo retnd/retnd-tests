@@ -18,9 +18,9 @@ import (
 	"path/filepath"
 	"time"
 
-	getbuild "github.com/spdrman/backupd-tests/tools/getbuild"
+	getbuild "github.com/backupdproject/backupd-tests/tools/getbuild"
 
-	fixtures "github.com/spdrman/backupd-tests/fixtures/lib"
+	fixtures "github.com/backupdproject/backupd-tests/fixtures/lib"
 )
 
 func main() {

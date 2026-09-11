@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	fixtures "github.com/spdrman/backupd-tests/fixtures/lib"
-	"github.com/spdrman/backupd-tests/tools/getbuild"
-	"github.com/spdrman/backupd-tests/tools/statesnap"
+	fixtures "github.com/backupdproject/backupd-tests/fixtures/lib"
+	"github.com/backupdproject/backupd-tests/tools/getbuild"
+	"github.com/backupdproject/backupd-tests/tools/statesnap"
 )
 
 // Runner executes cases against one build under test.
