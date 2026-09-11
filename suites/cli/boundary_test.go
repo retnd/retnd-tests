@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spdrman/backupd-tests/suites/cli/harness"
+	"github.com/backupdproject/backupd-tests/suites/cli/harness"
 )
 
 // TestRetentionOverrideItemisationSurvivesTheUTCMidnightBoundary is the

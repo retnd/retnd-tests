@@ -204,7 +204,7 @@ lifecycle timeline and the whole Copies card were unreachable in a
 browser on any real deployment. The mock's ids were `art_01J9C1XY7T09`,
 one segment, so the route matched and five cases asserted their way
 through a page nobody could open. Filed and fixed as
-[backupd#677](https://github.com/spdrman/backupd/issues/677);
+[backupd#677](https://github.com/backupdproject/backupd/issues/677);
 App.tsx had already fixed this exact defect on the neighbouring
 backup-set route in #285.
 

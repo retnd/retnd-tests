@@ -92,7 +92,7 @@ export const test = base.extend<{ pair: Pair }, { scenario: string }>({
     // not identical, and two that straddle a second boundary produce
     // artifacts whose remote mtimes differ by a second. That was
     // invisible until FR-19's reason line started printing the artifact's
-    // resolved date (spdrman/backupd#215): after it, the two
+    // resolved date (backupdproject/backupd#215): after it, the two
     // sides' retention previews disagreed on that line whenever the
     // boundary fell between the two calls, which is a coin flip weighted
     // by how long one materialisation takes. Both sides are anchored to

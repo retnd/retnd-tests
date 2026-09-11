@@ -26,7 +26,7 @@ doc: >
   Neither case alone carries the claim. Read on its own this one is
   consistent with a chain that ignores its inputs and keeps only the
   newest artifact, which is exactly what the build before
-  spdrman/backupd#215 did on this fixture under any flags at all.
+  backupdproject/backupd#215 did on this fixture under any flags at all.
   It is the pair, one fixture and two chains giving two different
   itemisations, that shows the flags reached the arithmetic.
 
@@ -40,7 +40,7 @@ doc: >
   today's discovery-placed monthly bucket. A build in which either of
   these read differently would be one whose discovery pass had started
   spreading a single ingest across several buckets, which is the bug
-  spdrman/backupd#192 was filed about in reverse.
+  backupdproject/backupd#192 was filed about in reverse.
 
   000d's own DAILY and WEEKLY attribution is deliberately not pinned to
   an exact placement here (backupd#270). --daily-days 1 and

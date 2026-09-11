@@ -4,7 +4,7 @@ doc: >
   against a remote that was never configured. It is also the positive
   control for artifacts/nonexistent-backup-set: the two commands are
   asserted to refuse the same name with the same wording, which is what
-  they disagreed about until spdrman/backupd#187 was fixed.
+  they disagreed about until backupdproject/backupd#187 was fixed.
 scenario: seeded-local
 argv: [fetch, --config, "${CONFIG}", --source, production, --backup-set, nope]
 exit: 1

@@ -31,5 +31,5 @@ state: unchanged
 contract:
   - "usage text: medium test-connection - reporting a missing path, a directory the service user cannot write to, and a full filesystem as three different failures"
   - "usage text: medium preflight - Exits non-zero when any check fails (#443)"
-  - "spdrman/backupd#622: it works on the local hard drive entry and reports a missing path, a permission problem and a full filesystem distinctly"
+  - "backupdproject/backupd#622: it works on the local hard drive entry and reports a missing path, a permission problem and a full filesystem distinctly"
 tags: [smoke]

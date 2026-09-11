@@ -1,6 +1,6 @@
 # backupd-tests
 
-End-to-end test suites for [`backupd`](https://github.com/spdrman/backupd),
+End-to-end test suites for [`backupd`](https://github.com/backupdproject/backupd),
 run from outside it, against a build it has already released.
 
 Three suites live here:
@@ -24,7 +24,7 @@ testing what an operator has. From out here, a suite has exactly what a
 real deployment has: a binary, a YAML config file, a state directory,
 exit codes, printed output, and a browser. That is what catches a
 contract break, and it is why **nothing in this repository may import
-`github.com/spdrman/backupd/core/...`**. The moment it does, it
+`github.com/backupdproject/backupd/core/...`**. The moment it does, it
 stops being an outside consumer and starts checking the product against
 itself.
 
@@ -52,14 +52,14 @@ what a run certifies. See [`docs/pinning.md`](docs/pinning.md) for the
 three modes and how to point the suites at a newer build in one command.
 
 The command is `backupd` from 0.3.3
-([backupd#648](https://github.com/spdrman/backupd/issues/648)),
+([backupd#648](https://github.com/backupdproject/backupd/issues/648)),
 and was `backupd` before it. The old name still runs, because the
 image links it beside the new one, so this repository has to be able to
 tell the two apart: what the binary *prints* is asserted as `backupd` in
 every case, what an operator *types* is asserted under both names in
 `global/g6-…` and `global/g7-…`, and the three things merely named after
 the old command (the config directory `/etc/backupd`, the image
-`ghcr.io/spdrman/backupd`, the Go package path
+`ghcr.io/backupdproject/backupd`, the Go package path
 `core/cmd/backupd`) did not move and are still spelled that way
 throughout.
 
@@ -108,9 +108,9 @@ today, and no contract question is. (This line said two while the table
 in `findings/` had one row in it, which is what a hand-maintained count
 does; it is derived from that table now, and DISC-008 and DISC-009 are
 the two that made the drift visible.) Five have been retired: four when
-[#209](https://github.com/spdrman/backupd/pull/209) answered them,
+[#209](https://github.com/backupdproject/backupd/pull/209) answered them,
 and DISC-006's FR-18 bucket-key question when
-[#215](https://github.com/spdrman/backupd/pull/215) wrote the
+[#215](https://github.com/backupdproject/backupd/pull/215) wrote the
 missing rule into the requirement. Each time the pin moved onto the
 answer in the same change, which is the mechanism working rather than an
 exception to it: the cases stayed and now assert the contract with no
