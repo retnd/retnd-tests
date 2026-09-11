@@ -9,14 +9,14 @@ against a situation the other could not produce.
 
 ## Two rules that are not negotiable
 
-**Nothing here imports `rclone-manager`.** This repository has exactly
+**Nothing here imports `backupd`.** This repository has exactly
 what an operator has. The moment it reaches into the product's own
 packages it stops being able to catch the contract breaks it exists to
 catch.
 
 **Catalog state is seeded by replaying documented operator commands,
 never by writing SQLite rows.** A scenario with `state: replay` runs
-`rbm fetch` (or `run`) against the fixture and lets the
+`backupd fetch` (or `run`) against the fixture and lets the
 product build its own catalog. Writing rows directly would bake FR-9's
 schema into the fixtures, which is knowledge an operator does not have,
 and it would rot silently on the first migration.

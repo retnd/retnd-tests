@@ -12,14 +12,14 @@ import (
 	"syscall"
 	"time"
 
-	fixtures "github.com/spdrman/rclone-manager-tests/fixtures/lib"
-	"github.com/spdrman/rclone-manager-tests/tools/getbuild"
-	"github.com/spdrman/rclone-manager-tests/tools/statesnap"
+	fixtures "github.com/spdrman/backupd-tests/fixtures/lib"
+	"github.com/spdrman/backupd-tests/tools/getbuild"
+	"github.com/spdrman/backupd-tests/tools/statesnap"
 )
 
 // Runner executes cases against one build under test.
 type Runner struct {
-	// CLI is the absolute path to the rbm binary, already
+	// CLI is the absolute path to the backupd binary, already
 	// through the identity handshake.
 	CLI string
 	// ScenarioDir is fixtures/scenarios.

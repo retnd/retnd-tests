@@ -33,12 +33,12 @@ const EXPECTED: Record<
   { name: string; integration: string; nativeAuth: boolean; nativeNotify: boolean; picker: boolean; chrome: boolean; mount: string }
 > = {
   generic: { name: "Generic Docker / Linux", integration: "Standalone web app", nativeAuth: false, nativeNotify: false, picker: false, chrome: false, mount: "/data/backups" },
-  ugos: { name: "UGREEN UGOS Pro", integration: "Native app", nativeAuth: true, nativeNotify: true, picker: true, chrome: true, mount: "/volume1/backup-manager" },
-  synology: { name: "Synology DSM", integration: "Embedded web app", nativeAuth: false, nativeNotify: false, picker: false, chrome: true, mount: "/volume1/backup-manager" },
-  truenas: { name: "TrueNAS", integration: "Container app", nativeAuth: false, nativeNotify: false, picker: false, chrome: false, mount: "/mnt/tank/backup-manager/backups" },
-  unraid: { name: "Unraid", integration: "Container app", nativeAuth: false, nativeNotify: false, picker: false, chrome: false, mount: "/mnt/user/backups/backup-manager" },
-  openmediavault: { name: "OpenMediaVault", integration: "Compose plugin container", nativeAuth: false, nativeNotify: false, picker: false, chrome: false, mount: "/srv/dev-disk-by-uuid/backups/backup-manager" },
-  proxmox: { name: "Proxmox VE", integration: "Standalone web app", nativeAuth: false, nativeNotify: false, picker: false, chrome: false, mount: "/mnt/backup-manager" }
+  ugos: { name: "UGREEN UGOS Pro", integration: "Native app", nativeAuth: true, nativeNotify: true, picker: true, chrome: true, mount: "/volume1/backupd" },
+  synology: { name: "Synology DSM", integration: "Embedded web app", nativeAuth: false, nativeNotify: false, picker: false, chrome: true, mount: "/volume1/backupd" },
+  truenas: { name: "TrueNAS", integration: "Container app", nativeAuth: false, nativeNotify: false, picker: false, chrome: false, mount: "/mnt/tank/backupd/backups" },
+  unraid: { name: "Unraid", integration: "Container app", nativeAuth: false, nativeNotify: false, picker: false, chrome: false, mount: "/mnt/user/backups/backupd" },
+  openmediavault: { name: "OpenMediaVault", integration: "Compose plugin container", nativeAuth: false, nativeNotify: false, picker: false, chrome: false, mount: "/srv/dev-disk-by-uuid/backups/backupd" },
+  proxmox: { name: "Proxmox VE", integration: "Standalone web app", nativeAuth: false, nativeNotify: false, picker: false, chrome: false, mount: "/mnt/backupd" }
 };
 
 const expected = EXPECTED[PLATFORM];
@@ -62,16 +62,16 @@ test.describe("provider: " + PLATFORM, () => {
     }
   });
 
-  test("retains Backup Manager product identity, not provider branding", async ({ page }) => {
+  test("retains Backupd product identity, not provider branding", async ({ page }) => {
     await page.goto("/");
     // .first(): the product name is legitimately on this page more than
     // once against a real deployment (the header lockup and the footer's
-    // "Backup Manager running on ..."), and an unscoped strict-mode
+    // "Backupd running on ..."), and an unscoped strict-mode
     // locator resolves to both. The mock rendered fewer of them, which is
     // why this only showed up on the first real run.
-    await expect(page.getByText("rclone-manager").first()).toBeVisible();
+    await expect(page.getByText("backupd").first()).toBeVisible();
     const title = await page.title();
-    expect(title).toMatch(/Backup Manager/);
+    expect(title).toMatch(/Backupd/);
   });
 
   test("declares an accent token", async ({ page }) => {
@@ -84,11 +84,11 @@ test.describe("provider: " + PLATFORM, () => {
 
   test("draws window chrome only when the platform is embedded", async ({ page }) => {
     await page.goto("/");
-    // Anchored on the em dash the titlebar actually uses ("Backup Manager
+    // Anchored on the em dash the titlebar actually uses ("Backupd
     // — <platform>", AppShell.tsx) — the looser ".*" also matched the
-    // page footer's "Backup Manager running on <platform>", which exists
+    // page footer's "Backupd running on <platform>", which exists
     // regardless of chrome and made this always find something.
-    const titlebar = page.getByText(new RegExp("Backup Manager — " + expected.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    const titlebar = page.getByText(new RegExp("Backupd — " + expected.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     if (expected.chrome) {
       await expect(titlebar.first()).toBeVisible();
     } else {
@@ -127,7 +127,7 @@ test.describe("provider: " + PLATFORM, () => {
       // so this text is legitimately repeated more than once on this page.
       await expect(page.getByText(new RegExp(expected.name + " session")).first()).toBeVisible();
     } else {
-      await expect(page.getByText("Backup Manager local account").first()).toBeVisible();
+      await expect(page.getByText("Backupd local account").first()).toBeVisible();
     }
   });
 

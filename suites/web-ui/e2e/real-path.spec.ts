@@ -87,7 +87,7 @@ test.describe("the browser is looking at a real deployment", () => {
     );
 
     await bm.goto("/activity");
-    // rclone-manager#598's page, reading the real feed. An empty timeline
+    // backupd#598's page, reading the real feed. An empty timeline
     // and a failed read look identical to an operator, which is what that
     // issue was about, so the claim here is that this one is neither.
     await expect(page.getByRole("alert")).toHaveCount(0);

@@ -7,7 +7,7 @@ argv: [validate, --config, "${CONFIG}", not-an-id]
 exit: 1
 stdout: ignored
 stderr:
-  - contains: "rbm: "
+  - contains: "backupd: "
   - contains: "source/backup-set/name"
 state: unchanged
 contract:

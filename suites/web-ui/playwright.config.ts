@@ -17,10 +17,10 @@ import {
 // under `import.meta.env.DEV`. So every `?scenario=` state the specs drove
 // was a fixture inside the browser. The suite proved the UI renders
 // correctly given data, and structurally could not fail on anything in the
-// path an operator actually uses: browser -> `rbm-web serve-ui` ->
-// reverse proxy -> `rbm-web serve` -> SQLite.
+// path an operator actually uses: browser -> `backupd-web serve-ui` ->
+// reverse proxy -> `backupd-web serve` -> SQLite.
 //
-// That gap cost something real. rclone-manager#598 was the Activity page
+// That gap cost something real. backupd#598 was the Activity page
 // erroring in a browser while the server answered 200 with 64KB of valid
 // JSON in 20ms, and the spec beside it that drives the same page happily
 // passed, because the mock resolved every call cleanly.
@@ -33,7 +33,7 @@ import {
 // host port.
 //
 // The topology is worth knowing about here, because one part of it is load
-// bearing for what this suite can claim. `rclone-manager` is an alias on
+// bearing for what this suite can claim. `backupd` is an alias on
 // the EDGE network only, and the engine sits on an internal network the
 // client cannot resolve at all: a spec that tried to fetch the engine
 // directly gets ENOTFOUND. So every request this suite makes, from a page
@@ -57,7 +57,7 @@ import {
 //
 // Retries stay at zero, including under CI. A retry is what turns a
 // deterministic red into something that reads as a flake, which is the
-// mistake rclone-manager#172 cost four merges to notice.
+// mistake backupd#172 cost four merges to notice.
 //
 // # Traces are on, where they used to be on-first-retry
 //

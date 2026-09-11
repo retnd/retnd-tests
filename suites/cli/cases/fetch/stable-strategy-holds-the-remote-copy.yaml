@@ -39,5 +39,5 @@ contract:
   - "docs/EPIC.md FR-8 (producer-controlled atomic completion SHOULD be preferred; a candidate MUST be proven complete before ingestion)"
   - "docs/EPIC.md FR-15 (remote delete safety: deletion only through COMMITTED to REMOTE_DELETE_PENDING to COMPLETE, and refused when revalidation fails)"
   - "docs/EPIC.md FR-10 (explicit lifecycle states)"
-  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (backupd#536, #544)'
 tags: [smoke]

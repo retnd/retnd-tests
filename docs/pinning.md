@@ -18,18 +18,18 @@ it, and moving to a newer build is a reviewable one-line change.
 
 ### `source`
 
-Clone `rclone-manager` at `commit` into a per-commit cache directory and
+Clone `backupd` at `commit` into a per-commit cache directory and
 build the binaries from it. This is the only honest mode today, because
-nothing has been pushed to `ghcr.io/spdrman/backup-manager` yet.
+nothing has been pushed to `ghcr.io/spdrman/backupd` yet.
 
 `source_builder` chooses how:
 
-- **`go`** compiles `./cmd/backup-manager` directly. Seconds, no Docker,
+- **`go`** compiles `./cmd/backupd` directly. Seconds, no Docker,
   and enough for the CLI contract, which is what Suite A tests. The
   package path keeps the old spelling; the command it produces calls
-  itself `rbm`.
-- **`docker`** builds `container/Dockerfile` and copies `/backup-manager`
-  and `/backup-manager-web` out of the resulting image. Slower, and the
+  itself `backupd`.
+- **`docker`** builds `container/Dockerfile` and copies `/backupd`
+  and `/backupd-web` out of the resulting image. Slower, and the
   only route that produces the artefact operators actually receive, so it
   is what the integration runs and Suites B and C use.
 
@@ -40,11 +40,11 @@ would get skipped rather than run. The choice is a field in the pin, so
 switching is a data change and both routes are covered.
 
 **The `docker` route and the rename.** From 0.3.3 the image's binaries are
-`/rbm` and `/rbm-web`, and `/backup-manager` and `/backup-manager-web`
+`/backupd` and `/backupd-web`, and `/backupd` and `/backupd-web`
 are symbolic links beside them so an operator's existing scripts keep
 working. Extraction still asks for the two old paths, and it now passes
 `docker cp -L`, because `docker cp` copies a link *as a link*: without
-the flag what lands on the host is a four-byte dangling link to `/rbm`,
+the flag what lands on the host is a four-byte dangling link to `/backupd`,
 and the next thing that happens is the identity handshake trying to exec
 it. Measured on a two-line image with that exact layout, not reasoned
 about: `docker cp` produced a symlink of size 4, `docker cp -L` produced
@@ -53,8 +53,8 @@ paths are ordinary files, so the one flag spans both sides of the rename
 and the extraction still needs to know nothing about which name is which.
 
 What that does **not** check is that the image contains both names at
-all. A `/backup-manager` that stopped being built would fail this
-extraction outright, which is a loud enough signal; a `/rbm` that never
+all. A `/backupd` that stopped being built would fail this
+extraction outright, which is a loud enough signal; a `/backupd` that never
 appeared would not, because nothing here asks for it by that name. The
 honest check is to extract both and require them to be the same bytes,
 and it is not written, because the pin is allowed to point either side of
@@ -65,7 +65,7 @@ reached.
 
 ### `registry`
 
-Pull the digest-pinned image from `ghcr.io/spdrman/backup-manager`,
+Pull the digest-pinned image from `ghcr.io/spdrman/backupd`,
 extract both binaries, and cross-check their sha256 against
 `container/release-manifest.json` **as it exists at the pinned commit**,
 not as `main` has it today. A digest pin rather than a tag pin: tags
@@ -83,13 +83,13 @@ repository.
 ### `local`
 
 Test a binary from a working tree. Used for the dev loop, and for
-`rclone-manager`'s own gate, where the build under test is the commit
+`backupd`'s own gate, where the build under test is the commit
 being made and a pin would be pointing at the wrong thing.
 
 ```sh
 RM_MODE=local \
-RM_BINARY=/path/to/rclone-manager/core/rbm \
-RM_SOURCE_DIR=/path/to/rclone-manager \
+RM_BINARY=/path/to/backupd/core/backupd \
+RM_SOURCE_DIR=/path/to/backupd \
 make suite-a
 ```
 
@@ -102,7 +102,7 @@ nobody meant to test.
 ## The identity handshake
 
 Before a single case runs, in every mode, the harness invokes
-`rbm version` and compares the commit it prints against what the pin
+`backupd version` and compares the commit it prints against what the pin
 promised. It reads the first line under either name the command has had,
 so a pin pointing back at a pre-0.3.3 build can still say which commit it
 is; the printed name itself is asserted where an assertion belongs, in
@@ -124,8 +124,8 @@ suffix on a build made from a modified tree.
 | Variable | Effect |
 |---|---|
 | `RM_MODE` | force a mode, ignoring the pin's own |
-| `RM_BINARY` | `local`: the `rbm` binary to test |
-| `RM_WEB_BINARY` | `local`: the `rbm-web` binary, optional |
+| `RM_BINARY` | `local`: the `backupd` binary to test |
+| `RM_WEB_BINARY` | `local`: the `backupd-web` binary, optional |
 | `RM_COMMIT` | `local`: the commit that binary claims to be |
 | `RM_SOURCE_DIR` | `local`: a checkout to read `HEAD` from when `RM_COMMIT` is unset |
 | `RM_SOURCE_REPO` | `source`: clone from here instead of GitHub; a local checkout path works and is much faster |

@@ -1,6 +1,6 @@
 # Contract versus observed
 
-Every file here records a place where `rclone-manager`'s real behaviour
+Every file here records a place where `backupd`'s real behaviour
 disagrees with what its documentation, its own usage text, or its own
 stated conventions say it should do.
 
@@ -8,8 +8,8 @@ The rule that produced them is the one thing that keeps this repository a
 validator rather than a change detector. When a case is written, its
 expectation comes from a document. When the binary then does something
 else, the expectation does not move. The disagreement gets written down
-here, filed against `rclone-manager`, and the case is marked
-`known_discrepancy: spdrman/rclone-manager#N` so the runner treats it as
+here, filed against `backupd`, and the case is marked
+`known_discrepancy: spdrman/backupd#N` so the runner treats it as
 a strict expected failure.
 
 Strict means both directions:
@@ -34,9 +34,9 @@ observed behaviour, and links its filed issue and its pinned case.
 
 | Finding | Issue | Summary |
 |---|---|---|
-| DISC-007 | [#211](https://github.com/spdrman/rclone-manager/issues/211) | the Web UI's API client calls fourteen `/api/v1` operations neither the contract nor the engine has, so four pages cannot load against a real backend |
-| DISC-008 | [#633](https://github.com/spdrman/rclone-manager/issues/633) | the mock API's CANDIDATE test connection hands its `archive` boolean to the report builder's `deliverable` parameter, so an ordinary storage class is reported as unable to take delivery and no destination can be saved in the browser, while the one class a retention tier is refused for would be waved through |
-| DISC-009 | [#634](https://github.com/spdrman/rclone-manager/issues/634) | a retention tier created after the default destination is moved starts on the old one, because the two cards on the settings page hold separate reads of it; and a tier added to a backup set's own policy never consults the default at all |
+| DISC-007 | [#211](https://github.com/spdrman/backupd/issues/211) | the Web UI's API client calls fourteen `/api/v1` operations neither the contract nor the engine has, so four pages cannot load against a real backend |
+| DISC-008 | [#633](https://github.com/spdrman/backupd/issues/633) | the mock API's CANDIDATE test connection hands its `archive` boolean to the report builder's `deliverable` parameter, so an ordinary storage class is reported as unable to take delivery and no destination can be saved in the browser, while the one class a retention tier is refused for would be waved through |
+| DISC-009 | [#634](https://github.com/spdrman/backupd/issues/634) | a retention tier created after the default destination is moved starts on the old one, because the two cards on the settings page hold separate reads of it; and a tier added to a backup set's own policy never consults the default at all |
 
 ## Resolved
 
@@ -50,11 +50,11 @@ that "this used to be wrong" stays findable without the stale write-up.
 The pin moves with the fix, every time: until it does, none of these
 cases can see the change that resolved them. DISC-001 through DISC-004
 went out together with
-[#209](https://github.com/spdrman/rclone-manager/pull/209) and the pin
+[#209](https://github.com/spdrman/backupd/pull/209) and the pin
 moved to `defa0a6`. DISC-006 went out with
-[#215](https://github.com/spdrman/rclone-manager/pull/215) and the pin
+[#215](https://github.com/spdrman/backupd/pull/215) and the pin
 moved to `612b48c`. DISC-005 went out with
-[#465](https://github.com/spdrman/rclone-manager/pull/465), whose own
+[#465](https://github.com/spdrman/backupd/pull/465), whose own
 branch carries `scripts/e2e/tests-repo.pin` forward to this repository's
 side of it; `build-under-test.json` still has to follow it here.
 
@@ -74,13 +74,13 @@ different thing.
 
 | Finding | Issue | What it was | The case that now asserts the contract |
 |---|---|---|---|
-| DISC-001 | [#187](https://github.com/spdrman/rclone-manager/issues/187) | `artifacts` answered a nonexistent backup set with an empty list and exit 0 | `artifacts/nonexistent-backup-set` |
-| DISC-002 | [#188](https://github.com/spdrman/rclone-manager/issues/188) | `validate` blamed the argument count when the real problem was flag ordering | `validate/operand-after-flags`, with `validate/unknown-flag-after-operand` and `validate/double-dash-ends-flags` bounding the accommodation |
-| DISC-003 | [#189](https://github.com/spdrman/rclone-manager/issues/189) | `version` silently accepted unknown flags where every other command exits 2 | `version/no-config-flag`, plus `version/rejects-an-operand` for the other way it says no |
-| DISC-004 | [#190](https://github.com/spdrman/rclone-manager/issues/190) | `daemon` exited 143 after handling SIGTERM, so a normal stop looked like a crash | `daemon/sigterm-stops-cleanly`, which now also asserts the shutdown log that used to be a race |
-| DISC-005 | [#21](https://github.com/spdrman/rclone-manager/issues/21), settled by [#431](https://github.com/spdrman/rclone-manager/issues/431) | plain `retention` printed that FR-20 local deletion is not implemented anywhere in this codebase and that #21 is open, months after #21 landed it; the usage line implied an apply mode the CLI deliberately does not have | `retention/plain-retention-is-a-preview`, which asserts the note that replaced it and, on the state dimension, that the invocation which looks destructive changes nothing |
-| DISC-006 | [#192](https://github.com/spdrman/rclone-manager/issues/192) | FR-18 defined the retention buckets and never said which timestamp put an artifact in one, so an ingested backlog collapsed into a single daily, weekly and monthly bucket and five artifacts out of six were delete candidates on the very first pass | `retention/gfs-tiers-from-one-ingest`, with `retention/override-flags-narrow-the-itemisation` showing the same fixture under a narrower chain and `retention/every-artifact-is-kept-or-deleted` still holding the partition |
-| DISC-010 | [#677](https://github.com/spdrman/rclone-manager/issues/677) | clicking a backup landed an operator on the Dashboard: an artifact id is three URL segments and `/backups/:artifactId` was one, so the detail page, the lifecycle timeline and the whole Copies card were unreachable in a browser on any real deployment | `backups.spec.ts`'s `backup detail` and `where a backup's copies are` blocks, which now assert against the real route directly rather than through `expectedToFailOnDISC010()` |
+| DISC-001 | [#187](https://github.com/spdrman/backupd/issues/187) | `artifacts` answered a nonexistent backup set with an empty list and exit 0 | `artifacts/nonexistent-backup-set` |
+| DISC-002 | [#188](https://github.com/spdrman/backupd/issues/188) | `validate` blamed the argument count when the real problem was flag ordering | `validate/operand-after-flags`, with `validate/unknown-flag-after-operand` and `validate/double-dash-ends-flags` bounding the accommodation |
+| DISC-003 | [#189](https://github.com/spdrman/backupd/issues/189) | `version` silently accepted unknown flags where every other command exits 2 | `version/no-config-flag`, plus `version/rejects-an-operand` for the other way it says no |
+| DISC-004 | [#190](https://github.com/spdrman/backupd/issues/190) | `daemon` exited 143 after handling SIGTERM, so a normal stop looked like a crash | `daemon/sigterm-stops-cleanly`, which now also asserts the shutdown log that used to be a race |
+| DISC-005 | [#21](https://github.com/spdrman/backupd/issues/21), settled by [#431](https://github.com/spdrman/backupd/issues/431) | plain `retention` printed that FR-20 local deletion is not implemented anywhere in this codebase and that #21 is open, months after #21 landed it; the usage line implied an apply mode the CLI deliberately does not have | `retention/plain-retention-is-a-preview`, which asserts the note that replaced it and, on the state dimension, that the invocation which looks destructive changes nothing |
+| DISC-006 | [#192](https://github.com/spdrman/backupd/issues/192) | FR-18 defined the retention buckets and never said which timestamp put an artifact in one, so an ingested backlog collapsed into a single daily, weekly and monthly bucket and five artifacts out of six were delete candidates on the very first pass | `retention/gfs-tiers-from-one-ingest`, with `retention/override-flags-narrow-the-itemisation` showing the same fixture under a narrower chain and `retention/every-artifact-is-kept-or-deleted` still holding the partition |
+| DISC-010 | [#677](https://github.com/spdrman/backupd/issues/677) | clicking a backup landed an operator on the Dashboard: an artifact id is three URL segments and `/backups/:artifactId` was one, so the detail page, the lifecycle timeline and the whole Copies card were unreachable in a browser on any real deployment | `backups.spec.ts`'s `backup detail` and `where a backup's copies are` blocks, which now assert against the real route directly rather than through `expectedToFailOnDISC010()` |
 
 ## Open contract questions
 
@@ -92,7 +92,7 @@ here, and pinned by cases that assert only what holds whichever way the
 question is answered.
 
 There are none open right now. DISC-006 was the one, and
-[#215](https://github.com/spdrman/rclone-manager/pull/215) answered it by
+[#215](https://github.com/spdrman/backupd/pull/215) answered it by
 writing the missing rule into FR-18: an artifact is placed twice, once by
 the discovery timestamp and once by the producer's own timestamp where
 that one is admissible, and KEEP is the union. It is in the Resolved

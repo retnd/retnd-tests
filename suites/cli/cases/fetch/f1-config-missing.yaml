@@ -4,7 +4,7 @@ argv: [fetch, --config, "${WORK}/no-such-config.yaml", --source, production, --b
 exit: 1
 stdout: ignored
 stderr:
-  - contains: "rbm: "
+  - contains: "backupd: "
   - contains: "${WORK}/no-such-config.yaml"
 state: unchanged
 contract:

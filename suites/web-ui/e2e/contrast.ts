@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 /**
  * A computed-contrast reading of everything a page has actually painted.
  *
- * rclone-manager#618 was not a wrong colour anybody wrote down. Nothing in
+ * backupd#618 was not a wrong colour anybody wrote down. Nothing in
  * the app declared `color-scheme`, so every browser assumed light for its
  * own controls whatever `data-theme` said, and any `input`, `select`,
  * `textarea` or `button` without an explicit colour took the user agent's

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spdrman/rclone-manager-tests/tools/equivstate"
+	"github.com/spdrman/backupd-tests/tools/equivstate"
 )
 
 // The point of these tests is the RED half of Suite C's plan: a state
@@ -222,7 +222,7 @@ func write(t *testing.T, path, body string) {
 	}
 }
 
-// stubCLI writes a script that stands in for rbm. Each mode
+// stubCLI writes a script that stands in for backupd. Each mode
 // decides how the two sides' read surfaces relate, which is the one
 // variable each test above is changing.
 func stubCLI(t *testing.T, mode string) string {
@@ -241,7 +241,7 @@ func stubCLI(t *testing.T, mode string) string {
 	if body == "" {
 		t.Fatalf("unknown stub mode %q", mode)
 	}
-	path := filepath.Join(t.TempDir(), "rbm")
+	path := filepath.Join(t.TempDir(), "backupd")
 	write(t, path, "#!/bin/sh\n"+body+"\n")
 	if err := os.Chmod(path, 0o755); err != nil {
 		t.Fatal(err)

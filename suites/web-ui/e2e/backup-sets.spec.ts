@@ -192,7 +192,7 @@ test.describe("backup set detail", () => {
     // every enabled set, so it claimed something the API could not do.
     // #214 renamed it for what it did. #597 then built the per-set run
     // for real. The engine half had existed since FR-1 behind
-    // `rbm fetch --backup-set`, and what was missing was a way
+    // `backupd fetch --backup-set`, and what was missing was a way
     // to reach it inside the serving process, so the header carries both
     // today. A pair like that is only honest while each says which one it
     // is, and a name alone cannot: that is exactly how the rewired

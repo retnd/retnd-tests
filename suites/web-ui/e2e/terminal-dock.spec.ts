@@ -1,7 +1,7 @@
 import { CONTENT_COLUMN, TERMINAL, expect, needs, test } from "./fixtures";
 
 /**
- * rclone-manager#617: the global terminal is pinned to the browser window,
+ * backupd#617: the global terminal is pinned to the browser window,
  * and the content column reserves the room it takes.
  *
  * # What the defect was
@@ -43,7 +43,7 @@ import { CONTENT_COLUMN, TERMINAL, expect, needs, test } from "./fixtures";
  */
 
 /** What a collapsed terminal is allowed to be: one line, plus the rule it
- *  draws along its top edge. rclone-manager exports the 32 as
+ *  draws along its top edge. backupd exports the 32 as
  *  DOCK_BAR_HEIGHT; nothing here imports from the product, so it is
  *  written down with the reason it is that number. */
 const ONE_LINE = 32;

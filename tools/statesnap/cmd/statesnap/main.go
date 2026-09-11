@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spdrman/rclone-manager-tests/tools/statesnap"
+	"github.com/spdrman/backupd-tests/tools/statesnap"
 )
 
 func main() {

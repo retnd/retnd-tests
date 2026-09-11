@@ -1,13 +1,13 @@
 # Suite B: the Web UI, against a real deployment
 
 This suite used to drive a Vite dev server. It drives a running
-`rclone-manager` now: a browser in one container, `rbm-web serve-ui` and
-`rbm-web serve` in another, a real sshd holding real backup files in a
+`backupd` now: a browser in one container, `backupd-web serve-ui` and
+`backupd-web serve` in another, a real sshd holding real backup files in a
 third, and SQLite behind all of it.
 
 ```sh
 cd suites/web-ui && npm ci && npx playwright install chromium   # once
-RM_BASE_URL=http://rclone-manager:8080 \
+RM_BASE_URL=http://backupd:8080 \
 RM_ADMIN_USERNAME=e2e-operator \
 RM_ADMIN_PASSWORD=... \
   npm run e2e
@@ -18,7 +18,7 @@ brings the containers up before this runner starts. Nothing in this
 directory starts anything. From a product checkout:
 
 ```sh
-scripts/e2e/three-machine-web-ui.sh --suite ../rclone-manager-tests/suites/web-ui
+scripts/e2e/three-machine-web-ui.sh --suite ../backupd-tests/suites/web-ui
 ```
 
 Against the rig as it stands (one backup set, three ingested artifacts, a
@@ -36,7 +36,7 @@ every `?scenario=` state a spec drove was a fixture inside the browser,
 and no test in this repository could fail on anything below it. Not the
 session, not the reverse proxy, not the engine, not the database.
 
-That gap cost something specific. `rclone-manager` #598 was the Activity
+That gap cost something specific. `backupd` #598 was the Activity
 page erroring in a browser while the server answered HTTP 200 with 64KB
 of valid JSON in 20ms. `activity-failure.spec.ts` has a case beside it
 called "activity, when the feed reads fine, still lists the recorded
@@ -57,7 +57,7 @@ instead.
 
 | variable | what it is |
 |---|---|
-| `RM_BASE_URL` | where the Web UI answers on the private network, e.g. `http://rclone-manager:8080`. A container name, resolved by Docker's embedded DNS, not a published host port |
+| `RM_BASE_URL` | where the Web UI answers on the private network, e.g. `http://backupd:8080`. A container name, resolved by Docker's embedded DNS, not a published host port |
 | `RM_ADMIN_USERNAME` | the throwaway administrator this run signs in as |
 | `RM_ADMIN_PASSWORD` | its password. Held in this process's environment and written nowhere: no file, no argv, no report |
 | `RM_ARTIFACTS_DIR` | where the evidence goes. Traces, screenshots and videos land in `<dir>/test-results` and the HTML report in `<dir>/html-report`, both a level below the directory itself: Playwright removes its own output directory on startup and a bind mount cannot be unlinked from inside the container |
@@ -204,7 +204,7 @@ lifecycle timeline and the whole Copies card were unreachable in a
 browser on any real deployment. The mock's ids were `art_01J9C1XY7T09`,
 one segment, so the route matched and five cases asserted their way
 through a page nobody could open. Filed and fixed as
-[rclone-manager#677](https://github.com/spdrman/rclone-manager/issues/677);
+[backupd#677](https://github.com/spdrman/backupd/issues/677);
 App.tsx had already fixed this exact defect on the neighbouring
 backup-set route in #285.
 

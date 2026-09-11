@@ -1,7 +1,7 @@
 doc: >
   `activity --follow` streams the SERVING PROCESS's own live event feed,
   which is a different thing from the durable transition log the same verb
-  reads without it (rclone-manager#598).
+  reads without it (backupd#598).
 
   With nothing serving this deployment there is no such feed: it is an
   in-memory tail of a process that is not running, and no file holds it.

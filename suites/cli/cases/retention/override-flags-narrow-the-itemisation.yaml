@@ -26,7 +26,7 @@ doc: >
   Neither case alone carries the claim. Read on its own this one is
   consistent with a chain that ignores its inputs and keeps only the
   newest artifact, which is exactly what the build before
-  spdrman/rclone-manager#215 did on this fixture under any flags at all.
+  spdrman/backupd#215 did on this fixture under any flags at all.
   It is the pair, one fixture and two chains giving two different
   itemisations, that shows the flags reached the arithmetic.
 
@@ -40,10 +40,10 @@ doc: >
   today's discovery-placed monthly bucket. A build in which either of
   these read differently would be one whose discovery pass had started
   spreading a single ingest across several buckets, which is the bug
-  spdrman/rclone-manager#192 was filed about in reverse.
+  spdrman/backupd#192 was filed about in reverse.
 
   000d's own DAILY and WEEKLY attribution is deliberately not pinned to
-  an exact placement here (rclone-manager#270). --daily-days 1 and
+  an exact placement here (backupd#270). --daily-days 1 and
   --weekly-months 1 narrow those two windows down to, respectively,
   exactly today and the current month to date, and 000d's producer
   placement is only ever a whisker inside either one: the fixture ages it
@@ -75,7 +75,7 @@ stdout:
   - line: "${SP}KEEP${SP}pg-04-age-100d.dump${SP}tiers=[MONTHLY(producer)]"
   - line: "${SP}KEEP${SP}pg-05-age-040d.dump${SP}tiers=[MONTHLY(producer)]"
   # DAILY and WEEKLY are a regex, not a line, on purpose: see the doc
-  # above (rclone-manager#270). Both narrowed windows admit only 000d's
+  # above (backupd#270). Both narrowed windows admit only 000d's
   # own placement or its discovery placement depending on which side of a
   # UTC-day boundary the harness's frozen Now and the CLI's real clock
   # landed on when this case happened to run, and that split is not the
@@ -96,6 +96,6 @@ contract:
   - "docs/EPIC.md FR-18 (a tier's window runs from the start of the bucket keep - 1 units back from today, through today inclusive)"
   - "docs/EPIC.md FR-18 (the weekly tier buckets by week and measures its look-back in calendar months)"
   - "docs/EPIC.md FR-19 (the newest eligible restore point is protected whatever the chain selects)"
-  - "rclone-manager#270 (a narrowed tier's placement attribution on the artifact sitting on its own boundary is not this case's claim)"
-  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544)'
+  - "backupd#270 (a narrowed tier's placement attribution on the artifact sitting on its own boundary is not this case's claim)"
+  - 'usage text: status, sources, artifacts and retention read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (backupd#536, #544)'
 tags: [smoke]

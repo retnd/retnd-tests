@@ -1,7 +1,7 @@
 doc: >
   `activity` lists the durable lifecycle transitions a real cycle
   recorded, newest first, which is the same append-only log the Web UI's
-  Activity page draws (rclone-manager#598). Before this verb existed the
+  Activity page draws (backupd#598). Before this verb existed the
   only way to read that log was a browser, so a deployment whose Activity
   page was failing had no second way to look at the same rows.
 
@@ -24,5 +24,5 @@ state: unchanged
 contract:
   - "usage text: activity [--backup-set S] [--severity warn|error] [--limit N] [--json] - list recorded lifecycle events, newest first"
   - "docs/EPIC.md FR-10 (explicit lifecycle states)"
-  - 'usage text: status, sources, artifacts, retention and activity read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (rclone-manager#536, #544, #598)'
+  - 'usage text: status, sources, artifacts, retention and activity read rather than write, so they announce which world the answer is about; "mode: direct" is nothing serving (backupd#536, #544, #598)'
 tags: [smoke]

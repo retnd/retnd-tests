@@ -2,7 +2,7 @@
 
 ```sh
 cd suites/equivalence && npm ci && npx playwright install chromium   # once
-RM_UI_DIR=/path/to/rclone-manager/ui/shared npm test
+RM_UI_DIR=/path/to/backupd/ui/shared npm test
 ```
 
 Or from the repository root, `make suite-c`.
@@ -33,7 +33,7 @@ proved today, the row says why and names the issue.
    goes over HTTP; the credential is generated per run, held in memory, and
    never written to disk or passed through argv.
 4. Perform the action through the browser on the first directory, and
-   through `rbm` on the second. One row drives the API directly
+   through `backupd` on the second. One row drives the API directly
    instead of the browser, and says so in the spec: the wizard's own path
    to creating a backup set goes through a live host-key probe, which
    opens a real SSH connection to a machine no fixture here has. Driving
@@ -103,10 +103,10 @@ creating a backup set. `MATRIX.md` says which, and says plainly that the
 number is a finding rather than a scope decision: against a real backend,
 four of the six pages cannot load, because `ui/shared/src/api/client.ts`
 calls fourteen `/api/v1` operations neither the contract nor the engine has
-([#211](https://github.com/spdrman/rclone-manager/issues/211),
+([#211](https://github.com/spdrman/backupd/issues/211),
 `findings/DISC-007.md`), and the two mutating actions that would matter
 most are refused by a destructive gate that is hardcoded shut pending
-[#92](https://github.com/spdrman/rclone-manager/issues/92).
+[#92](https://github.com/spdrman/backupd/issues/92).
 
 `specs/contract-gaps.spec.ts` pins every one of those blocks against a live
 engine, in both directions. A blocked row that starts working turns that

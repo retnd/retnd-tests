@@ -28,7 +28,7 @@ import { expect, test } from "./fixtures";
  *  the button, because that is the thing under test. */
 
 test.describe("signing out", () => {
-  test("sign-out lands on the Backup Manager login", async ({ page, bm }) => {
+  test("sign-out lands on the Backupd login", async ({ page, bm }) => {
     await bm.goto("/");
     // The real control, reaching the real endpoint. On the mock,
     // api.logout() never made a network call at all and the stub had to be
@@ -37,7 +37,7 @@ test.describe("signing out", () => {
 
     await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
     await expect(page.getByText(/not.*your NAS operating-system login/i)).toBeVisible();
-    await expect(page.getByRole("img", { name: "Backup Manager" })).toBeVisible();
+    await expect(page.getByRole("img", { name: "Backupd" })).toBeVisible();
   });
 
   test("the session it dropped is really gone from the service", async ({ page, bm, context }) => {
@@ -126,9 +126,9 @@ test.describe("the login form", () => {
     await page.goto("/");
     await page.getByRole("link", { name: /Create the administrator account/ }).click();
 
-    await expect(page.getByRole("heading", { name: /Create Backup Manager administrator/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Create Backupd administrator/ })).toBeVisible();
     await expect(
-      page.getByText(/manages Backup Manager only.*separate from your NAS operating-system account/s)
+      page.getByText(/manages Backupd only.*separate from your NAS operating-system account/s)
     ).toBeVisible();
   });
 
@@ -166,7 +166,7 @@ test.describe("the login form", () => {
     // reason that has nothing to do with what the test is checking. A
     // leading-anchored prefix survives the name growing and still cannot
     // collide with a "Show confirm password" toggle button, which starts
-    // with "Show" (rclone-manager#344).
+    // with "Show" (backupd#344).
     const confirm = page.getByLabel(/^Confirm password/);
     await page.getByLabel("Username").fill("bm-admin");
     await password.fill("short");

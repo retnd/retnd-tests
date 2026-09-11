@@ -1,7 +1,7 @@
 doc: >
   `--tier-medium NAME=local` moves a tier back to the drive this
   deployment's backups already land on, and the configuration ends up as
-  it started (spdrman/rclone-manager#622).
+  it started (spdrman/backupd#622).
 
   `local` being a legal name here is the whole of #622's vocabulary
   decision arriving on a command line. It is the name the picker shows,
