@@ -1,6 +1,6 @@
 # DISC-007: the Web UI's API client calls fourteen operations neither the contract nor the engine has
 
-- **Filed as**: [spdrman/backupd#211](https://github.com/spdrman/backupd/issues/211)
+- **Filed as**: [backupdproject/backupd#211](https://github.com/backupdproject/backupd/issues/211)
 - **Pinned by**: `suites/equivalence/specs/contract-gaps.spec.ts`
 - **Build**: originally observed on `backupd` at
   `137f64699203a5ec6d2a6e399a654b99814a5a74`
@@ -8,7 +8,7 @@
   running them against each other for the first time.
 - **Status**: **mostly resolved upstream.** Of the pairs enumerated under
   "Observed" below, all but three were closed by
-  [#214](https://github.com/spdrman/backupd/pull/214) (`aba87b7`),
+  [#214](https://github.com/backupdproject/backupd/pull/214) (`aba87b7`),
   which this repository observed when the pin moved from `612b48c` to
   `6a93b96`. The three that remain are a different shape from the rest.
   See "What has since changed" below.
@@ -80,7 +80,7 @@ destructive gate. That one is deliberate and tracked at #92.
 
 ## What has since changed
 
-[#214](https://github.com/spdrman/backupd/pull/214) (`aba87b7`,
+[#214](https://github.com/backupdproject/backupd/pull/214) (`aba87b7`,
 "Make every /api/v1 path the Web UI calls a real operation") closed all
 but three of the pairs above, registering them in
 `apps/common/webhost/router.go` and declaring them in
@@ -109,7 +109,7 @@ contract at this pin. The per-set manual run reaches the backend through
 `POST /operations` instead, and that route exists, is declared, and is
 refused by `requireDestructiveGate` while `serve` sets no gate and
 `NewRouter` defaults to `NotYetImplementedGate`. So the manual-run row in
-the matrix stays blocked, but on [#92](https://github.com/spdrman/backupd/issues/92)
+the matrix stays blocked, but on [#92](https://github.com/backupdproject/backupd/issues/92)
 rather than on this finding.
 
 ### One distinction worth keeping

@@ -1,6 +1,6 @@
 # DISC-009: a newly created retention tier does not always start on the default destination
 
-- **Filed as**: [spdrman/backupd#634](https://github.com/spdrman/backupd/issues/634)
+- **Filed as**: [backupdproject/backupd#634](https://github.com/backupdproject/backupd/issues/634)
 - **Pinned by**: nothing yet, deliberately. See "What the suite does about
   it" below; `suites/web-ui/e2e/storage-destinations.spec.ts`'s "gives a
   newly added tier a destination of its own, named rather than left empty"
@@ -13,7 +13,7 @@
 
 ## Contract
 
-spdrman/backupd#622, on what "default" means:
+backupdproject/backupd#622, on what "default" means:
 
 > "Default" is new. It is not currently in the model, and it needs to say
 > what it governs: the destination a newly created tier starts on.

@@ -4,7 +4,7 @@ doc: >
 
   That is the first of the three answers a local test connection has to be
   able to give apart from each other
-  (spdrman/backupd#622), and it is by far the most
+  (backupdproject/backupd#622), and it is by far the most
   common of them on a NAS: the path in the configuration is right, the
   volume behind it did not mount, and a backup written now would go into
   an empty mount point on the system disk.

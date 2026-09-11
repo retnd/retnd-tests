@@ -65,7 +65,7 @@ type Build struct {
 // DefaultRepoURL is where source mode clones backupd from when
 // RM_SOURCE_REPO does not override it. A local checkout path works there
 // too and is much faster, which is what the gate scripts use.
-const DefaultRepoURL = "https://github.com/spdrman/backupd.git"
+const DefaultRepoURL = "https://github.com/backupdproject/backupd.git"
 
 // LoadPin reads build-under-test.json from repoRoot.
 func LoadPin(repoRoot string) (Pin, error) {
@@ -110,7 +110,7 @@ func Resolve(repoRoot string, pin Pin) (Build, error) {
 		return resolveSource(pin)
 	case "registry":
 		return Build{}, errors.New(
-			"registry mode is not usable yet: nothing has been pushed to ghcr.io/spdrman/backupd. " +
+			"registry mode is not usable yet: nothing has been pushed to ghcr.io/backupdproject/backupd. " +
 				"See docs/pinning.md; use source or local mode until the first push exists")
 	default:
 		return Build{}, fmt.Errorf("unsupported mode %q", mode)

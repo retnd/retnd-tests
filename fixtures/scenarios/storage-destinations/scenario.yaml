@@ -4,7 +4,7 @@ doc: >
   chain whose tiers can be named on a command line.
 
   It exists for the storage-destination surfaces EPIC H's H2.2
-  (spdrman/backupd#622) added, and it is written as `raw_config`
+  (backupdproject/backupd#622) added, and it is written as `raw_config`
   rather than through the rendered shape because two of the keys those
   surfaces are about have no field in it: `storage_mediums` and an
   explicit `retention.tiers` chain. The rendered config writes the

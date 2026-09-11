@@ -17,7 +17,7 @@ doc: >
   calendar buckets and never said which timestamp put an artifact in one,
   the backup's own date or the moment this manager received it, and the
   two readings gave different answers for this fixture. That question was
-  filed as spdrman/backupd#192 and settled by #215: FR-18 now
+  filed as backupdproject/backupd#192 and settled by #215: FR-18 now
   places every artifact twice and unions the results, and this fixture's
   six artifacts no longer collapse into one bucket.
 

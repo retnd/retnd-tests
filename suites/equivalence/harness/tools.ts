@@ -105,7 +105,7 @@ export interface CliResult {
  *
  *  `version` is the one command that has to opt out, with `config: false`.
  *  The usage banner says every command *except* version accepts --config,
- *  and since spdrman/backupd#189 the binary means it: version
+ *  and since backupdproject/backupd#189 the binary means it: version
  *  answers an undefined flag the way every other command does, with exit 2
  *  and the flag package's own complaint. Suite A pins that as
  *  `version/no-config-flag`. Appending --config unconditionally therefore
