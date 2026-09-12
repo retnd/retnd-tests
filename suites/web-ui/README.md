@@ -23,7 +23,7 @@ scripts/e2e/three-machine-web-ui.sh --suite ../backupd-tests/suites/web-ui
 
 Against the rig as it stands (one backup set, three ingested artifacts, a
 healthy deployment with nothing declared), that is green in about ten
-minutes, with the eight cases that used to carry `expectedToFailOnDISC010()`
+minutes, with the eight cases that used to carry `expectedToFailOnDISC010`
 now asserting for real. The run ends by printing every skipped case with
 the reason it declined.
 
@@ -36,7 +36,7 @@ every `?scenario=` state a spec drove was a fixture inside the browser,
 and no test in this repository could fail on anything below it. Not the
 session, not the reverse proxy, not the engine, not the database.
 
-That gap cost something specific. `backupd` #598 was the Activity
+That gap cost something specific. `backupd` was the Activity
 page erroring in a browser while the server answered HTTP 200 with 64KB
 of valid JSON in 20ms. `activity-failure.spec.ts` has a case beside it
 called "activity, when the feed reads fine, still lists the recorded
@@ -84,7 +84,7 @@ refused. It now does what the client does (`harness/session.ts`):
 1. GET any page. `apps/common/csrf`'s `EnsureCookie` runs in front of
    every response precisely so a fresh client has a token before it needs
    one, and sets `backupd_csrf` (`bm_csrf` on a build from before
-   backupd#794 renamed it; the harness reads either).
+    renamed it; the harness reads either).
 2. POST `/api/v1/auth/login` carrying that cookie and its value again in
    `X-CSRF-Token`. The cookie is what a cross-site attacker can make a
    browser send; the header is what it cannot read to construct.
@@ -110,7 +110,7 @@ Two properties are worth knowing about:
 
 A spec that wants the signed-out UI says `test.use({ signedIn: false })`
 and gets a context with no session at all, which is both the honest thing
-and free. `bm.signOut()` is kept for the one case that is about signing
+and free. `bm.signOut` is kept for the one case that is about signing
 out: it really revokes the session server-side, which is why it tells the
 store.
 
@@ -129,7 +129,7 @@ So a case asserting on rows now does one of four things, and says which:
 | runs | the claim never depended on which data was behind it | most of the suite |
 | `needs(...)` | the deployment is not in the state this case is about, and the reason is read off the API rather than off a flag | the run prints `needs a backup set halted on a changed host key`, and so on |
 | `mockOnly(...)` | the case's SUBJECT is a state only `createMockApi` could manufacture | three cases, all in the version-mismatch block |
-| `destructive()` | it destroys something nothing puts back | two cases |
+| `destructive` | it destroys something nothing puts back | two cases |
 
 Nothing was deleted to reach green. A case that quietly disappears is
 indistinguishable from one nobody wrote; a case that says "skipped,
@@ -205,15 +205,15 @@ lifecycle timeline and the whole Copies card were unreachable in a
 browser on any real deployment. The mock's ids were `art_01J9C1XY7T09`,
 one segment, so the route matched and five cases asserted their way
 through a page nobody could open. Filed and fixed as
-[backupd#677](https://github.com/backupdproject/backupd/issues/677);
+(https://github.com/backupdproject/backupd/issues/677);
 App.tsx had already fixed this exact defect on the neighbouring
-backup-set route in #285.
+backup-set route in
 
 **Two cases that had learned something untrue from the fixture.** The
 storage-critical case asserted that a full disk escalates the headline;
 §8 says the headline is the BACKUP verdict and storage is a chip beside
 it, and `HealthSummary` does exactly that. The mock escalated it. And the
-nav badge beside "Backups" counts backup SETS, not backups (#211), so it
+nav badge beside "Backups" counts backup SETS, not backups, so it
 reads 1 beside a page listing 3, which the mock's fixture hid by having
 the two numbers agree.
 
