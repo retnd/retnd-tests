@@ -12,13 +12,14 @@
 //
 //  1. GET any page. `apps/common/csrf`'s EnsureCookie runs in front of
 //     EVERY response this service sends, precisely so a fresh client has a
-//     token to echo before it needs one, and sets `bm_csrf`.
+//     token to echo before it needs one, and sets `backupd_csrf` (or, on a
+//     build from before backupd#794, `bm_csrf` - see LEGACY_CSRF_COOKIE).
 //  2. POST /api/v1/auth/login carrying that cookie AND its value again in
 //     the `X-CSRF-Token` header. The cookie is what a cross-site attacker
 //     can make a browser send; the header is what it cannot read to
 //     construct, and the service compares the two in constant time.
-//  3. A 204 with a `bm_session` cookie. That cookie is what the browser
-//     then carries, and it is what everything else in this suite runs on.
+//  3. A 204 with a `backupd_session` cookie. That cookie is what the
+//     browser then carries, and everything else in this suite runs on it.
 //
 // A fresh install has no administrator to log in as, and enrolment is the
 // step in front of the whole thing: POST /api/v1/auth/enroll, same CSRF
@@ -44,17 +45,50 @@ import { BOOTSTRAP_TOKEN_VAR, PASSWORD_VAR, USERNAME_VAR } from "./deployment";
 /** apps/common/csrf's double-submit pair. Written down rather than
  *  imported, because nothing here depends on the product's source tree,
  *  and repeated in the comment above with the reason it is two things. */
-export const CSRF_COOKIE = "bm_csrf";
+export const CSRF_COOKIE = "backupd_csrf";
 export const CSRF_HEADER = "X-CSRF-Token";
 /** apps/common/auth/local's session cookie, and its single-use enrolment
  *  header (BootstrapTokenHeader). */
-export const SESSION_COOKIE = "bm_session";
+export const SESSION_COOKIE = "backupd_session";
 export const BOOTSTRAP_HEADER = "X-Bootstrap-Token";
+
+/** What those two cookies were called before backupd#794 renamed the
+ *  project, and why both names are still here.
+ *
+ *  The product reads either and writes only the current one
+ *  (apps/common/csrf's `LegacyCookieName`, and `LegacySessionCookieName`
+ *  beside it), so a bundle cached from before the rename keeps working
+ *  while a fresh client is issued the new name. This suite has to do the
+ *  same for a different reason: it is pinned at a build under test that
+ *  may be either side of that rename, and a run against a 0.3.x image
+ *  should assert on the product rather than die in a fixture.
+ *
+ *  The old names alone are exactly how this suite spent a release
+ *  reporting nothing: every case failed in the worker fixture with "GET /
+ *  set no bm_csrf cookie" before it could assert anything at all. */
+export const LEGACY_CSRF_COOKIE = "bm_csrf";
+export const LEGACY_SESSION_COOKIE = "bm_session";
 
 /** Reads one cookie's value out of what a request context is holding. */
 export function cookieValue(cookies: readonly Cookie[], name: string): string {
   const found = cookies.find((c) => c.name === name);
   return found ? found.value : "";
+}
+
+/** The CSRF token this jar carries, under whichever name issued it.
+ *
+ *  Current name first, exactly like `ui/shared/src/api/client.ts`: a jar
+ *  that somehow holds both is one mid-rename, and the current one is the
+ *  one the service just set. */
+export function csrfCookieValue(cookies: readonly Cookie[]): string {
+  const current = cookieValue(cookies, CSRF_COOKIE);
+  return current === "" ? cookieValue(cookies, LEGACY_CSRF_COOKIE) : current;
+}
+
+/** The session this jar carries, under whichever name issued it. */
+export function sessionCookieValue(cookies: readonly Cookie[]): string {
+  const current = cookieValue(cookies, SESSION_COOKIE);
+  return current === "" ? cookieValue(cookies, LEGACY_SESSION_COOKIE) : current;
 }
 
 /** The cookies a signed-in browser needs, in Playwright's own shape so
@@ -73,12 +107,13 @@ async function csrfToken(api: APIRequestContext): Promise<string> {
         "Nothing was submitted to it."
     );
   }
-  const token = cookieValue((await api.storageState()).cookies, CSRF_COOKIE);
+  const token = csrfCookieValue((await api.storageState()).cookies);
   if (token === "") {
     throw new Error(
-      "GET / set no " + CSRF_COOKIE + " cookie, so there is no token to echo back and every " +
-        "state-changing request would be refused with CSRF_TOKEN_MISSING. " +
-        "Either the URL is not this product, or it is being served without apps/common/csrf's middleware."
+      "GET / set neither a " + CSRF_COOKIE + " nor a " + LEGACY_CSRF_COOKIE + " cookie, so there is " +
+        "no token to echo back and every state-changing request would be refused with " +
+        "CSRF_TOKEN_MISSING. Either the URL is not this product, or it is being served without " +
+        "apps/common/csrf's middleware."
     );
   }
   return token;
@@ -149,9 +184,10 @@ export async function signIn(deployment: Deployment): Promise<SessionCookies> {
 
 function sessionFrom(state: { cookies: Cookie[] }, how: string): SessionCookies {
   const cookies = state.cookies;
-  if (cookieValue(cookies, SESSION_COOKIE) === "") {
+  if (sessionCookieValue(cookies) === "") {
     throw new Error(
-      how + " reported success but set no " + SESSION_COOKIE + " cookie, so nothing is signed in. " +
+      how + " reported success but set neither a " + SESSION_COOKIE + " nor a " +
+        LEGACY_SESSION_COOKIE + " cookie, so nothing is signed in. " +
         "A proxy in front of the service that drops Set-Cookie looks exactly like this."
     );
   }

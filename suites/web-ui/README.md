@@ -83,11 +83,12 @@ refused. It now does what the client does (`harness/session.ts`):
 
 1. GET any page. `apps/common/csrf`'s `EnsureCookie` runs in front of
    every response precisely so a fresh client has a token before it needs
-   one, and sets `bm_csrf`.
+   one, and sets `backupd_csrf` (`bm_csrf` on a build from before
+   backupd#794 renamed it; the harness reads either).
 2. POST `/api/v1/auth/login` carrying that cookie and its value again in
    `X-CSRF-Token`. The cookie is what a cross-site attacker can make a
    browser send; the header is what it cannot read to construct.
-3. A 204, and a `bm_session` cookie the browser then carries.
+3. A 204, and a `backupd_session` cookie the browser then carries.
 
 A deployment with no administrator is enrolled instead, through
 `/api/v1/auth/enroll` with the single-use `X-Bootstrap-Token`, when the

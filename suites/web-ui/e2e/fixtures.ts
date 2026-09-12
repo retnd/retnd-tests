@@ -21,8 +21,8 @@ import { type SessionCookies, sessionIsLive, signIn } from "../harness/session";
  * would take the one path this move exists to cover and stub it out again.
  *
  * So the fixture signs in the way the client does: GET a page for the
- * `bm_csrf` cookie, POST /api/v1/auth/login echoing it back in
- * `X-CSRF-Token`, and carry the `bm_session` cookie the 204 sets. The
+ * `backupd_csrf` cookie, POST /api/v1/auth/login echoing it back in
+ * `X-CSRF-Token`, and carry the `backupd_session` cookie the 204 sets. The
  * details are in harness/session.ts, including why no credential in this
  * suite ever reaches a file.
  *

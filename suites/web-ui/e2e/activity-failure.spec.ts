@@ -1,3 +1,5 @@
+import type { Page } from "@playwright/test";
+
 import { expect, needs, test } from "./fixtures";
 
 /**
@@ -62,7 +64,7 @@ const NOT_AN_ID = "correlation id unavailable";
  *  Deliberately NOT a 500. A refusal the client understands would be
  *  handled by the code path that already worked, and the bug was in the
  *  other one. */
-async function serveUnreadableActivity(page: import("@playwright/test").Page) {
+async function serveUnreadableActivity(page: Page) {
   await page.route("**/api/v1/activity*", async (route) => {
     await route.fulfill({
       status: 200,
@@ -225,5 +227,101 @@ test.describe("activity, when the feed reads fine", () => {
     // rendered is an event rather than an empty-state line that happens to
     // be a list item.
     await expect(page.getByRole("listitem").first()).toContainText(/\d{2}:\d{2}:\d{2}/);
+  });
+});
+
+/** backupd#795: the other half of the distinction this file's header
+ *  promises - "a service that did not answer" as against "one that
+ *  answered unreadably".
+ *
+ *  On the reported UGREEN NAS the web-ui reverse proxy
+ *  (`backupd-web serve-ui`) could not reach the engine at all
+ *  (`dial tcp: lookup rclone-manager on 127.0.0.11:53: no such host`), and
+ *  the Activity page showed the operator nothing. A read that never gets
+ *  an answer is a different problem from one whose answer will not parse,
+ *  and it must not be reported in the other one's words.
+ *
+ *  `route.abort("failed")` is what an unreachable service looks like from
+ *  inside the page: the fetch rejects with a TypeError, which is exactly
+ *  what the client's `no-response` failure is made of.
+ *
+ *  # What this cannot claim, and where that claim lives
+ *
+ *  The abort happens in the browser, so serve-ui is never involved: this
+ *  case cannot fail on what a real proxy answers when its upstream is
+ *  gone, nor on whether that answer carries the correlation id its own log
+ *  line quotes. `engine-unreachable.spec.ts` stops the engine CONTAINER
+ *  and asserts exactly that, and it runs only under the rig's
+ *  `--break-engine`. This one runs on every Suite B run, which is the
+ *  point of keeping both: the cheap guard is always on, and the expensive
+ *  one is the one that can fail on the deployment. */
+async function serveUnreachableEngine(page: Page) {
+  await page.route("**/api/v1/activity*", (route) => route.abort("failed"));
+}
+
+test.describe("activity, when nothing answers at all", () => {
+  test.beforeEach(async ({ bm, page }) => {
+    await serveUnreachableEngine(page);
+    await bm.goto("/activity");
+  });
+
+  test("says a failure happened at all, rather than an empty feed", async ({ page }) => {
+    // A blank timeline reads as "nothing has happened on this NAS", which
+    // is the exact wrong claim when the request never reached anything -
+    // and the whole of what #795 gave its operator.
+    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(page.getByText("No matching events")).toHaveCount(0);
+  });
+
+  test("names a service that did not answer, not one that answered unreadably", async ({ page }) => {
+    const alert = page.getByRole("alert");
+    // The two failures send whoever is fixing them to different machines.
+    // Borrowing the 200-unreadable wording here sends them to read the
+    // build's parser when the service is down.
+    await expect(alert).toContainText(
+      /did not answer|not answering|could not reach|unreachable|no response/i
+    );
+    await expect(alert).not.toContainText(/could not read the answer/i);
+  });
+
+  test("offers no correlation id, and never the literal one", async ({ page }) => {
+    // Nothing answered, so there is no id to quote, and the honest
+    // rendering of "no id" is silence. The banner is asserted first for
+    // the same reason as in the unreadable case: a build that drew no
+    // banner at all would satisfy both absences.
+    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(NOT_AN_ID);
+    await expect(page.locator("body")).not.toContainText("unavailable");
+  });
+
+  test("shows no stack trace and no source path", async ({ page }) => {
+    const body = await page.locator("body").innerText();
+    // §37, and worth repeating for this path specifically: the object
+    // thrown here is the browser's own TypeError rather than the client's
+    // typed failure, so it arrives with a different stack to leak.
+    expect(body).not.toContain("    at ");
+    expect(body).not.toMatch(/\/src\/[A-Za-z]+\.tsx?/);
+  });
+
+  test("Try again re-issues the read and leaves evidence it ran", async ({ page }) => {
+    const alert = page.getByRole("alert");
+    await alert.getByRole("button", { name: /try again/i }).click();
+    // The interception is still installed, so the retry really goes out
+    // and really fails again; the banner has to change, or it is a button
+    // people press harder at an unchanged screen.
+    await expect(alert.getByText(/tried again at/i)).toBeVisible();
+  });
+
+  test("recovers when the service becomes reachable again", async ({ page, bm }) => {
+    // Keeps the five above honest: a build that drew the banner
+    // permanently would satisfy every one of them.
+    needs(
+      bm.facts.activityEvents > 0,
+      "at least one recorded activity event, so the recovered page has something to draw"
+    );
+    await page.unroute("**/api/v1/activity*");
+    await page.getByRole("alert").getByRole("button", { name: /try again/i }).click();
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    await expect(page.getByRole("listitem").first()).toBeVisible();
   });
 });
