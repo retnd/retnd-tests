@@ -43,7 +43,7 @@ out where they occur.
      shared directory, which is a change from the original design: this
      machine carries around fifty worktrees of the product, and one shared
      working tree that every concurrent gate run checks out into is shared
-     mutable state of exactly the kind that produced #172. A directory
+     mutable state of exactly the kind that produced A directory
      there is immutable once complete, and the clone plus its `npm ci`
      happen in a scratch sibling renamed into place only at the end, so a
      half-finished attempt can never be mistaken for a good checkout;
@@ -83,7 +83,7 @@ out where they occur.
    `git commit --no-verify` stays the documented WIP escape hatch it
    already is.
 
-   **A missing Chromium** was the open question #197 left for whoever
+   **A missing Chromium** was the open question left for whoever
    implemented this, and it is answered with the repository's own
    precedent rather than a new shape: the step refuses, names
    `npx playwright install chromium` as the fix, and `CI_LOCAL_SKIP_E2E=1`
