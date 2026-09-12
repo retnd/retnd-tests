@@ -1,3 +1,11 @@
+import type { Page } from "@playwright/test";
+
+import {
+  CSRF_COOKIE,
+  LEGACY_CSRF_COOKIE,
+  LEGACY_SESSION_COOKIE,
+  SESSION_COOKIE
+} from "../harness/session";
 import { expect, test } from "./fixtures";
 
 /** §30 — the login must not resemble a NAS system login, and must say so.
@@ -210,16 +218,135 @@ test.describe("what the service says about this session", () => {
     // credentials belong to rather than any string a stub could return.
     await bm.goto("/");
 
+    // Either name, because the build under test can be either side of
+    // backupd#794's rename and this case is about a session existing, not
+    // about which release named it (harness/session.ts).
     const cookies = (await context.cookies()).map((c) => c.name);
-    expect(cookies).toContain("bm_session");
+    expect(cookies.filter((name) => name === SESSION_COOKIE || name === LEGACY_SESSION_COOKIE))
+      .not.toHaveLength(0);
     // The CSRF half of the pair, which every mutating request in every
     // other spec depends on and which no page can function without.
-    expect(cookies).toContain("bm_csrf");
+    expect(cookies.filter((name) => name === CSRF_COOKIE || name === LEGACY_CSRF_COOKIE))
+      .not.toHaveLength(0);
 
     const session = await context.request.get("/api/v1/auth/session");
     expect(session.status()).toBe(200);
     expect(((await session.json()) as { username?: string }).username).toBe(
       deployment.credentials.username
     );
+  });
+});
+
+/** backupd#795, the half of it that is about 403 rather than about 502.
+ *
+ *  `/api/v1/auth/session`'s contract has exactly one answer that means
+ *  "this browser is not signed in", and it is 401. A 403 is the service
+ *  having looked and refused on POLICY - an authorization layer, a proxy
+ *  rule, an account disabled between one request and the next - and the
+ *  one action it is guaranteed not to be fixed by is the one a login form
+ *  offers. Reading it as signed-out is #795's own mistake made on a
+ *  smaller scale: a refusal the frontend did not understand, rendered as a
+ *  verdict about the operator.
+ *
+ *  Nor is it the outage page. Something DID answer, in one round trip,
+ *  with a status and often with a sentence explaining the policy; telling
+ *  the operator that Backupd is not answering sends them to restart a
+ *  service that is running.
+ *
+ *  `page.route` for the same reason `activity-failure.spec.ts` uses it: a
+ *  real deployment answering this route 403 is a deployment misconfigured
+ *  in a way no run can arrange, and only the bytes on the wire are
+ *  substituted - the bundle, the auth gate, the router and the surface
+ *  that renders are all the real ones. */
+async function refuseSession(page: Page, body: string | null) {
+  await page.route("**/api/v1/auth/session", async (route) => {
+    if (body === null) {
+      // What a proxy's own denial looks like: a status and nothing to
+      // read. The frontend has no sentence to quote and still may not
+      // invent one about the session.
+      await route.fulfill({ status: 403, contentType: "text/plain", body: "" });
+      return;
+    }
+    await route.fulfill({ status: 403, contentType: "application/json", body });
+  });
+}
+
+/** The service's own words for this refusal, chosen to be unmistakably
+ *  not a string this frontend could have produced. */
+const POLICY_MESSAGE = "This account may not sign in from this network.";
+
+test.describe("a session the service refuses to discuss", () => {
+  test("does not ask for a password it has been told will not help", async ({ page }) => {
+    await refuseSession(
+      page,
+      JSON.stringify({ error: { code: "forbidden", message: POLICY_MESSAGE } })
+    );
+    await page.goto("/");
+
+    // The load-bearing absence. A 403 rendered as the login screen is an
+    // operator typing a correct password into a form that will answer 403
+    // again, with no way to learn why from either screen.
+    await expect(page.getByRole("heading", { name: /^sign in$/i })).toHaveCount(0);
+    await expect(page.locator("input[type='password']")).toHaveCount(0);
+  });
+
+  test("says the service refused rather than that it did not answer", async ({ page }) => {
+    await refuseSession(
+      page,
+      JSON.stringify({ error: { code: "forbidden", message: POLICY_MESSAGE } })
+    );
+    await page.goto("/");
+
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "Backupd could not check your session",
+        exact: true
+      })
+    ).toBeVisible();
+    // Verbatim. The service explained its own policy, and a frontend that
+    // paraphrases it is a frontend that has decided it understands a rule
+    // it has never seen; #598 is what that costs.
+    await expect(page.getByRole("alert")).toContainText(POLICY_MESSAGE);
+    // And not the outage wording, which belongs to a request that got no
+    // answer at all - this one got one, immediately.
+    await expect(page.locator("body")).not.toContainText(/is not answering|did not answer/i);
+  });
+
+  test("says something an operator can act on even when the refusal carries no words", async ({
+    page
+  }) => {
+    await refuseSession(page, null);
+    await page.goto("/");
+
+    // Nothing to quote, so the frontend must say what it actually knows -
+    // that it could not find out - and must still not offer the login
+    // form as the answer.
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "Backupd could not check your session",
+        exact: true
+      })
+    ).toBeVisible();
+    await expect(page.getByRole("alert")).toContainText(
+      "Backupd could not answer whether this browser is signed in."
+    );
+    await expect(page.getByRole("heading", { name: /^sign in$/i })).toHaveCount(0);
+  });
+
+  test("never renders the placeholder correlation id on this surface", async ({ page }) => {
+    await refuseSession(
+      page,
+      JSON.stringify({ error: { code: "forbidden", message: POLICY_MESSAGE } })
+    );
+    await page.goto("/");
+
+    // #598's string, asserted here because this surface is new and the
+    // ban is on the product rather than on any one page. The alert is
+    // asserted first so a build that drew nothing at all cannot satisfy
+    // the absence.
+    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(page.locator("body")).not.toContainText("correlation id unavailable");
   });
 });

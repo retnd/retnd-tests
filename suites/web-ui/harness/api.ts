@@ -29,7 +29,7 @@
 
 import type { APIRequestContext } from "@playwright/test";
 
-import { CSRF_COOKIE, CSRF_HEADER, cookieValue } from "./session";
+import { CSRF_COOKIE, CSRF_HEADER, LEGACY_CSRF_COOKIE, csrfCookieValue } from "./session";
 
 const BASE = "/api/v1";
 
@@ -230,11 +230,12 @@ export function describeFacts(facts: DeploymentFacts): string {
 /** The CSRF header a mutating request has to carry, read out of the
  *  cookie the same request context is already holding. */
 async function csrfHeaders(api: APIRequestContext): Promise<Record<string, string>> {
-  const token = cookieValue((await api.storageState()).cookies, CSRF_COOKIE);
+  const token = csrfCookieValue((await api.storageState()).cookies);
   if (token === "") {
     throw new Error(
-      "this request context holds no " + CSRF_COOKIE + " cookie, so a mutating call would be refused " +
-        "with CSRF_TOKEN_MISSING. A context that has never loaded a page from this origin is the usual cause."
+      "this request context holds neither a " + CSRF_COOKIE + " nor a " + LEGACY_CSRF_COOKIE +
+        " cookie, so a mutating call would be refused with CSRF_TOKEN_MISSING. A context that has " +
+        "never loaded a page from this origin is the usual cause."
     );
   }
   return { [CSRF_HEADER]: token, "content-type": "application/json" };
