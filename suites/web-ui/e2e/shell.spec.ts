@@ -26,7 +26,14 @@ test.describe("application shell", () => {
     // mode on the first real run; the mock's page had fewer of them.
     // `.first()` would have made it pass by picking whichever came first
     // in the DOM, which is not the same claim.
-    await expect(page.getByRole("banner").getByText("backupd")).toBeVisible();
+    //
+    // `exact` is the second half, and backupd#794 is why: the mark's own
+    // <title>Backupd</title> is text too, and getByText matches
+    // case-insensitively on a substring, so after the rename the header
+    // held two matches - one of them an SVG title that is never visible.
+    // Exact matching is case-sensitive, so it selects the wordmark and
+    // not the accessible name beside it.
+    await expect(page.getByRole("banner").getByText("backupd", { exact: true })).toBeVisible();
     // Scoped to the header (role "banner") — the dashboard body's own
     // health summary widget repeats "Service running" with a different
     // suffix (uptime, not version), so an unscoped match is ambiguous once

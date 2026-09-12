@@ -1,3 +1,9 @@
+import {
+  CSRF_COOKIE,
+  LEGACY_CSRF_COOKIE,
+  LEGACY_SESSION_COOKIE,
+  SESSION_COOKIE
+} from "../harness/session";
 import { expect, test } from "./fixtures";
 
 /** §30 — the login must not resemble a NAS system login, and must say so.
@@ -210,11 +216,16 @@ test.describe("what the service says about this session", () => {
     // credentials belong to rather than any string a stub could return.
     await bm.goto("/");
 
+    // Either name, because the build under test can be either side of
+    // backupd#794's rename and this case is about a session existing, not
+    // about which release named it (harness/session.ts).
     const cookies = (await context.cookies()).map((c) => c.name);
-    expect(cookies).toContain("bm_session");
+    expect(cookies.filter((name) => name === SESSION_COOKIE || name === LEGACY_SESSION_COOKIE))
+      .not.toHaveLength(0);
     // The CSRF half of the pair, which every mutating request in every
     // other spec depends on and which no page can function without.
-    expect(cookies).toContain("bm_csrf");
+    expect(cookies.filter((name) => name === CSRF_COOKIE || name === LEGACY_CSRF_COOKIE))
+      .not.toHaveLength(0);
 
     const session = await context.request.get("/api/v1/auth/session");
     expect(session.status()).toBe(200);

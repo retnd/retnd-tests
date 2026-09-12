@@ -76,7 +76,8 @@ const NOT_AN_ID = "correlation id unavailable";
 /** A service that DID NOT ANSWER, in whichever of its two honest forms
  *  this deployment produces: the browser's fetch rejected outright, or
  *  serve-ui answered for it and said it could not reach the engine. */
-const DID_NOT_ANSWER = /did not answer|could not reach|unreachable|no response|not responding/i;
+const DID_NOT_ANSWER =
+  /did not answer|not answering|could not reach|unreachable|no response|not responding/i;
 
 /** And the words that belong to the OTHER failure - a service that
  *  answered with something this build could not parse (#598). Borrowing
@@ -268,8 +269,9 @@ test.describe("the engine, taken away under a loaded browser", () => {
     });
   });
 
-  test("Try again re-issues the read, and the page comes back when the engine does", async ({
+  test("Try again re-issues the read, and the operator can get back in when the engine returns", async ({
     bm,
+    deployment,
     page
   }) => {
     needs(canBreakEngine(), NEEDS_BREAKABLE_ENGINE);
@@ -296,20 +298,53 @@ test.describe("the engine, taken away under a loaded browser", () => {
       await alert.getByRole("button", { name: /try again/i }).click();
       await expect(alert.getByText(/tried again at/i)).toBeVisible();
       expect(failedReads(traffic)).toBeGreaterThan(before);
-
-      // And then the operator fixes their deployment. This is the case
-      // that keeps every assertion in this file honest: a build that drew
-      // that banner permanently would satisfy all of them.
-      await startEngine(control);
-      await page.getByRole("alert").getByRole("button", { name: /try again/i }).click();
-      await expect(page.getByRole("alert")).toHaveCount(0);
-      await expect(page.getByRole("listitem").first()).toBeVisible();
     } finally {
-      // Already running by the happy path; the rig acks a redundant start
-      // rather than refusing it, so this costs one round trip and covers
-      // every path that did not get that far.
       await startEngine(control);
     }
+
+    // And then the operator fixes their deployment. This is the case that
+    // keeps every assertion in this file honest: a build that drew that
+    // banner permanently would satisfy all of them.
+    //
+    // What comes back is not the feed, and that is the product's own
+    // documented trade rather than a defect: apps/common/auth/local keeps
+    // sessions in one process's memory, so the restart that fixed the
+    // outage also ended the session (session.go's header states it).
+    //
+    // Which makes the claim here the operator's rather than the session's,
+    // and it is one this run found the product failing: a 401 on a page
+    // read used to render as an in-panel "authentication required" beside
+    // a Try again that could never succeed, and the only way out was a
+    // reload nobody tells you to do. So: pressing the control that IS on
+    // screen has to end with somewhere to sign in, without a reload.
+    const signIn = page.getByRole("heading", { level: 1, name: /^sign in$/i });
+    const retry = page.getByRole("alert").getByRole("button", { name: /try again/i });
+    // `.catch`: the 30-second poll may have re-issued the read on its own
+    // between the heal and this line, in which case the app has already
+    // moved on and there is no button left to press.
+    if (await retry.isVisible().catch(() => false)) await retry.click();
+
+    await expect(signIn).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(DID_NOT_ANSWER);
+    // No dead end behind it: a Try again that cannot work is worse than
+    // no button, because it is the one thing an operator will keep doing.
+    await expect(page.getByRole("button", { name: /try again/i })).toHaveCount(0);
+
+    await page.getByRole("textbox", { name: "Username" }).fill(deployment.credentials.username);
+    await page.getByRole("textbox", { name: "Password" }).fill(deployment.credentials.password);
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    // Waited for, not assumed: the POST is a real round trip through
+    // serve-ui into an engine that has just finished starting, and a
+    // navigation issued on top of it lands back on this form with no hint
+    // that anything was submitted.
+    await expect(page.getByRole("navigation", { name: "Sections" })).toBeVisible();
+
+    // The whole point of the case: the deployment recovered end to end,
+    // through the same stack that failed, and the page an operator came
+    // for draws its rows again.
+    await bm.goto("/activity");
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    await expect(page.getByRole("listitem").first()).toBeVisible();
   });
 
   test("a reload while the engine is away does not claim the operator is signed out", async ({
@@ -322,8 +357,10 @@ test.describe("the engine, taken away under a loaded browser", () => {
     // engine is down cannot find out whether anybody is signed in - and
     // "could not ask" was rendered as "not signed in", which is a login
     // form, a password typed into it, and a refusal that also cannot be
-    // explained. The session is untouched: the engine holds it and it is
-    // still there.
+    // explained. Whether the session survives is a separate question
+    // (it does not survive a RESTART, by design); what this case is
+    // about is that a deployment which cannot check a credential must not
+    // ask for one.
     needs(canBreakEngine(), NEEDS_BREAKABLE_ENGINE);
     test.setTimeout(300_000);
 
@@ -347,10 +384,19 @@ test.describe("the engine, taken away under a loaded browser", () => {
       await expect(page.locator("body")).not.toContainText(NOT_AN_ID);
     });
 
-    // And the engine coming back is all it takes: no re-authentication,
-    // because nothing ever signed this browser out.
+    // Once the engine answers again, whatever this browser is shown, it is
+    // not the outage page: the words that named an unreachable service are
+    // gone, and the operator has either their shell or a sign-in form
+    // rather than a dead end. (The session itself died with the process
+    // that held it - see the recovery case above.)
     await page.reload();
-    await expect(page.getByRole("navigation", { name: "Sections" })).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(DID_NOT_ANSWER);
+    await expect(
+      page
+        .getByRole("navigation", { name: "Sections" })
+        .or(page.getByRole("heading", { level: 1, name: /^sign in$/i }))
+        .first()
+    ).toBeVisible();
   });
 
   test("leaves the deployment the way the rest of the run expects to find it", async ({

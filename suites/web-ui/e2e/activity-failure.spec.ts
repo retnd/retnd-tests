@@ -278,7 +278,9 @@ test.describe("activity, when nothing answers at all", () => {
     // The two failures send whoever is fixing them to different machines.
     // Borrowing the 200-unreadable wording here sends them to read the
     // build's parser when the service is down.
-    await expect(alert).toContainText(/did not answer|could not reach|unreachable|no response/i);
+    await expect(alert).toContainText(
+      /did not answer|not answering|could not reach|unreachable|no response/i
+    );
     await expect(alert).not.toContainText(/could not read the answer/i);
   });
 
