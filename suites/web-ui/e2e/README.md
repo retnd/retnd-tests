@@ -22,16 +22,16 @@ npm run e2e:all-providers       # provider treatment across all seven
 | `backups.spec.ts` | table semantics, all seven columns, multi-classification, filtering, artifact detail, lifecycle ordering |
 | `retention.spec.ts` | server-issued plan id, keep/delete itemisation, stale-plan refusal, consequence-named confirm, safe default focus, Escape |
 | `quarantine-activity.spec.ts` | three safe actions only, no "delete anyway", event vocabulary, filters |
-| `activity-failure.spec.ts` | the failure path the block above structurally cannot see: a `listActivity` that throws something untyped, and what an operator is told about it (backupd#598). Names the exception, offers no invented correlation id, offers a way to copy it, and holds the dashboard's Recent activity panel to the same rule rather than letting it draw empty |
+| `activity-failure.spec.ts` | the failure path the block above structurally cannot see: a `listActivity` that throws something untyped, and what an operator is told about it. Names the exception, offers no invented correlation id, offers a way to copy it, and holds the dashboard's Recent activity panel to the same rule rather than letting it draw empty |
 | `settings-recovery.spec.ts` | service settings, capability honesty, build provenance, version-mismatch read-only mode, non-destructive catalog rebuild |
-| `auth.spec.ts` | login is not a NAS system login, enrolment validation, password never echoed, and a `/auth/session` the service REFUSES on policy (403) reaching neither the login form nor the outage page (backupd#795) |
+| `auth.spec.ts` | login is not a NAS system login, enrolment validation, password never echoed, and a `/auth/session` the service REFUSES on policy (403) reaching neither the login form nor the outage page |
 | `provider-treatment.spec.ts` | per-provider identity, shared IA, accent token, chrome/picker/notifications only where supported |
 | `responsive.spec.ts` | small app window: no clipped table column, no page-level horizontal scroll, dialogs fully visible |
 | `accessibility.spec.ts` | one h1 per page, every control labelled, no colour-only status, focus visibility, dialog semantics, zero console errors |
 | `safety-invariants.spec.ts` | no remote/file delete anywhere, no private key, no "restore point", no stack traces, no vague destructive labels |
-| `terminal-dock.spec.ts` | the global terminal is pinned to the browser window rather than riding the end of the document, content passes behind it, and the content column reserves the room it takes so the last row of a long table can still be scrolled clear (backupd#617) |
-| `theme-contrast.spec.ts` | a computed-contrast sweep of the rendered tree in both themes, the SSH auth wizard's own controls, the primary button on the accent, and the `color-scheme` declaration that makes native controls follow the theme (backupd#618) |
-| `engine-unreachable.spec.ts` | the hop `activity-failure.spec.ts` cannot reach: the engine CONTAINER stopped under a loaded browser, so a real `serve-ui` really cannot reach a real engine (backupd#795). Runs only under `scripts/e2e/three-machine-web-ui.sh --break-engine`, which is what gives the suite the control channel `harness/engine.ts` speaks; every other run skips it with that command as the reason |
+| `terminal-dock.spec.ts` | the global terminal is pinned to the browser window rather than riding the end of the document, content passes behind it, and the content column reserves the room it takes so the last row of a long table can still be scrolled clear |
+| `theme-contrast.spec.ts` | a computed-contrast sweep of the rendered tree in both themes, the SSH auth wizard's own controls, the primary button on the accent, and the `color-scheme` declaration that makes native controls follow the theme |
+| `engine-unreachable.spec.ts` | the hop `activity-failure.spec.ts` cannot reach: the engine CONTAINER stopped under a loaded browser, so a real `serve-ui` really cannot reach a real engine. Runs only under `scripts/e2e/three-machine-web-ui.sh --break-engine`, which is what gives the suite the control channel `harness/engine.ts` speaks; every other run skips it with that command as the reason |
 
 Two files in here are not specs. `fixtures.ts` is the page object, and
 `contrast.ts` is the sweep `theme-contrast.spec.ts` runs: it walks the
@@ -49,8 +49,8 @@ from.
 - Provider specs assert *capability honesty* — that the UI never presents an
   unsupported capability as available — not visual difference.
 - Wait on a real signal (an element, a settled fetch, a control leaving its
-  disabled state), never on `waitForTimeout`. See #142, and see the
-  `toBeEnabled()` gate in `wizard.spec.ts`'s validator picklist assertion.
+  disabled state), never on `waitForTimeout`. See, and see the
+  `toBeEnabled` gate in `wizard.spec.ts`'s validator picklist assertion.
 - A case that guards against a regression, rather than proving a fix, needs
   a control beside it that makes it fail. Both of the new files have one:
   `terminal-dock.spec.ts` takes the reserved room away and requires the
@@ -63,13 +63,13 @@ from.
   start. A `npm run dev` you already have open on 5173 is left alone and can
   never be what the suite tests, and two worktrees of this repo can run the
   suite at the same time without either of them reporting on the other's
-  build (#172). `E2E_PORT` still pins a port explicitly; it has to be a whole
+  build. `E2E_PORT` still pins a port explicitly; it has to be a whole
   number from 1 to 65535, and a value that is not one stops the run instead
   of being coerced to 0 or NaN. See `port.ts` for why the default moved off a
   fixed 5273.
 - `e2e:all-providers` runs the seven providers one after another, each
   starting and tearing down its own server on that same port. No provider run
   gets a retry: nothing in this suite does any more, since a retry is what
-  turns a deterministic red into something that reads as a flake (#172). If a
+  turns a deterministic red into something that reads as a flake. If a
   run is killed and leaves a Vite child behind, the next provider fails to
   bind on a port it names, which is a stale child to kill, not a new flake.
