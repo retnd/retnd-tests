@@ -56,7 +56,7 @@ what a run certifies. See [`docs/pinning.md`](docs/pinning.md) for the
 three modes and how to point the suites at a newer build in one command.
 
 The command is `backupd` from 0.3.3
-([backupd#648](https://github.com/backupdproject/backupd/issues/648)),
+((https://github.com/backupdproject/backupd/issues/648)),
 and was `backupd` before it. The old name still runs, because the
 image links it beside the new one, so this repository has to be able to
 tell the two apart: what the binary *prints* is asserted as `backupd` in
@@ -112,9 +112,9 @@ today, and no contract question is. (This line said two while the table
 in `findings/` had one row in it, which is what a hand-maintained count
 does; it is derived from that table now, and DISC-008 and DISC-009 are
 the two that made the drift visible.) Five have been retired: four when
-[#209](https://github.com/backupdproject/backupd/pull/209) answered them,
+(https://github.com/backupdproject/backupd/pull/209) answered them,
 and DISC-006's FR-18 bucket-key question when
-[#215](https://github.com/backupdproject/backupd/pull/215) wrote the
+(https://github.com/backupdproject/backupd/pull/215) wrote the
 missing rule into the requirement. Each time the pin moved onto the
 answer in the same change, which is the mechanism working rather than an
 exception to it: the cases stayed and now assert the contract with no
@@ -164,7 +164,7 @@ Suites B and C at all. What the check does not turn on is
 `noUnusedLocals`/`noUnusedParameters`, and the reason has changed: while
 `suites/web-ui/e2e/` was byte-identical to `backupd`'s
 `ui/shared/e2e/` the one unused binding in there belonged upstream, but
-#217 deleted that directory, so it is this repository's to fix and these
+ deleted that directory, so it is this repository's to fix and these
 options are this repository's to turn on, in a change of its own. Real
 ESLint is absent for the same reason, spelled out in
 `suites/web-ui/README.md`.
