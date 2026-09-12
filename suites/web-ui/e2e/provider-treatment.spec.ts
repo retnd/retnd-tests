@@ -69,7 +69,12 @@ test.describe("provider: " + PLATFORM, () => {
     // "Backupd running on ..."), and an unscoped strict-mode
     // locator resolves to both. The mock rendered fewer of them, which is
     // why this only showed up on the first real run.
-    await expect(page.getByText("backupd").first()).toBeVisible();
+    //
+    // `exact` keeps it off the mark's own <title>Backupd</title>, which
+    // is matched by a case-insensitive substring and is never visible, so
+    // after backupd#794's rename `.first()` was resolving to a hidden
+    // element and this case failed on a page that was perfectly branded.
+    await expect(page.getByText("backupd", { exact: true }).first()).toBeVisible();
     const title = await page.title();
     expect(title).toMatch(/Backupd/);
   });
