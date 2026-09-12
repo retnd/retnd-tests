@@ -115,6 +115,16 @@ function recordActivityTraffic(page: Page): ActivityTraffic {
   return { responses, failures };
 }
 
+/** How many activity reads came back badly, or did not come back at all.
+ *
+ *  Counted rather than `responses.length`, because every case here loads a
+ *  page against a HEALTHY engine first and the dashboard reads activity
+ *  while it does: a 200 from before the break, or one still in flight
+ *  across it, is not evidence of anything these cases claim. */
+function failedReads(traffic: ActivityTraffic): number {
+  return traffic.responses.filter((answer) => answer.status >= 400).length + traffic.failures.length;
+}
+
 test.describe("the engine, taken away under a loaded browser", () => {
   // The engine is put back however this file ends, including the one path
   // a per-case `finally` cannot cover: a case that exceeds its own timeout
@@ -154,10 +164,10 @@ test.describe("the engine, taken away under a loaded browser", () => {
 
       await expect(page.getByRole("alert")).toBeVisible();
       await expect(page.getByText("No matching events")).toHaveCount(0);
-      // And the request really left this browser. Without this the case
-      // would pass against a `page.route` stub, which is the thing this
-      // file exists not to be.
-      expect(traffic.responses.length + traffic.failures.length).toBeGreaterThan(0);
+      // And the read really left this browser and really failed out
+      // there. Without this the case would pass against a `page.route`
+      // stub, which is the thing this file exists not to be.
+      expect(failedReads(traffic)).toBeGreaterThan(0);
     });
   });
 
@@ -216,14 +226,17 @@ test.describe("the engine, taken away under a loaded browser", () => {
       // Two honest shapes, and which one this deployment produces is the
       // deployment's business, not this suite's: serve-ui can answer for
       // the engine it could not reach, or the browser can get nothing at
-      // all. What is asserted is that it is one of them, and that the
-      // first one carries the id its own log line quotes.
+      // all. What is asserted is that it was one of them, and that when
+      // something DID answer it carried the id its own log line quotes.
       //
       // That header is the whole reason this case cannot live in
       // `activity-failure.spec.ts`: an aborted route produces no response
       // to read it off.
-      expect(traffic.responses.length + traffic.failures.length).toBeGreaterThan(0);
-      for (const answer of traffic.responses) {
+      expect(failedReads(traffic)).toBeGreaterThan(0);
+      for (const answer of traffic.responses.filter((seen) => seen.status >= 400)) {
+        // Nothing behind the proxy answered, so a 4xx would mean the
+        // refusal came from somewhere else entirely and this case is
+        // measuring the wrong request.
         expect(answer.status).toBeGreaterThanOrEqual(500);
         // A 502 with no correlation id is a failure nobody can trace: the
         // operator has a red banner, the proxy has a `proxy_error` line,
@@ -279,10 +292,10 @@ test.describe("the engine, taken away under a loaded browser", () => {
       // Pressed against a service that is still down: the button has to
       // leave evidence it ran, or it is a control people press harder at
       // an unchanged screen.
-      const before = traffic.responses.length + traffic.failures.length;
+      const before = failedReads(traffic);
       await alert.getByRole("button", { name: /try again/i }).click();
       await expect(alert.getByText(/tried again at/i)).toBeVisible();
-      expect(traffic.responses.length + traffic.failures.length).toBeGreaterThan(before);
+      expect(failedReads(traffic)).toBeGreaterThan(before);
 
       // And then the operator fixes their deployment. This is the case
       // that keeps every assertion in this file honest: a build that drew
@@ -297,6 +310,47 @@ test.describe("the engine, taken away under a loaded browser", () => {
       // every path that did not get that far.
       await startEngine(control);
     }
+  });
+
+  test("a reload while the engine is away does not claim the operator is signed out", async ({
+    bm,
+    page
+  }) => {
+    // The quietest lie in this whole failure, and the one an operator is
+    // most likely to act on. Every /api/v1 call goes through serve-ui to
+    // the engine, `auth/session` included, so a page loaded while the
+    // engine is down cannot find out whether anybody is signed in - and
+    // "could not ask" was rendered as "not signed in", which is a login
+    // form, a password typed into it, and a refusal that also cannot be
+    // explained. The session is untouched: the engine holds it and it is
+    // still there.
+    needs(canBreakEngine(), NEEDS_BREAKABLE_ENGINE);
+    test.setTimeout(300_000);
+
+    const control = resolveEngineControl()!;
+    await bm.goto("/activity");
+
+    await withEngineStopped(control, async () => {
+      await page.reload();
+
+      // Not a sign-in prompt. Asserted on the form rather than on any
+      // particular sentence, because what must not happen here is an
+      // operator being asked for a password by a deployment that cannot
+      // check one.
+      await expect(page.getByRole("heading", { name: /^sign in$/i })).toHaveCount(0);
+      await expect(page.locator("input[type='password']")).toHaveCount(0);
+
+      // And it says which machine is not answering, in the same words the
+      // Activity banner uses, so the two surfaces do not describe one
+      // outage two ways.
+      await expect(page.locator("body")).toContainText(DID_NOT_ANSWER);
+      await expect(page.locator("body")).not.toContainText(NOT_AN_ID);
+    });
+
+    // And the engine coming back is all it takes: no re-authentication,
+    // because nothing ever signed this browser out.
+    await page.reload();
+    await expect(page.getByRole("navigation", { name: "Sections" })).toBeVisible();
   });
 
   test("leaves the deployment the way the rest of the run expects to find it", async ({
