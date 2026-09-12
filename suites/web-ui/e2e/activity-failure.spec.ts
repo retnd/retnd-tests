@@ -1,4 +1,5 @@
 import { expect, needs, test } from "./fixtures";
+import type { Page } from "@playwright/test";
 
 /**
  * backupd#598: the Activity page failing on a real 0.3.2 NAS with
@@ -225,5 +226,88 @@ test.describe("activity, when the feed reads fine", () => {
     // rendered is an event rather than an empty-state line that happens to
     // be a list item.
     await expect(page.getByRole("listitem").first()).toContainText(/\d{2}:\d{2}:\d{2}/);
+  });
+});
+
+/** backupd#795 / #730: the NAS shape this file's own header names but never
+ *  exercised — "a service that did not answer apart from one that answered
+ *  unreadably". On the real UGREEN NAS the web-ui reverse proxy
+ *  (`backupd-web serve-ui`) could not reach the engine
+ *  (`dial tcp: lookup rclone-manager on 127.0.0.11:53: no such host`), so the
+ *  browser's `fetch('/api/v1/activity')` never got an answer at all and threw
+ *  a `TypeError: Failed to fetch`. That is a different failure from a 200 that
+ *  carried the wrong bytes, and it must not be reported with the words that
+ *  belong to the other one.
+ *
+ *  Reproduced the same way the unreadable case is: `page.route` substitutes
+ *  only the transport OUTCOME of this one call — the app, the bundle off
+ *  `serve-ui`, the router, the error boundary and the session are the real
+ *  deployment. `route.abort("failed")` is what an unreachable upstream looks
+ *  like from inside the browser container. */
+async function serveUnreachableEngine(page: Page) {
+  await page.route("**/api/v1/activity*", (route) => route.abort("failed"));
+}
+
+test.describe("activity, when serve-ui cannot reach the engine", () => {
+  test.beforeEach(async ({ bm, page }) => {
+    // Installed before navigation: the page fires this fetch as it mounts.
+    await serveUnreachableEngine(page);
+    await bm.goto("/activity");
+  });
+
+  test("says a failure happened at all, rather than an empty feed", async ({ page }) => {
+    // A blank timeline reads as "nothing has happened on this NAS", which is
+    // the exact wrong claim when the request never reached the engine — and
+    // the whole of what the reported NAS gave its operator.
+    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(page.getByText("No matching events")).toHaveCount(0);
+  });
+
+  test("names a service that did not answer, not one that answered unreadably", async ({ page }) => {
+    const alert = page.getByRole("alert");
+    // The distinction the file header promises. A transport failure (no
+    // response) is a different problem for whoever is fixing it than a
+    // response this build could not parse, and it must not borrow the
+    // 200-unreadable wording ("could not read the answer").
+    await expect(alert).toContainText(/could not reach|did not answer|no response|unreachable|failed to reach/i);
+    await expect(alert).not.toContainText(/could not read the answer/i);
+  });
+
+  test("never renders the literal 'correlation id unavailable'", async ({ page }) => {
+    // A pure transport failure carries no server correlation id (nothing
+    // answered), so the product must say that honestly rather than quote the
+    // placeholder string the NAS showed.
+    await expect(page.getByRole("alert")).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(NOT_AN_ID);
+    await expect(page.locator("body")).not.toContainText("unavailable");
+  });
+
+  test("shows no stack trace and no source path", async ({ page }) => {
+    const body = await page.locator("body").innerText();
+    expect(body).not.toContain("    at ");
+    expect(body).not.toMatch(/\/src\/[A-Za-z]+\.tsx?/);
+  });
+
+  test("Try again re-issues the request and leaves evidence it ran", async ({ page }) => {
+    const alert = page.getByRole("alert");
+    await alert.getByRole("button", { name: /try again/i }).click();
+    // The interception is still installed, so the retry really goes out and
+    // really fails again; the banner must change so the button is not one
+    // people press harder against silence.
+    await expect(alert.getByText(/tried again at/i)).toBeVisible();
+  });
+
+  test("recovers when the engine becomes reachable again", async ({ page, bm }) => {
+    // Keeps every assertion above honest: a build that rendered the banner
+    // permanently would satisfy them all. Removing the interception is what
+    // an operator who fixed the proxy/ordering in front of their NAS does.
+    needs(
+      bm.facts.activityEvents > 0,
+      "at least one recorded activity event, so the recovered page has something to draw"
+    );
+    await page.unroute("**/api/v1/activity*");
+    await page.getByRole("alert").getByRole("button", { name: /try again/i }).click();
+    await expect(page.getByRole("alert")).toHaveCount(0);
+    await expect(page.getByRole("listitem").first()).toBeVisible();
   });
 });
