@@ -75,8 +75,16 @@ test.describe("provider: " + PLATFORM, () => {
     // after backupd#794's rename `.first()` was resolving to a hidden
     // element and this case failed on a page that was perfectly branded.
     await expect(page.getByText("backupd", { exact: true }).first()).toBeVisible();
-    const title = await page.title();
-    expect(title).toMatch(/Backupd/);
+    // Case-insensitively, because the claim is about whose product this
+    // is and not about how the wordmark is set: ui/shared/index.html
+    // titles the document `backupd`, lowercase, the same way the header
+    // draws it, while the mark's accessible name is `Backupd`. A
+    // case-sensitive match here pinned a typographic choice and failed on
+    // a page carrying the product's identity correctly in three places.
+    expect(await page.title()).toMatch(/backupd/i);
+    // And provider branding is what must NOT be in the title: this is
+    // Backupd running on a NAS, never the NAS's own product.
+    expect(await page.title()).not.toMatch(new RegExp(expected.name, "i"));
   });
 
   test("declares an accent token", async ({ page }) => {
