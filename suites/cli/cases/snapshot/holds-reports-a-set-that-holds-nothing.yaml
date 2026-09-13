@@ -1,0 +1,22 @@
+doc: >
+  `snapshot holds` on a set with no unreleased holds says so, and exits
+  0.
+
+  A hold is what stops retention deleting a restore point, so "nothing
+  is held" is a statement an operator acts on: it is the answer that
+  says retention is free to act on every snapshot in this set. Reporting
+  it as a failure, or as an empty table, would make the one state that
+  needs no action indistinguishable from a set nobody can read.
+scenario: incremental-set
+argv: [snapshot, holds, "production/uploads-tree", --config, "${CONFIG}"]
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+exit: 0
+stdout:
+  - line: "production/uploads-tree holds no snapshot"
+stderr: empty
+state: unchanged
+contract:
+  - "usage text: snapshot holds <source/backup-set> - every unreleased hold over this set's snapshots: what is being kept, why, and by whom"
+  - 'usage text: exit codes - 0 is "the command did what it was asked"'
+tags: [smoke]

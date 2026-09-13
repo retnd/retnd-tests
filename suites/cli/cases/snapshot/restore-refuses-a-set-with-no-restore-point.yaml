@@ -1,0 +1,23 @@
+doc: >
+  `snapshot restore` on a set with no restore point refuses, and creates
+  nothing at the destination.
+
+  The destination is the assertion. A restore that made its --to
+  directory and then failed would leave an empty directory an operator
+  could mistake for a restore that found nothing to bring back, and the
+  next attempt would meet a --conflict refuse against wreckage of the
+  first.
+scenario: incremental-set
+argv: [snapshot, restore, "production/uploads-tree", --to, "${WORK}/restored", --config, "${CONFIG}"]
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+exit: 1
+stdout:
+  - contains: "restore: failed"
+  - contains: "no restore point"
+stderr: ignored
+state: changed
+contract:
+  - "usage text: snapshot restore <source/backup-set> --to DIR [--snapshot ID] [--path P] [--conflict refuse|skip|overwrite] - restore one snapshot, or one path inside it, into a local directory"
+  - "usage text: exit codes - 1 is an ordinary failure"
+tags: []

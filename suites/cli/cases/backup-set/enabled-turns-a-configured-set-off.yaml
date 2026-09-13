@@ -1,0 +1,29 @@
+doc: >
+  `backup-set enabled <id> off` turns an already-configured backup set
+  off, writes the change, and says what "off" means.
+
+  Until backupdproject/backupd#788 the only way to disable a set was
+  --disabled at creation, so an operator who needed to stop one set
+  running -- while a source was being migrated, say -- had to remove and
+  recreate it, which loses everything the removal strands.
+
+  The sentence matters as much as the exit code. "off" has a precise
+  meaning the usage text gives: the scheduler stops OFFERING the set to
+  the next cycle, and a pass already inside it finishes. An operator who
+  read "off" as "stop now" would use this verb to abort a running
+  backup, and it does not do that.
+scenario: incremental-set
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+argv: [backup-set, enabled, "production/uploads-tree", "off", --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - contains: "mode: direct"
+  - line: "production/uploads-tree"
+  - contains: "the scheduler will not offer this backup set to a cycle"
+stderr: empty
+state: changed
+contract:
+  - "usage text: backup-set enabled <source/backup-set> <on|off> - turn one already-configured backup set on or off, which --disabled can only do at creation. \"off\" stops the scheduler offering the set to the next cycle; a pass already inside it finishes (#788)"
+  - "usage text: a configuration write goes one of three ways, and says which on a \"mode:\" line. With nothing serving this deployment it is written here"
+tags: [smoke]

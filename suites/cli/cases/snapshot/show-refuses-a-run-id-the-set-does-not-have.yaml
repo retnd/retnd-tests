@@ -1,0 +1,23 @@
+doc: >
+  `snapshot show` with a run id this set never produced refuses and
+  names the set.
+
+  The refusal is scoped to the SET, not to the deployment, and that is
+  the property under test: run ids are unique across a journal, so a
+  show that answered for any run it could find would happily print
+  another backup set's snapshot under the id an operator typed beside
+  this one's name.
+scenario: incremental-set
+argv: [snapshot, show, "production/uploads-tree", "run-nothing-ever-produced", --config, "${CONFIG}"]
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+exit: 1
+stdout: empty
+stderr:
+  - contains: "no snapshot of that id belongs to this backup set"
+  - contains: "production/uploads-tree"
+state: unchanged
+contract:
+  - "usage text: snapshot show <source/backup-set> <run-id> - one snapshot run in full"
+  - "usage text: exit codes - 1 is an ordinary failure, including a set or an artifact that is not there"
+tags: []

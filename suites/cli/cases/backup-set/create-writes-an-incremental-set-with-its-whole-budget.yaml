@@ -1,0 +1,50 @@
+doc: >
+  `backup-set create --engine kopia` writes an incremental backup set,
+  with the repository domain, the consistency mode and the whole
+  verification budget the flags named.
+
+  Until backupdproject/backupd#788 none of those flags existed: the
+  engine, the domain and the budget were fields of the service request
+  that no command line could fill in, so a terminal could only ever
+  write an artifact set and everything EPIC K added was reachable from
+  the wizard alone.
+
+  What this case can assert from outside is the exit code, the report,
+  and that the configuration file changed. That the individual keys
+  really landed in the file is asserted by backupd's own
+  cmd/backupd/backupsetincremental_test.go, which can read the YAML
+  back; this case's job is to prove the command line itself is accepted
+  and carried out against a real deployment. See
+  create-reports-every-field-it-wrote.yaml for the half of the report
+  that is missing.
+scenario: incremental-set
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+argv: [backup-set, create, "production/api-uploads",
+       --host, "source.example.internal",
+       --port, "2222",
+     --user, "backupuser",
+       --ssh-key-file, "${SSH_KEY}",
+       --known-hosts-line, "[source.example.internal]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ7Zq1i0i7Xw3v0m7d3Wl1nZk5Q9tJm2fVYy0m9c8ZqR",
+       --remote-path, "/srv/api-uploads",
+       --engine, kopia,
+       --repository-domain, production,
+       --source-consistency, external_snapshot,
+       --verification-level, content_sample,
+       --verification-sample-percent, "15",
+       --verification-full-every, "168h",
+       --verification-restore-drill-every, "720h",
+       --no-verify,
+       --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - contains: "mode: direct"
+  - contains: "backup set: production/api-uploads"
+  - contains: "not verified"
+  - contains: "backupd backup-set test-connection production/api-uploads"
+stderr: ignored
+state: changed
+contract:
+  - "usage text: backup-set create <source/backup-set> ... [--engine artifact|kopia] [--repository-domain D] [--source-consistency S] [--verification-level L] [--verification-sample-percent N] [--verification-full-every D] [--verification-restore-drill-every D]"
+  - "usage text: --no-verify writes it anyway, says in so many words that nothing was proven, and leaves the set marked as unverified until a connection test passes (#624)"
+tags: []

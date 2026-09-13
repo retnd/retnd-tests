@@ -1,0 +1,29 @@
+doc: >
+  `snapshot list` on a configured incremental backup set that has never
+  run says so in a sentence, and exits 0.
+
+  Zero is the load-bearing half. "No snapshots yet" is a true, complete
+  answer about a correctly configured set, and a deployment being set up
+  is in this state for as long as it takes to point the set at a source;
+  a non-zero exit would make every setup script treat a working
+  configuration as a failure. It is also the state the set is in before
+  its FIRST cycle, which is when an operator looks hardest.
+
+  The five-number contract is deliberately not asserted here: there is
+  no run to carry numbers. It is asserted against a populated repository
+  in backupd's own core/tests/e2eproduction, which is the only place a
+  real snapshot can be taken.
+scenario: incremental-set
+argv: [snapshot, list, "production/uploads-tree", --config, "${CONFIG}"]
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+exit: 0
+stdout:
+  - line: "production/uploads-tree has taken no snapshots"
+stderr: empty
+state: unchanged
+contract:
+  - "usage text: snapshot list <source/backup-set> - every snapshot run this incremental backup set has on record, newest first"
+  - 'usage text: exit codes - 0 is "the command did what it was asked"'
+  - "EPIC K: \"not measured\" is a real answer and never a zero"
+tags: [smoke]

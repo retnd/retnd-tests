@@ -1,0 +1,30 @@
+doc: >
+  `snapshot verify` with no --run verifies the set's last known good
+  snapshot, and a set that has none is refused rather than reported as
+  verified.
+
+  This is the most dangerous possible false positive in the product. The
+  whole purpose of the verification ladder is that a claim of "verified"
+  means bytes were read; a set with nothing to read that answered
+  "nothing was found wrong" would be a green check mark over an empty
+  repository, which is exactly the state an operator most needs to be
+  told about.
+
+  The non-zero exit is documented for this verb specifically: "Exits
+  non-zero when the verification finds damage". A restore point that is
+  not there is the limiting case of damage.
+scenario: incremental-set
+argv: [snapshot, verify, "production/uploads-tree", --config, "${CONFIG}"]
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+exit: 1
+stdout:
+  - contains: "verification: failed"
+  - contains: "no restore point"
+  - absent: "verified"
+stderr: ignored
+state: changed
+contract:
+  - "usage text: snapshot verify <source/backup-set> [--run R] [--level L] - prove NOW that a restore point is readable, at a stated depth. Without --run it verifies the set's last known good snapshot. Exits non-zero when the verification finds damage"
+  - "backupdproject/backupd EPIC K: a row saying a level was proved means the engine really did that work"
+tags: [smoke]

@@ -1,0 +1,36 @@
+doc: >
+  `repository maintenance <domain>` answers for a domain whose
+  repository cannot be opened at all, and exits 0.
+
+  That is the whole point of the verb, and the usage text says so:
+  "Opens nothing, so it answers while the repository itself is
+  unreachable". The record lives beside the repository rather than
+  inside it precisely so that the question "when did maintenance last
+  run, and is it overdue" can be answered during the incident where it
+  matters -- the one where the storage is down.
+
+  "never" is asserted on every time field rather than accepting any
+  value, because a zero time rendered as an instant (1970, or today)
+  would be a maintenance history nobody has: the one answer that must
+  never be faked here is that maintenance has run.
+scenario: incremental-set
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+argv: [repository, maintenance, production, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "production"
+  - re: '^\s+owner:\s+nobody has claimed maintenance for this repository$'
+  - re: '^\s+last quick:\s+never$'
+  - re: '^\s+last full:\s+never$'
+  - re: '^\s+next eligible:\s+never$'
+  - re: '^\s+overdue:\s+false$'
+  - re: '^\s+runs:\s+0 \(0 failed\)$'
+  - re: '^\s+reclaimed:\s+0 bytes$'
+  - contains: "no maintenance has ever been recorded for this repository"
+stderr: empty
+state: unchanged
+contract:
+  - "usage text: repository maintenance <repository-domain> - who owns maintenance for one repository, when it last ran quick and full, when it is next eligible, and whether it is overdue or failing. Opens nothing, so it answers while the repository itself is unreachable"
+  - 'usage text: exit codes - 0 is "the command did what it was asked"'
+tags: [smoke]

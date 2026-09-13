@@ -1,0 +1,24 @@
+doc: >
+  `backup-set enabled` takes exactly two words, and anything else is a
+  usage error with nothing written.
+
+  There is no room for a helpful interpretation here. "true", "yes",
+  "1", "disable" are all things somebody will type, and each of them
+  could plausibly mean either value to a reader; guessing would mean a
+  backup set silently in the state nobody asked for, which for this
+  particular setting means either backups that stopped or backups that
+  restarted.
+scenario: incremental-set
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+argv: [backup-set, enabled, "production/uploads-tree", "yes", --config, "${CONFIG}"]
+exit: 2
+stdout: empty
+stderr:
+  - contains: "is not on or off"
+  - contains: "those two words are the only ones this verb takes"
+state: unchanged
+contract:
+  - "usage text: backup-set enabled <source/backup-set> <on|off>"
+  - "usage text: exit codes - 2 is nothing ran: the command line was wrong (an unknown flag, a missing or surplus argument)"
+tags: [smoke]

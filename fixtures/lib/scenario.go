@@ -70,6 +70,11 @@ type Scenario struct {
 	// every valid scenario shares.
 	RawConfig string `yaml:"raw_config"`
 
+	// SSHKey asks the fixture to write a private key at ${SSH_KEY}, for
+	// the cases about `backup-set create`, which cannot be invoked
+	// without one. See writeSSHKey in materialize.go.
+	SSHKey bool `yaml:"ssh_key"`
+
 	// Doc is a one-line note about what this scenario is for. It exists so
 	// scenarios read as documentation of the situations the CLI is
 	// contractually expected to handle.

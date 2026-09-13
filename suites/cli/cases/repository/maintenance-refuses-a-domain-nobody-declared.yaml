@@ -1,0 +1,24 @@
+doc: >
+  `repository maintenance` for a domain this configuration does not
+  declare refuses and prints nothing.
+
+  A repository domain is the boundary an encryption key, a credential, a
+  maintenance window and a deduplication span all belong to, so an
+  undeclared id is not a typo to be helpfully resolved: it names nothing
+  this deployment is allowed to touch. Answering about it -- with an
+  empty record, say -- would be a maintenance report for a repository
+  nobody configured.
+scenario: incremental-set
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+argv: [repository, maintenance, "staging", --config, "${CONFIG}"]
+exit: 1
+stdout: empty
+stderr:
+  - contains: "declares no repository domain of that id"
+  - contains: "staging"
+state: unchanged
+contract:
+  - "usage text: repository maintenance <repository-domain>"
+  - "usage text: exit codes - 1 is an ordinary failure, including a set or an artifact that is not there"
+tags: []

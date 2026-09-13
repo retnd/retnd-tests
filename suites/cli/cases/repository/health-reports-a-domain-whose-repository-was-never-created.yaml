@@ -1,0 +1,56 @@
+doc: >
+  `repository health` reports every declared repository domain with its
+  own verdict, and a domain whose repository has never been created is
+  FAILING with a named cause, exit 1.
+
+  This is the state every deployment passes through, between declaring
+  a domain and the first successful cycle, and it is the state an
+  operator debugging a new installation is looking at. What the verdict
+  has to do is name which of the seven checks failed rather than
+  answering "unhealthy": the difference between "the storage is not
+  reachable" and "the declared passphrase did not open this repository"
+  is the difference between a mount problem and a secret problem, and
+  they are fixed in different places by different people.
+
+  The set this domain serves is named too, which is what makes the
+  report actionable on a deployment with several domains: a FAILING
+  domain nobody can attribute to a backup set is an alert nobody owns.
+
+  The last line is the one worth reading twice, and it is asserted
+  verbatim-ish because it is a statement of policy rather than of state:
+  the storage ANSWERED and holds no repository, and nothing has been
+  created there, deliberately. That is EPIC K's rule against creating a
+  repository on the strength of an empty location -- a sleeping NAS, an
+  unmounted share and a wrongly-mounted one all present exactly like
+  this, and creating a fresh empty repository in any of them would give
+  the set a backup history of nothing on the wrong filesystem, which
+  nobody would find out about until a restore.
+
+  Exit 1 is documented for this verb: "Exits non-zero when a repository
+  is FAILING".
+scenario: incremental-set
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+  BACKUPD_TEST_REPO_PASSPHRASE: "a-passphrase-long-enough-to-be-a-passphrase"
+argv: [repository, health, --config, "${CONFIG}"]
+exit: 1
+stdout:
+  - re: '^production\s+FAILING$'
+  - re: '^\s+shared:\s+true$'
+  - re: '^\s+reachable:\s+true$'
+  - re: '^\s+readable:\s+false$'
+  - re: '^\s+credentials:\s+the declared passphrase did not open this repository$'
+  - re: '^\s+maintenance:\s+never run$'
+  - re: '^\s+last snapshot:\s+none$'
+  - re: '^\s+last verified:\s+none$'
+  - re: '^\s+backup set:\s+production/uploads-tree$'
+  - contains: "the storage answered and holds no repository"
+  - contains: "nothing has been created here, deliberately"
+  - absent: "a-passphrase-long-enough-to-be-a-passphrase"
+stderr: empty
+state: unchanged
+contract:
+  - "usage text: repository health - every declared repository domain and its own verdict: reachable, readable, writable, whether the declared passphrase opens it, whether this machine's clock can be trusted, whether maintenance is overdue, and the last snapshot and verification it holds. Exits non-zero when a repository is FAILING"
+  - "backupdproject/backupd#789 acceptance criterion: no credentials appear in logs/API/metrics"
+  - "backupdproject/backupd EPIC K: a repository is never created because a location looked empty; creation requires the catalog to hold no snapshot for the domain"
+tags: [smoke]

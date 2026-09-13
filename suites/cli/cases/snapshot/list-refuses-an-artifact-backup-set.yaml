@@ -1,0 +1,29 @@
+doc: >
+  `snapshot list` on an ARTIFACT backup set refuses, and says the set
+  does not store snapshots.
+
+  This is the case that makes the one next door meaningful. Both sets in
+  this fixture are configured and healthy; only one of them has a
+  snapshot lineage at all. An empty list for the artifact set would read
+  as "this set has no backups", which is the opposite of the truth -- it
+  has artifacts, listed by `artifacts` -- and it is the answer an
+  operator would act on.
+
+  Exit 1 rather than 2: the command line is well formed and the set
+  exists. What is wrong is the question, and it takes the loaded
+  configuration to know that.
+scenario: incremental-set
+argv: [snapshot, list, "production/postgres-primary", --config, "${CONFIG}"]
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+exit: 1
+stdout: empty
+stderr:
+  - contains: "this backup set does not store snapshots"
+  - contains: "production/postgres-primary"
+state: unchanged
+contract:
+  - "usage text: snapshot list <source/backup-set> - every snapshot run this INCREMENTAL backup set has on record"
+  - "usage text: exit codes - 1 is an ordinary failure, including a set that is not there"
+  - "backupdproject/backupd#789: existing artifact backup sets remain unchanged, and nothing migrates one to the incremental engine"
+tags: [smoke]

@@ -1,0 +1,44 @@
+doc: >
+  `backup-set patch` changes an incremental set's verification budget in
+  place, and only the flags passed.
+
+  Before backupdproject/backupd#788 the budget could not be revised at
+  all from a terminal, which mattered more than it sounds: the budget is
+  the one EPIC K setting an operator tunes AFTER watching what it costs
+  -- a nightly content_full over a growing source is a decision made
+  with a month of measurements in hand, not at creation.
+
+  The set is created in setup and patched under test, because a patch is
+  only meaningful against something that exists, and the refusal for a
+  set that does not is a different case.
+scenario: incremental-set
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+setup:
+  - [backup-set, create, "production/api-uploads",
+     --host, "source.example.internal",
+     --port, "2222",
+     --user, "backupuser",
+     --ssh-key-file, "${SSH_KEY}",
+     --known-hosts-line, "[source.example.internal]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ7Zq1i0i7Xw3v0m7d3Wl1nZk5Q9tJm2fVYy0m9c8ZqR",
+     --remote-path, "/srv/api-uploads",
+     --engine, kopia,
+     --repository-domain, production,
+     --verification-level, content_full,
+     --no-verify,
+     --config, "${CONFIG}"]
+argv: [backup-set, patch, "production/api-uploads",
+       --verification-level, content_sample,
+       --verification-sample-percent, "5",
+       --source-consistency, live_best_effort,
+       --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - contains: "mode: direct"
+  - contains: "backup set: production/api-uploads"
+  - contains: "remote_path: /srv/api-uploads"
+stderr: ignored
+state: changed
+contract:
+  - "usage text: backup-set patch <source/backup-set> ... [--source-consistency S] [--verification-level L] [--verification-sample-percent N] [--verification-full-every D] [--verification-restore-drill-every D] - change one configured backup set in place; only the flags you pass are changed"
+tags: []

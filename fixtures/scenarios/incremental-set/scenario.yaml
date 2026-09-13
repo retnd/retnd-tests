@@ -1,0 +1,97 @@
+doc: >
+  One deployment with both engines in it: an ordinary artifact backup set
+  and an incremental (kopia) one, sharing a source and a declared
+  repository domain. This is the fixture for EPIC K's operator surfaces
+  (backupdproject/backupd#788, #789) -- `snapshot`, `repository`,
+  `backup-set enabled|read-only`, and the incremental flags on
+  `backup-set create|patch`.
+
+  Both engines, deliberately. Half of what these commands have to get
+  right is refusing to answer about the wrong kind of set: `snapshot
+  list` against an artifact set must say the set stores no snapshots
+  rather than printing an empty list, and a fixture with only incremental
+  sets in it could not tell the two apart.
+
+  The repository has never been CREATED, and that is the state this
+  fixture is for rather than a limitation of it. Creating one needs a
+  real snapshot run against a real source, which is Suite A's
+  out-of-scope by construction (no engine, no containers); what is in
+  scope is every answer a deployment gives before its first successful
+  run, which is exactly what an operator sees while they are setting one
+  up. The cases that need a populated repository live in backupd's own
+  core/tests/e2eproduction and core/tests/miniointegration.
+
+  Only the ARTIFACT set appears in the `sources:` block above, and the
+  incremental one only in `raw_config` below. That block is what the
+  fixture layer replays to seed the catalog and what it creates remote
+  directories for; the config the product actually reads is the raw one,
+  which declares both. Replaying `fetch` against an incremental set would
+  need a repository and a source tree, so it is the artifact set that
+  seeds the journal -- which is all the seeding is for: the state
+  database has to EXIST before the command under test runs, or every
+  read case would have to assert "the work directory changed" and would
+  no longer be able to tell a read that created a journal from a read
+  that wrote something it should not have.
+
+  raw_config rather than the rendered schema because the fixture schema
+  has no repository domain and no engine key, and adding one would mean
+  teaching this repository's own YAML the whole of EPIC K's config
+  surface to express one fixture. The config below is written the way an
+  operator writes it, against backupd's docs/configuration.
+poll_interval: 15m
+sources:
+  - id: production
+    backup_sets:
+      - id: postgres-primary
+        remote: {type: local}
+        include: ["*.dump"]
+        completion: {strategy: rename}
+        stale_after: 30h
+        artifacts:
+          - {name: pg-2026-06-01.dump, size: 4096, seed: k1, mtime: now-2h}
+raw_config: |
+  poll_interval: 15m
+  state:
+    database: ${STATE_DB}
+  repository_domains:
+    - id: production
+      description: Snapshots for this deployment
+      isolation: shared
+      passphrase:
+        env: BACKUPD_TEST_REPO_PASSPHRASE
+  sources:
+    - id: production
+      backup_sets:
+        - id: postgres-primary
+          remote:
+            type: local
+          remote_path: ${REMOTE}/production/postgres-primary
+          local_path: ${LOCAL}/production/postgres-primary
+          include:
+            - "*.dump"
+          completion:
+            strategy: rename
+          stale_after: 30h
+        - id: uploads-tree
+          engine: kopia
+          uuid: 6f1d2b7a-1c4e-4f8b-9a2d-3e5c7b9d1f00
+          repository_domain: production
+          source_consistency: live_best_effort
+          verification_level: content_sample
+          verification_sample_percent: 50
+          remote:
+            type: local
+          remote_path: ${REMOTE}/production/uploads-tree
+          stale_after: 30h
+  capacity:
+    backup_root: ${LOCAL}
+  retention:
+    timezone: UTC
+    week_starts_on: monday
+    daily_days: 7
+    weekly_months: 3
+    monthly_months: 12
+    protect_last_known_good: true
+ssh_key: true
+state: replay
+replay: fetch

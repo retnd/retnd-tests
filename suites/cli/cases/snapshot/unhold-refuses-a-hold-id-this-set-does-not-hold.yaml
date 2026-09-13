@@ -1,0 +1,29 @@
+doc: >
+  `snapshot unhold` with an id this set holds no hold under refuses.
+
+  Scoped to the set again, for the reason `snapshot show` is: releasing
+  another set's hold because the id happened to match would silently
+  expose somebody else's restore point to retention.
+
+  The work directory DOES change, and that is correct rather than a
+  concession: releasing a hold is a durable operation, so the attempt is
+  recorded in the operations table with status "failed" and the hold id
+  that was asked for. Releasing a restore point's protection is exactly
+  the kind of action an audit has to be able to see somebody attempt,
+  successfully or not, so a refusal that left no trace would be the
+  defect. What must not change is any hold, and no hold exists to
+  change.
+scenario: incremental-set
+argv: [snapshot, unhold, "production/uploads-tree", "hold-nothing-ever-placed", --config, "${CONFIG}"]
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+exit: 1
+stdout: empty
+stderr:
+  - contains: "holds no active hold of that id"
+  - contains: "production/uploads-tree"
+state: changed
+contract:
+  - "usage text: snapshot unhold <source/backup-set> <hold-id> - end one hold, by the id snapshot holds prints"
+  - "usage text: exit codes - 1 is an ordinary failure, including a set or an artifact that is not there"
+tags: []

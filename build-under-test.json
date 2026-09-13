@@ -1,8 +1,8 @@
 {
   "mode": "source",
-  "commit": "87a9dc72dab2eb3161072b738bd29b0ccfb3b811",
-  "version": "87a9dc7",
+  "commit": "4ffc25fb1b8980a85fccc1cb6d9795f23b297569",
+  "version": "4ffc25f",
   "source_builder": "go",
   "image": "",
-  "notes": "mode: source | registry | local. See docs/pinning.md. registry mode stays unusable until something is actually pushed to ghcr.io/backupdproject/backupd, so source is the only honest default today. Moved to 87a9dc7 because d2f4373 predates the activity verb, so the five activity cases, backup-set edit-hold and g3's usage listing were all red against it: they assert a command that build does not have. 87a9dc7 also carries backupd#617 and #618, which suites/web-ui/e2e/terminal-dock.spec.ts and theme-contrast.spec.ts were written against. This is the half of the lockstep with no automation: their scripts/e2e/tests-repo.pin moves to this repository in their own merge, and this line moves by hand or the specs stay red."
+  "notes": "mode: source | registry | local. See docs/pinning.md. registry mode stays unusable until something is actually pushed to ghcr.io/backupdproject/backupd, so source is the only honest default today. Moved to 4ffc25f for EPIC K's operator surfaces: 87a9dc7 predates the whole `snapshot` and `repository` command families and the incremental flags on `backup-set create|patch`, so the twenty cases under suites/cli/cases/snapshot, repository and backup-set added for backupdproject/backupd#789 assert commands that build does not have. 4ffc25f is main with #780 through #788 and the #852 write probe merged. This is the half of the lockstep with no automation: their scripts/e2e/tests-repo.pin moves to this repository in their own merge, and this line moves by hand or the specs stay red."
 }

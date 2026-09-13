@@ -1,0 +1,26 @@
+doc: >
+  `snapshot hold` without --reason is a usage error: nothing ran, exit
+  2.
+
+  The product's own argument for requiring it is in the usage text, and
+  it is about what happens months later: "a hold nobody explained is one
+  nobody dares release, which makes it permanent by accident". A hold
+  that becomes permanent by accident is a snapshot retention can never
+  delete, which is unbounded storage cost with no owner.
+
+  Exit 2 and not 1, because nothing was attempted: the command line was
+  incomplete, which is true regardless of what this deployment holds.
+scenario: incremental-set
+argv: [snapshot, hold, "production/uploads-tree", --config, "${CONFIG}"]
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+exit: 2
+stdout: empty
+stderr:
+  - contains: "--reason is required"
+  - contains: "permanent by accident"
+state: unchanged
+contract:
+  - "usage text: snapshot hold <source/backup-set> --reason R [--run R] - --reason is required: a hold nobody explained is one nobody dares release, which makes it permanent by accident"
+  - "usage text: exit codes - 2 is nothing ran: the command line was wrong (a missing or surplus argument)"
+tags: [smoke]

@@ -1,0 +1,22 @@
+doc: >
+  `snapshot list` on a backup set id nothing configures refuses and
+  prints nothing.
+
+  Nothing on stdout is the assertion worth making. A read command that
+  printed an empty table for an unknown id would be answering a question
+  about a set that does not exist, and a script reading the table would
+  see "no snapshots" rather than "no such set".
+scenario: incremental-set
+argv: [snapshot, list, "production/no-such-set", --config, "${CONFIG}"]
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+exit: 1
+stdout: empty
+stderr:
+  - contains: "backup set not found"
+  - contains: "production/no-such-set"
+state: unchanged
+contract:
+  - "usage text: exit codes - 1 is an ordinary failure, including a set or an artifact that is not there"
+  - "usage text: a name this configuration does not have is only wrong here (#569)"
+tags: []

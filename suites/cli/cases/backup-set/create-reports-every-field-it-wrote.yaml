@@ -1,0 +1,53 @@
+doc: >
+  `backup-set create` documents that it "reports every field it wrote,
+  stale_after included". For an incremental set, the fields it wrote
+  include the engine, the repository domain, the consistency mode and
+  the verification budget, so the report has to name them.
+
+  Observed on 4ffc25f: it names none of them. The report is the
+  artifact engine's field list -- host, port, user, remote_path,
+  local_path, include, completion_strategy, stale_after, validator_id,
+  disabled, read_only, connection -- four of which are blank because an
+  incremental set has no use for them, and the six keys the command
+  actually wrote into config.yaml appear nowhere. An operator who typed
+  `--verification-level content_sample` is shown a report with an empty
+  completion_strategy and no verification anything, which reads as a
+  command that ignored its flags.
+
+  It is not cosmetic: this report is the only confirmation a scripted
+  fleet rollout gets, and the wizard and the API both echo the same
+  service response, so "what did I just configure" has no answer on any
+  surface without re-reading the file.
+
+  Filed as findings/DISC-012.md.
+scenario: incremental-set
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+argv: [backup-set, create, "production/api-uploads",
+       --host, "source.example.internal",
+       --port, "2222",
+     --user, "backupuser",
+       --ssh-key-file, "${SSH_KEY}",
+       --known-hosts-line, "[source.example.internal]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ7Zq1i0i7Xw3v0m7d3Wl1nZk5Q9tJm2fVYy0m9c8ZqR",
+       --remote-path, "/srv/api-uploads",
+       --engine, kopia,
+       --repository-domain, production,
+       --source-consistency, external_snapshot,
+       --verification-level, content_sample,
+       --no-verify,
+       --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - contains: "backup set: production/api-uploads"
+  - contains: "engine: kopia"
+  - contains: "repository_domain: production"
+  - contains: "source_consistency: external_snapshot"
+  - contains: "verification_level: content_sample"
+stderr: ignored
+state: changed
+known_discrepancy: "findings/DISC-012.md"
+known_discrepancy_dimensions: [stdout]
+contract:
+  - "usage text: A routed create or patch reports every field it wrote, stale_after included: the API carries stale_after_seconds now, so both routes print the same set (#555)"
+  - "usage text: backup-set create ... [--engine artifact|kopia] [--repository-domain D] [--source-consistency S] [--verification-level L]"
+tags: []

@@ -1,0 +1,28 @@
+doc: >
+  `backup-set read-only <id> on` records the promise never to delete
+  this backup set's remote originals, and says so in those words.
+
+  This is the highest-consequence toggle on the surface, which is why
+  the sentence is asserted and not just the exit code: "on" is a promise
+  about what this manager will never do to somebody else's data.
+  Rendering it as a bare boolean would leave an operator guessing
+  whether read-only describes the SOURCE (never delete from it) or the
+  BACKUP (never write to it), and those are opposite behaviours.
+
+  Only "on" is exercised here. Going the other way is refused when the
+  source cannot support it, which needs a real source and belongs in
+  backupd's own suite rather than in a fixture with no server in it.
+scenario: incremental-set
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+argv: [backup-set, read-only, "production/uploads-tree", "on", --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - contains: "mode: direct"
+  - line: "production/uploads-tree"
+  - contains: "this manager will never delete this backup set's remote originals"
+stderr: empty
+state: changed
+contract:
+  - "usage text: backup-set read-only <source/backup-set> <on|off> - declare whether this manager may ever delete this backup set's remote originals, which --read-only can only do at creation. \"on\" is the promise never to delete from the source (#282, #788)"
+tags: [smoke]

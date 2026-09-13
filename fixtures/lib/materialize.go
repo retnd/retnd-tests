@@ -2,6 +2,9 @@ package fixtures
 
 import (
 	"bytes"
+	"crypto/ed25519"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"hash/fnv"
 	"math/rand"
@@ -20,15 +23,20 @@ import (
 // same structure off stdout, so all three suites agree on what a scenario
 // is by construction rather than by three parallel implementations.
 type Manifest struct {
-	Scenario   string      `json:"scenario"`
-	Work       string      `json:"work"`
-	Config     string      `json:"config"`
-	StateDir   string      `json:"state_dir"`
-	StateDB    string      `json:"state_db"`
-	RemoteRoot string      `json:"remote_root"`
-	LocalRoot  string      `json:"local_root"`
-	Sets       []SetPaths  `json:"sets"`
-	Replay     []ReplayRun `json:"replay,omitempty"`
+	Scenario   string `json:"scenario"`
+	Work       string `json:"work"`
+	Config     string `json:"config"`
+	StateDir   string `json:"state_dir"`
+	StateDB    string `json:"state_db"`
+	RemoteRoot string `json:"remote_root"`
+	LocalRoot  string `json:"local_root"`
+
+	// SSHKey is where a scenario with ssh_key: true puts its private
+	// key. It is always populated so a suite can name the path; the file
+	// exists only when the scenario asked for it.
+	SSHKey string      `json:"ssh_key"`
+	Sets   []SetPaths  `json:"sets"`
+	Replay []ReplayRun `json:"replay,omitempty"`
 }
 
 type SetPaths struct {
@@ -90,6 +98,7 @@ func Materialize(s Scenario, opt Options) (Manifest, error) {
 		StateDB:    filepath.Join(work, "state", "state.db"),
 		RemoteRoot: filepath.Join(work, "remote"),
 		LocalRoot:  filepath.Join(work, "local"),
+		SSHKey:     filepath.Join(work, "ssh-key"),
 	}
 	for _, d := range []string{m.StateDir, m.RemoteRoot, m.LocalRoot} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
@@ -132,6 +141,12 @@ func Materialize(s Scenario, opt Options) (Manifest, error) {
 					return m, err
 				}
 			}
+		}
+	}
+
+	if s.SSHKey {
+		if err := writeSSHKey(m.SSHKey); err != nil {
+			return m, fmt.Errorf("scenario %s: %w", s.Name, err)
 		}
 	}
 
@@ -237,6 +252,47 @@ func writeArtifact(dir, scenario, setID string, a Artifact, now time.Time) error
 	return os.Chtimes(path, mt, mt)
 }
 
+// sshKeySeed is the fixed seed every fixture SSH key is derived from.
+//
+// Fixed, so the key is byte-identical on every run and every machine,
+// which is the same determinism rule writeArtifact follows: a fixture
+// that differed run to run would make any assertion about what the
+// product wrote down a coin flip. It is a key material for a host that
+// does not exist, in a temp directory, used by commands run with
+// --no-verify, and it never authenticates against anything.
+var sshKeySeed = []byte("backupd-tests fixture ssh key !!")
+
+// writeSSHKey writes the private key a `backup-set create --ssh-key-file`
+// case needs.
+//
+// It exists because there is no other way to get one. Creating a backup
+// set requires a key to import -- there is no flag that declines to name
+// one -- so every case about `backup-set create` and `backup-set patch`
+// needs a file that parses as an SSH private key, and neither an
+// artifact (random bytes) nor a mutation can produce one.
+//
+// PKCS#8 PEM rather than OpenSSH's own format, because the standard
+// library can write PKCS#8 and cannot write OpenSSH's, and the product
+// accepts both: it parses keys through x/crypto/ssh, whose
+// ParseRawPrivateKey reads a "PRIVATE KEY" block as PKCS#8. Verified
+// against the pinned build: the create reports `imported ssh-ed25519
+// key SHA256:...`.
+func writeSSHKey(path string) error {
+	if len(sshKeySeed) != ed25519.SeedSize {
+		return fmt.Errorf("the fixture ssh key seed is %d bytes; ed25519 needs %d", len(sshKeySeed), ed25519.SeedSize)
+	}
+
+	der, err := x509.MarshalPKCS8PrivateKey(ed25519.NewKeyFromSeed(sshKeySeed))
+	if err != nil {
+		return fmt.Errorf("marshalling the fixture ssh key: %w", err)
+	}
+
+	// 0600, because the product refuses a key file the world can read,
+	// and a fixture that had to be chmod'ed by every caller would be a
+	// fixture that is wrong by default.
+	return os.WriteFile(path, pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}), 0o600)
+}
+
 func corruptBytes() []byte {
 	b := make([]byte, 8192)
 	rand.New(rand.NewSource(0x5EEDC0FFEE)).Read(b)
@@ -250,6 +306,7 @@ func expand(s string, m Manifest) string {
 	r := strings.NewReplacer(
 		"${WORK}", m.Work,
 		"${CONFIG}", m.Config,
+		"${SSH_KEY}", m.SSHKey,
 		"${STATE_DIR}", m.StateDir,
 		"${STATE_DB}", m.StateDB,
 		"${REMOTE}", m.RemoteRoot,

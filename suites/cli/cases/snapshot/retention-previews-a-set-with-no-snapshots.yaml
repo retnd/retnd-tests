@@ -1,0 +1,36 @@
+doc: >
+  `snapshot retention` on a configured incremental set that has never
+  run should preview an empty plan and exit 0, the way `snapshot list`
+  and `snapshot holds` answer for the same set.
+
+  The documented verb is a PREVIEW that deletes nothing: "what snapshot
+  retention would decide about each of this set's snapshots right now".
+  A set with no snapshots has nothing to decide about, and the answer to
+  a question about an empty collection is an empty answer.
+
+  Observed instead: exit 1 with "an internal error occurred". The
+  preview opens the repository before it decides anything, the
+  repository has never been created, and the failure to open it falls
+  through core/service's boundary mapping onto the unmapped-error arm.
+  `repository health` names the very same condition precisely on the
+  same fixture, so the information exists and this surface discards it.
+
+  Filed as findings/DISC-010.md. Marked on exit and stderr only: whether
+  the command touches the work directory is still asserted strictly,
+  because a preview that started writing would be a second, worse
+  defect hiding behind this one.
+scenario: incremental-set
+argv: [snapshot, retention, "production/uploads-tree", --config, "${CONFIG}"]
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+exit: 0
+stdout:
+  - contains: "production/uploads-tree"
+stderr: empty
+state: unchanged
+known_discrepancy: "findings/DISC-010.md"
+known_discrepancy_dimensions: [exit, stdout, stderr]
+contract:
+  - "usage text: snapshot retention <source/backup-set> - what snapshot retention would decide about each of this set's snapshots right now -- KEEP, DELETE or REFUSE, each with the reason. A preview; it deletes nothing"
+  - 'usage text: exit codes - 0 is "the command did what it was asked"'
+tags: []

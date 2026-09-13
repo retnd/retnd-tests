@@ -1,0 +1,48 @@
+doc: >
+  `backup-set create --engine kopia` with no --repository-domain is
+  refused, the refusal says why in full, and NOTHING is written.
+
+  The refusal's reasoning is the product's own and it is worth quoting,
+  because it is why this cannot be defaulted: a set whose repository
+  nobody named "would share an encryption key, a credential, a
+  maintenance window, a deduplication span and a corruption fate with
+  whatever else happened to be there".
+
+  The state half of this case is the interesting one, and it currently
+  fails. Observed on 4ffc25f: the create imports the SSH key and writes
+  a known_hosts file for the set BEFORE the configuration is validated,
+  so a refused create leaves credential material on disk under the name
+  of a backup set that does not exist -- orphaned, referenced by
+  nothing, and invisible to every command that lists what is
+  configured. Filed as findings/DISC-011.md.
+
+  Marked on the state dimension alone: the exit code, the empty stdout
+  and the refusal text are all correct and are asserted strictly, so a
+  regression in any of them still fails this case.
+scenario: incremental-set
+env:
+  BACKUPD_INCREMENTAL_ENGINE: "1"
+argv: [backup-set, create, "production/no-domain",
+       --host, "source.example.internal",
+       --port, "2222",
+     --user, "backupuser",
+       --ssh-key-file, "${SSH_KEY}",
+       --known-hosts-line, "[source.example.internal]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ7Zq1i0i7Xw3v0m7d3Wl1nZk5Q9tJm2fVYy0m9c8ZqR",
+       --remote-path, "/srv/no-domain",
+       --engine, kopia,
+       --no-verify,
+       --config, "${CONFIG}"]
+exit: 1
+stdout:
+  - contains: "mode: direct"
+stderr:
+  - contains: "repository_domain is required for engine"
+  - contains: "would share an encryption key, a credential, a maintenance window, a deduplication span and a corruption fate"
+state: unchanged
+known_discrepancy: "findings/DISC-011.md"
+known_discrepancy_dimensions: [state]
+contract:
+  - "usage text: backup-set create ... [--engine artifact|kopia] [--repository-domain D]"
+  - "usage text: with something serving and no route, the write is refused and nothing is written"
+  - "backupdproject/backupd FR-33 and #789's security review: credential material is written once, in a file only this service can read, and nothing strands it"
+tags: []
