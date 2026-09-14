@@ -1,4 +1,6 @@
 import { expect, needs, test } from "./fixtures";
+import { WorkflowScreens } from "./workflow-page";
+import { readWorkflowRuns, readWorkflowSteps } from "../harness/workflow";
 
 /** §32 — keyboard, semantics and non-colour-only status, checked structurally
  *  rather than with a snapshot so failures point at a real defect.
@@ -174,6 +176,65 @@ test.describe("accessibility", () => {
     await expect(table).toBeVisible();
     await expect(table.getByRole("columnheader").first()).toBeVisible();
     await expect(table.getByRole("row").nth(1)).toBeVisible();
+  });
+
+  test("the workflow run page is one page with one heading and labelled controls", async ({
+    bm,
+    page
+  }) => {
+    const runs = await readWorkflowRuns(bm.api);
+    needs(
+      runs !== null && runs.length > 0,
+      "a recorded workflow run: EPIC L's run page does not exist until something has run, so " +
+        "the sweep above never visits it"
+    );
+
+    const wf = new WorkflowScreens(page);
+    await wf.gotoRun(runs![0].run_id);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+
+    const unlabelled = await page.evaluate(() => {
+      const controls = Array.from(
+        document.querySelectorAll("button, a[href], input, select, textarea")
+      );
+      return controls
+        .filter((el) => {
+          const style = getComputedStyle(el);
+          if (style.display === "none" || style.visibility === "hidden") return false;
+          const label =
+            el.getAttribute("aria-label") ??
+            el.getAttribute("title") ??
+            (el as HTMLElement).innerText ??
+            "";
+          if (label.trim().length > 0) return false;
+          return !el.closest("label");
+        })
+        .map((el) => el.tagName + (el.className ? "." + String(el.className).slice(0, 40) : ""));
+    });
+    expect(unlabelled, "unlabelled controls on the workflow run page").toEqual([]);
+  });
+
+  test("which step's output is being read is answerable without sight", async ({ bm, page }) => {
+    const runs = await readWorkflowRuns(bm.api);
+    needs(runs !== null && runs.length > 0, "a recorded workflow run to open");
+    const steps = await readWorkflowSteps(bm.api, runs![0].run_id);
+    needs(steps.length > 0, "a run holding at least one step, so there is a selection to announce");
+
+    const wf = new WorkflowScreens(page);
+    await wf.gotoRun(runs![0].run_id);
+    const row = wf.stepRow(steps[0].script_name);
+    // A real button with `aria-pressed`, and not a div with a tint: the
+    // selection is the only thing that says which log is on screen, and
+    // colour cannot say it.
+    await expect(row).toHaveAttribute("aria-pressed", "false");
+    await row.click();
+    await expect(row).toHaveAttribute("aria-pressed", "true");
+
+    // The scrollback is a named, read-only log region rather than a
+    // wall of unlabelled text.
+    const output = wf.output(steps[0].script_name);
+    await expect(output).toBeVisible();
+    await expect(output).toHaveAttribute("aria-readonly", "true");
   });
 
   test("no console errors on any page", async ({ page }) => {
