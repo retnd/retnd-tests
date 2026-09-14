@@ -69,14 +69,28 @@ test.describe("the browser is looking at a real deployment", () => {
     );
 
     await bm.goto("/backups");
+    // One assertion per distinct source/set/name, not per artifact. A
+    // filename is not unique on a real deployment: this fixture backs
+    // twelve sets up from one source directory, so `payload.bin` is a
+    // dozen rows, and a set that has run twice has two of its own. The
+    // claim worth making is unchanged - a file that originated on the
+    // source machine, travelled over SFTP, was recorded in SQLite and
+    // came back through the proxy is on the page - and scoping the row
+    // to the set it belongs to is what keeps it a claim rather than a
+    // strict-mode violation.
+    const seen = new Set<string>();
     for (const artifact of bm.facts.backups) {
-      // The artifact's own filename, which originated on the source
-      // machine, travelled over SFTP, was recorded in SQLite and came back
-      // through the proxy. A row carrying it is the whole chain reporting.
+      const key = artifact.source_name + "/" + artifact.set_name + "/" + artifact.name;
+      if (seen.has(key)) continue;
+      seen.add(key);
       await expect(
-        page.getByRole("row").filter({ hasText: artifact.name }),
-        artifact.name + " is in the catalogue but not on the page"
-      ).toHaveCount(1);
+        page
+          .getByRole("row")
+          .filter({ hasText: artifact.name })
+          .filter({ hasText: artifact.set_name })
+          .first(),
+        key + " is in the catalogue but not on the page"
+      ).toBeVisible();
     }
   });
 

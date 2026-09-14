@@ -122,6 +122,15 @@ export interface DeploymentFacts {
   /** One entry per configured backup set, with the health verdict the
    *  service computes rather than one derived here. */
   sets: WireHealth[];
+  /** The sentence the service publishes under the dashboard's BACKUPS
+   *  headline, verbatim.
+   *
+   *  Carried rather than pattern-matched because it is the SERVICE's
+   *  sentence: `HealthSummary` renders `backupHealthReason` straight
+   *  through, so a spec that matched a regex of remembered wordings was
+   *  really asserting which verdict this deployment happens to be on,
+   *  and went red the day the fleet grew a set whose hooks fail. */
+  backupHealthReason: string;
   /** Backups in the catalogue, quarantined ones excluded (GET /backups
    *  and GET /quarantine are two different lists). */
   backups: WireArtifactRow[];
@@ -180,7 +189,11 @@ async function readJson<T>(api: APIRequestContext, path: string, fallback: T): P
  *  measuring. */
 export async function readFacts(api: APIRequestContext): Promise<Omit<DeploymentFacts, "seededBackupSet">> {
   const firstRun = await readJson<{ configured?: boolean }>(api, "/system/first-run", {});
-  const health = await readJson<{ backup_sets?: WireHealth[] }>(api, "/system/health", {});
+  const health = await readJson<{ backup_sets?: WireHealth[]; backup_health_reason?: string }>(
+    api,
+    "/system/health",
+    {}
+  );
   const backups = await readJson<{ artifacts?: WireArtifactRow[] }>(api, "/backups", {});
   const quarantine = await readJson<{ artifacts?: WireArtifactRow[] }>(api, "/quarantine", {});
   const activity = await readJson<{ events?: unknown[] }>(api, "/activity", {});
@@ -199,6 +212,7 @@ export async function readFacts(api: APIRequestContext): Promise<Omit<Deployment
   return {
     configured: firstRun.configured === true,
     sets: health.backup_sets ?? [],
+    backupHealthReason: health.backup_health_reason ?? "",
     backups: backups.artifacts ?? [],
     quarantined: quarantine.artifacts ?? [],
     activityEvents: (activity.events ?? []).length,
