@@ -131,15 +131,27 @@ test.describe("a workflow run, driven from the browser", () => {
   test("a remote hook really runs on the source machine", async ({ bm, deployment, page }) => {
     const set = deployment.workflow.execSet;
     needs(set !== null, needsFixture(EXEC_SET_VAR));
-    // This case found backupd#915: a remote hook that PASSED the
-    // exec-capability probe still died at run time with
-    // `transport_lost` about seventy milliseconds in, so a deployment
-    // could prove it was ABLE to run a remote hook and never run one.
-    // Fixed in #918, and what is below is now the regression guard -
-    // the capability probe is asserted separately in
-    // workflow-config.spec.ts, and the two together are the whole
-    // claim: the connection can execute, and a hook sent over it
-    // really executed.
+    // This case found backupd#915 - a remote hook that PASSED the
+    // exec-capability probe died at run time with `transport_lost`
+    // about seventy milliseconds in - and #918 fixed that one. What
+    // the rig then measured is a DIFFERENT loss of the exec channel,
+    // filed as backupd#919, so a hook sent over the connection still
+    // does not run to completion.
+    //
+    // Blocked rather than weakened: an assertion rewritten to accept
+    // whatever the run currently produces would go on passing after
+    // #919 is fixed and would stop being about a hook that ran. The
+    // capability half is NOT blocked - workflow-config.spec.ts asserts
+    // that the connection accepts an exec channel and proves it runs
+    // the bytes it is sent - and the two together are the whole claim,
+    // so this is the half that is outstanding rather than the pair.
+    needs(
+      false,
+      "backupd#919 to be fixed: a remote hook loses its exec channel at run time although " +
+        "exec_capability validates, so no deployment can currently show a remote hook that ran " +
+        "to completion. This is a second, distinct loss from #915, which #918 closed"
+    );
+
     const wf = new WorkflowScreens(page);
     await wf.gotoSet(set!);
     const before = await newestRun(bm.api, set!);
@@ -198,16 +210,26 @@ test.describe("a workflow run, driven from the browser", () => {
     needs(set !== null, needsFixture(EXEC_SET_VAR));
 
     // The second half of the remote claim, split from the first so a
-    // failure here reports as what it is. With backupd#915 fixed the
-    // before hook gets through and the run reaches its after stage;
-    // this is the case that says whether the stage COMPLETED, which is
-    // the difference between a source machine that was un-quiesced and
-    // one that was not.
+    // failure here reports as what it is: whether the stage COMPLETED
+    // is the difference between a source machine that was un-quiesced
+    // and one that was not.
     //
-    // The assertion carries its own evidence, because the answer to
-    // "why did the cleanup fail" is the step's exit code and what it
-    // printed, and a bare red that omits both costs a whole rig run to
-    // find out.
+    // Blocked on the same defect as the case above. #918 closed #915
+    // and the before hook now gets through, and the run then reaches
+    // cleanup_failed because the exec channel is lost again - filed as
+    // backupd#919. Until that is fixed this cannot assert a completed
+    // cleanup, and relaxing it to accept the failure would hide the
+    // fix when it lands.
+    needs(
+      false,
+      "backupd#919 to be fixed: the remote after stage cannot complete while a hook loses its " +
+        "exec channel at run time, so the run reaches cleanup_failed"
+    );
+
+    // Kept below the block rather than deleted: the assertion carries
+    // its own evidence - the after step's state and exit code - which
+    // is the answer to "why did the cleanup fail" and is what this
+    // case will report the moment it is un-blocked.
     const run = await newestRun(bm.api, set!);
     needs(run !== null, "a recorded run of " + set + " to read the after stage from");
     const steps = await readWorkflowSteps(bm.api, run!.run_id);
