@@ -7,14 +7,12 @@ import { expect, needs, test } from "./fixtures";
 import {
   CRASH_SET_VAR,
   NEEDS_WORKFLOW_CONTROL,
-  catchRunInFlight,
-  crashEngine,
+  acknowledgeHolds,
+  crashIntoHook,
   needsFixture,
   readWorkflowRecovery,
   readWorkflowRun,
   resolveWorkflowControl,
-  runAppearMs,
-  waitForHold,
   waitForNoHold,
   waitForSetIdle
 } from "../harness/workflow";
@@ -80,25 +78,24 @@ test.describe("a workflow run that was interrupted", () => {
 
     // Crash INTO a live hook. Nothing here starts the run: the
     // destructive gate refuses the product's own Run control on every
-    // deployment (backupd#92), so this waits for the scheduler and
-    // catches the run while its hold script is executing. A run
-    // observed a moment after it finished is an ordinary outcome at a
-    // one-minute cadence, and catchRunInFlight waits for the next one
-    // rather than crashing an idle engine and finding nothing to
-    // reconcile.
-    const caught = await catchRunInFlight(bm.api, set!);
-    const started = caught.run;
-    expect(caught.step.script_name).toBe(CRASH_HOLD);
-    await crashEngine(control!);
-
-    // What reconciliation found, read from the hold set the Run control
-    // is gated on. One run can raise more than one hold - the engine
-    // records the global scope and the set scope separately - so this
-    // asks for a hold belonging to this set and checks it is about the
-    // run that was interrupted, rather than assuming there is exactly
-    // one.
-    const hold = await waitForHold(bm.api, set!, runAppearMs());
-    expect(hold.run_id).toBe(started.run_id);
+    // deployment (backupd#92), so this waits for the scheduler, catches
+    // the run while its hold script is executing, and asks the rig to
+    // take the engine away underneath it.
+    //
+    // crashIntoHook retries: a crash that lands after the hook finished
+    // leaves nothing to reconcile, which is a timing miss rather than a
+    // product answer, and the honest response is the next scheduled run
+    // rather than an assertion about a run that completed. It returns
+    // only when reconciliation really raised a hold, and fails naming
+    // every attempt when none did.
+    //
+    // One run raises more than one hold - the engine records the global
+    // scope and the set scope separately - so what is required is a
+    // hold belonging to THIS set, about the run that was interrupted.
+    const crashed = await crashIntoHook(bm.api, control!, set!);
+    const started = crashed.run;
+    expect(crashed.step.script_name).toBe(CRASH_HOLD);
+    expect(crashed.hold.run_id).toBe(started.run_id);
     const reconciled = await readWorkflowRun(bm.api, started.run_id);
     expect(reconciled?.state).toBe("recovery_required");
 
@@ -153,6 +150,33 @@ test.describe("a workflow run that was interrupted", () => {
     await expect(wf.output(CRASH_CLEANUP)).toContainText(CRASH_CLEANUP_LINE, { timeout: 60_000 });
   });
 
+  // Settle whatever this file's crash left behind, however a case ended.
+  //
+  // Not tidiness: a set carrying an unresolved hold is a set the ENGINE
+  // refuses to run again, so a case that failed before settling its own
+  // hold does not fail alone - it starves every later case waiting for
+  // the scheduler to come round to that set, and each of those reports
+  // "the scheduler did not run this set", which says nothing about what
+  // broke. Acknowledged rather than resumed, because resuming EXECUTES
+  // owed hooks and that is a thing under test rather than a thing to do
+  // behind a case's back.
+  test.afterEach(async ({ bm, deployment }) => {
+    const set = deployment.workflow.crashSet;
+    if (set === null) return;
+    const settled = await acknowledgeHolds(
+      bm.api,
+      set,
+      "e2e: settled by the suite so the scheduler will run this set again; the case that caused " +
+        "this hold ended without clearing it"
+    );
+    if (settled > 0) {
+      console.log(
+        "e2e: acknowledged " + settled + " leftover recovery hold(s) on " + set +
+          " so later cases are not starved of a scheduled run"
+      );
+    }
+  });
+
   test("acknowledging is a reason in words, and nothing less unblocks the set", async ({
     bm,
     deployment,
@@ -163,14 +187,14 @@ test.describe("a workflow run that was interrupted", () => {
     const set = deployment.workflow.crashSet;
     needs(set !== null, needsFixture(CRASH_SET_VAR));
 
-    // Same sequencing as the case above: caught mid-hook rather than
-    // initiated, because nothing here can start a run.
-    const caught = await catchRunInFlight(bm.api, set!);
-    await crashEngine(control!);
-    await waitForHold(bm.api, set!, runAppearMs());
+    // Same sequencing as the case above: caught mid-hook and retried
+    // until the crash lands inside the window, because nothing here can
+    // start a run.
+    const crashed = await crashIntoHook(bm.api, control!, set!);
+    expect(crashed.step.script_name).toBe(CRASH_HOLD);
+    expect(crashed.hold.backup_set_id).toBe(set!);
 
     const wf = new WorkflowScreens(page);
-    expect(caught.step.script_name).toBe(CRASH_HOLD);
 
     await wf.gotoSet(set!);
     const banner = wf.recoveryBanner();

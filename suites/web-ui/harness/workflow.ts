@@ -884,6 +884,91 @@ export async function waitForHold(
   }
 }
 
+/** Crashes the engine INTO a live hook and returns the hold that
+ *  reconciliation raised, retrying until it lands inside the window.
+ *
+ *  The window is real and narrow: the fixture's hook holds for about
+ *  forty-five seconds inside a cycle, nothing in this suite can start a
+ *  run, and the stop-start-healthcheck the rig performs takes time of
+ *  its own. A crash that lands after the hook finished leaves nothing
+ *  to reconcile, and the honest response is to try the next scheduled
+ *  run rather than to assert against a run that completed.
+ *
+ *  Retried here rather than in each case, because the two crash cases
+ *  need identical timing and a retry written twice is a retry that
+ *  drifts. Throws only when every attempt missed, and says how many.
+ *
+ *  The mechanism itself is not in doubt: a crash into a live step
+ *  raises a global hold and a set hold about five seconds after the
+ *  engine returns, each carrying the run id and the spool reference.
+ *  What is uncertain is only whether this attempt caught the hook. */
+export async function crashIntoHook(
+  api: APIRequestContext,
+  control: WorkflowControl,
+  backupSetId: string,
+  attempts = 2
+): Promise<{ run: WireWorkflowRun; step: WireWorkflowStep; hold: WireWorkflowHold }> {
+  const missed: string[] = [];
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const caught = await catchRunInFlight(api, backupSetId);
+    await crashEngine(control);
+    const hold = await waitForHold(api, backupSetId, runAppearMs()).catch(() => null);
+    if (hold !== null) return { run: caught.run, step: caught.step, hold };
+    missed.push(
+      caught.run.run_id + " was " + caught.step.script_name + " when the crash was requested, " +
+        "and reconciliation raised no hold for " + backupSetId
+    );
+  }
+  throw new Error(
+    "crashed the engine " + attempts + " times into a run of " + backupSetId + " and never " +
+      "interrupted a hook: every crash landed after the step had finished, so there was nothing " +
+      "for reconciliation to find.\n  " + missed.join("\n  ")
+  );
+}
+
+/** Acknowledges every hold this set is carrying, through the API.
+ *
+ *  A cleanup step and not an assertion: a set with an unresolved hold
+ *  is a set the ENGINE will not run again, so a crash case that fails
+ *  before it settles its own hold does not fail alone - it starves
+ *  every later case that waits for the scheduler to come round to that
+ *  set, and those report "the scheduler did not run this set", which
+ *  says nothing about what actually broke.
+ *
+ *  Acknowledge rather than resume, deliberately: resuming EXECUTES the
+ *  hooks a run still owed, which is a thing under test and not a thing
+ *  to do behind a case's back. An acknowledgement records a person
+ *  taking responsibility and changes nothing on the source machine,
+ *  which is exactly what a test harness tidying up after itself is
+ *  doing.
+ *
+ *  Returns how many it settled, and never throws: it runs on the way
+ *  out of a case that may already be failing, and an error here would
+ *  replace the reason anybody is reading the report. */
+export async function acknowledgeHolds(
+  api: APIRequestContext,
+  backupSetId: string,
+  reason: string
+): Promise<number> {
+  let settled = 0;
+  try {
+    const holds = await readWorkflowRecovery(api);
+    const headers = await csrfHeaders(api);
+    for (const hold of holds ?? []) {
+      if (hold.backup_set_id !== backupSetId) continue;
+      const response = await api.post(
+        BASE + "/workflow-recovery/" + encodeURIComponent(hold.run_id) + "/acknowledge",
+        { headers, data: { reason } }
+      );
+      if (response.status() < 400) settled++;
+    }
+  } catch {
+    return settled;
+  }
+
+  return settled;
+}
+
 /** Waits until this set is no longer held. Used after Resume cleanup and
  *  after Acknowledge, so the next case does not inherit a blocked set. */
 export async function waitForNoHold(
