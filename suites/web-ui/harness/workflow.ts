@@ -652,6 +652,12 @@ export function describeWorkflowFacts(facts: WorkflowFacts): string {
 export const RUN_SETTLE_MS = 60_000;
 const RUN_POLL_MS = 500;
 
+/** How often a waiter re-checks whether something it can clear is the
+ *  reason nothing is happening. Seconds rather than milliseconds: it
+ *  costs a request, and the thing it looks for takes a run's
+ *  finalisation to appear. */
+const HOLD_SWEEP_MS = 5_000;
+
 /** The scheduler cadence the rig configured, in seconds.
  *
  *  Exported by the rig rather than written down, because the product
@@ -724,12 +730,24 @@ export async function waitForNewRun(
   api: APIRequestContext,
   backupSetId: string,
   excludingRunId: string | null,
-  timeoutMs = RUN_SETTLE_MS
+  timeoutMs = RUN_SETTLE_MS,
+  /** Run every few seconds while waiting, for a caller that can REMOVE
+   *  a reason no run is appearing. The only such reason this suite can
+   *  do anything about is a hold, and a hold cannot be cleared before
+   *  it exists: an interrupted run finalises seconds to minutes after
+   *  whatever interrupted it, so a clear taken once before the wait is
+   *  structurally too early. */
+  whileWaiting?: () => Promise<void>
 ): Promise<WireWorkflowRun> {
   const deadline = Date.now() + timeoutMs;
+  let nextSweep = Date.now();
   for (;;) {
     const run = await newestRun(api, backupSetId);
     if (run !== null && run.run_id !== excludingRunId) return run;
+    if (whileWaiting !== undefined && Date.now() >= nextSweep) {
+      nextSweep = Date.now() + HOLD_SWEEP_MS;
+      await whileWaiting();
+    }
     if (Date.now() >= deadline) {
       throw new Error(
         "no new workflow run appeared for " + backupSetId + " within " +
@@ -738,7 +756,8 @@ export async function waitForNewRun(
           ". Nothing in this suite can start one - the destructive gate refuses the product's " +
           "own Run control (backupd#92) - so this case waited " +
           (Math.round((timeoutMs / 1000) / Number((process.env[POLL_SECONDS_VAR] ?? "60").trim() || 60) * 10) / 10) +
-          " scheduler intervals and the scheduler did not run this set."
+          " scheduler intervals and the scheduler did not run this set" +
+          (whileWaiting === undefined ? "." : ", with no hold on it to explain why.")
       );
     }
     await sleep(RUN_POLL_MS);
@@ -833,8 +852,30 @@ export async function catchRunInFlight(
     if (live !== undefined) return { run: current, step: live };
   }
 
+  // Waiting for a run of a HELD set is waiting for something the engine
+  // is right to refuse, and a clear taken once at the start of a case
+  // can only ever be too early: an interrupted run does not become a
+  // hold until it finalises, which is seconds to minutes after whatever
+  // interrupted it. So a hold found while waiting is treated as a
+  // legitimate starting state - settled at the moment it exists, and
+  // said out loud - rather than as a reason to keep waiting.
+  const unblock = async (): Promise<void> => {
+    const settled = await acknowledgeHolds(
+      api,
+      backupSetId,
+      "e2e: settled so the scheduler will run this set again; an earlier case interrupted a " +
+        "hook belonging to it and the hold only finalised afterwards"
+    );
+    if (settled.length > 0) {
+      console.log(
+        "e2e: " + backupSetId + " was held (" + settled.length + " hold(s)) while this case was " +
+          "waiting for the scheduler, which is why no run was appearing; acknowledged"
+      );
+    }
+  };
+
   for (let attempt = 0; attempt < attempts; attempt++) {
-    const run = await waitForNewRun(api, backupSetId, previous, budget);
+    const run = await waitForNewRun(api, backupSetId, previous, budget, unblock);
     previous = run.run_id;
     try {
       return { run, step: await waitForRunningStep(api, run.run_id) };
