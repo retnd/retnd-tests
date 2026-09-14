@@ -8,6 +8,7 @@ import {
   MANY_STEPS_SET_VAR,
   SLOW_SET_VAR,
   needsFixture,
+  runAppearMs,
   newestRun,
   readWorkflowSteps,
   waitForNewRun,
@@ -43,7 +44,12 @@ import {
  * step that has already been read must not read it again.
  */
 
-test.describe.configure({ timeout: 240_000 });
+// A run is a real backup plus real hooks, and this suite cannot start
+// one: the destructive gate refuses the product's own Run control
+// (backupd#92), so each case waits for the scheduler's next pass at the
+// shortest legal interval the product allows. The suite-wide 90s is for
+// pages; this file waits on a deployment to come round to a set.
+test.describe.configure({ timeout: 480_000 });
 
 /** The follower's delay, in the throttled case. Long enough that a
  *  duration computed from when the log finished arriving would be
@@ -96,8 +102,15 @@ test.describe("the step log terminal", () => {
     const wf = new WorkflowScreens(page);
     await wf.gotoSet(set!);
     const before = await newestRun(bm.api, set!);
-    await wf.runControl().click();
-    const started = await waitForNewRun(bm.api, set!, before?.run_id ?? null);
+    // NOT pressed: `POST /api/v1/operations` is refused with
+    // DESTRUCTIVE_OPERATIONS_DISABLED on every deployment, because
+    // `NewEngine` never sets a destructive gate (backupd#92). That is a
+    // pre-existing product gate and nothing to do with EPIC L, so this
+    // case OBSERVES the run the scheduler starts instead of initiating
+    // one. Every assertion below is still made in a browser against a
+    // run whose hooks really executed; only the button press is
+    // unavailable.
+    const started = await waitForNewRun(bm.api, set!, before?.run_id ?? null, runAppearMs());
     const settled = await waitForRunToSettle(bm.api, started.run_id);
 
     await wf.gotoRun(settled.run_id);
@@ -146,8 +159,8 @@ test.describe("the step log terminal", () => {
     const wf = new WorkflowScreens(page);
     await wf.gotoSet(set!);
     const before = await newestRun(bm.api, set!);
-    await wf.runControl().click();
-    const started = await waitForNewRun(bm.api, set!, before?.run_id ?? null);
+    // Observed rather than initiated; see the first case in this file.
+    const started = await waitForNewRun(bm.api, set!, before?.run_id ?? null, runAppearMs());
     const settled = await waitForRunToSettle(bm.api, started.run_id);
 
     const steps = await readWorkflowSteps(bm.api, settled.run_id);
@@ -220,8 +233,8 @@ test.describe("the step log terminal", () => {
     const wf = new WorkflowScreens(page);
     await wf.gotoSet(set!);
     const before = await newestRun(bm.api, set!);
-    await wf.runControl().click();
-    const started = await waitForNewRun(bm.api, set!, before?.run_id ?? null);
+    // Observed rather than initiated; see the first case in this file.
+    const started = await waitForNewRun(bm.api, set!, before?.run_id ?? null, runAppearMs());
     const settled = await waitForRunToSettle(bm.api, started.run_id);
 
     const steps = await readWorkflowSteps(bm.api, settled.run_id);

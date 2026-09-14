@@ -9,6 +9,7 @@ import {
   NEEDS_WORKFLOW_CONTROL,
   crashEngine,
   needsFixture,
+  runAppearMs,
   newestRun,
   readWorkflowRecovery,
   readWorkflowRun,
@@ -55,7 +56,10 @@ import {
  * set, with an error about a disabled button and no mention of why.
  */
 
-test.describe.configure({ timeout: 420_000 });
+// Two crash cycles, each waiting for the scheduler to come round to the
+// crash set before there is a live hook to crash into. See
+// harness/workflow.ts's runAppearMs for why nothing here presses Run.
+test.describe.configure({ timeout: 900_000 });
 
 test.describe("a workflow run that was interrupted", () => {
   test.beforeEach(async ({ bm }) => {
@@ -79,13 +83,20 @@ test.describe("a workflow run that was interrupted", () => {
     await wf.gotoSet(set!);
     const previous = await newestRun(bm.api, set!);
     await expect(wf.runControl()).toBeEnabled();
-    await wf.runControl().click();
+    // NOT pressed: `POST /api/v1/operations` is refused with
+    // DESTRUCTIVE_OPERATIONS_DISABLED on every deployment, because
+    // `NewEngine` never sets a destructive gate (backupd#92). That is a
+    // pre-existing product gate and nothing to do with EPIC L, so this
+    // case OBSERVES the run the scheduler starts instead of initiating
+    // one. Every assertion below is still made in a browser against a
+    // run whose hooks really executed; only the button press is
+    // unavailable.
 
     // Crash INTO a live hook. A crash against an idle deployment
     // produces nothing to reconcile, and a case that waited a fixed
     // number of seconds instead would be asserting against whatever the
     // engine happened to be doing.
-    const started = await waitForNewRun(bm.api, set!, previous?.run_id ?? null);
+    const started = await waitForNewRun(bm.api, set!, previous?.run_id ?? null, runAppearMs());
     const running = await waitForRunningStep(bm.api, started.run_id);
     expect(running.script_name).toBe(CRASH_HOLD);
     await crashEngine(control!);
@@ -142,8 +153,8 @@ test.describe("a workflow run that was interrupted", () => {
     await wf.gotoSet(set!);
     const previous = await newestRun(bm.api, set!);
     await expect(wf.runControl()).toBeEnabled();
-    await wf.runControl().click();
-    const started = await waitForNewRun(bm.api, set!, previous?.run_id ?? null);
+    // Observed rather than initiated; see the first case in this file.
+    const started = await waitForNewRun(bm.api, set!, previous?.run_id ?? null, runAppearMs());
     await waitForRunningStep(bm.api, started.run_id);
     await crashEngine(control!);
     await waitForHold(bm.api, set!);

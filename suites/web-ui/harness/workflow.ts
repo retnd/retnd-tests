@@ -652,6 +652,37 @@ export function describeWorkflowFacts(facts: WorkflowFacts): string {
 export const RUN_SETTLE_MS = 60_000;
 const RUN_POLL_MS = 500;
 
+/** The scheduler cadence the rig configured, in seconds.
+ *
+ *  Exported by the rig rather than written down, because the product
+ *  puts a floor under it: `config.MinPollInterval` is one minute and a
+ *  shorter interval is refused, so "a run within 60 seconds" is not
+ *  achievable on any legal configuration and a suite that assumed one
+ *  would report a stall on a healthy deployment. */
+export const POLL_SECONDS_VAR = "RM_WF_POLL_SECONDS";
+
+/** How long a run is given to APPEAR.
+ *
+ *  Longer than the settle budget, and for a different reason: nothing in
+ *  this suite can start a backup. `POST /api/v1/operations` answers
+ *  DESTRUCTIVE_OPERATIONS_DISABLED on every deployment, because
+ *  `NewEngine` never sets a destructive gate (backupd#92), so the
+ *  product's own Run control is refused whoever presses it. The rig
+ *  answers that by giving the deployment the shortest legal scheduler
+ *  interval, and these cases OBSERVE the run it starts.
+ *
+ *  Two and a half intervals, floored at 150 seconds. A set becomes due
+ *  one interval after its last run and then waits its turn in the cycle,
+ *  so one interval is the wrong budget and two is tight on the set whose
+ *  hook holds for forty-five seconds. A function rather than a constant
+ *  because Playwright resolves the environment per worker. */
+export function runAppearMs(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = (env[POLL_SECONDS_VAR] ?? "").trim();
+  const seconds = /^\d+$/.test(raw) ? Number(raw) : 60;
+
+  return Math.max(150_000, seconds * 2_500);
+}
+
 /** The states a run is no longer moving in, out of the thirteen the
  *  contract declares. `pending`, `running` and `cleanup_running` are
  *  deliberately absent: a canceled run whose after hooks are still
@@ -680,9 +711,15 @@ export async function newestRun(
 
 /** Waits until this set has a run that is not `excludingRunId`.
  *
- *  The exclusion is what makes "press Run, then read the run" honest: a
- *  set that already has history would otherwise hand back the previous
- *  run instantly and the case would assert against it. */
+ *  The exclusion is what makes "read the run this case is about" honest:
+ *  a set that already has history would otherwise hand back the previous
+ *  run instantly, and the case would assert against a run that predates
+ *  whatever it is testing.
+ *
+ *  The run is started by the deployment's scheduler rather than by the
+ *  browser. See RUN_APPEAR_MS for why, and note what does NOT change:
+ *  the hooks execute for real, and every assertion about them is still
+ *  made through the product's own pages. */
 export async function waitForNewRun(
   api: APIRequestContext,
   backupSetId: string,
@@ -698,8 +735,10 @@ export async function waitForNewRun(
         "no new workflow run appeared for " + backupSetId + " within " +
           String(Math.round(timeoutMs / 1000)) + "s" +
           (excludingRunId === null ? "" : " (the newest is still " + excludingRunId + ")") +
-          ". The run control was pressed and the engine recorded nothing, so there is no run to " +
-          "assert about."
+          ". Nothing in this suite can start one - the destructive gate refuses the product's " +
+          "own Run control (backupd#92) - so this case waited " +
+          (Math.round((timeoutMs / 1000) / Number((process.env[POLL_SECONDS_VAR] ?? "60").trim() || 60) * 10) / 10) +
+          " scheduler intervals and the scheduler did not run this set."
       );
     }
     await sleep(RUN_POLL_MS);

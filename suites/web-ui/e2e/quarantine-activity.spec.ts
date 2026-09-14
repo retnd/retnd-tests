@@ -299,7 +299,12 @@ test.describe("activity", () => {
   });
 
   test("offers the two real filters, and no longer the decorative Time range select (backupd#299)", async ({ page }) => {
-    await expect(page.getByLabel("Backup set")).toBeVisible();
+    // By ROLE and not by label: every event row carries a "Close help for
+    // Backup set" tooltip button, so `getByLabel("Backup set")` matches
+    // the select plus one button per row. That was one match on a
+    // one-set deployment and two hundred on a real feed, which is a
+    // strict-mode violation rather than a product defect.
+    await expect(page.getByRole("combobox", { name: "Backup set" })).toBeVisible();
     await expect(page.getByLabel("Severity")).toBeVisible();
     // Time range used to sit here, `defaultValue="24"` with no `onChange`
     // and nothing reading it: listActivity() takes no window argument.
@@ -340,7 +345,7 @@ test.describe("activity", () => {
         "pass against a filter that is wired to nothing"
     );
     const before = await page.getByRole("listitem").count();
-    await page.getByLabel("Backup set").selectOption({ index: 1 });
+    await page.getByRole("combobox", { name: "Backup set" }).selectOption({ index: 1 });
     expect(await page.getByRole("listitem").count()).toBeLessThan(before);
   });
 
@@ -354,7 +359,7 @@ test.describe("activity", () => {
    *  every feed is empty for. */
   test("over-filtering shows an empty state, not a blank panel", async ({ page }) => {
     await page.getByLabel("Severity").selectOption("2");
-    await page.getByLabel("Backup set").selectOption({ index: 1 });
+    await page.getByRole("combobox", { name: "Backup set" }).selectOption({ index: 1 });
     const items = page.getByRole("listitem");
     if ((await items.count()) === 0) {
       await expect(page.getByText("No matching events")).toBeVisible();
