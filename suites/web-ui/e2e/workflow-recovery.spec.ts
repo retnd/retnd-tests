@@ -97,6 +97,38 @@ test.describe("a workflow run that was interrupted", () => {
     const set = deployment.workflow.crashSet;
     needs(set !== null, needsFixture(CRASH_SET_VAR));
 
+    // Start from a set the scheduler is willing to run.
+    //
+    // A set carrying an unsettled hold is never scheduled again, which
+    // is correct product behaviour and fatal to a case that can only
+    // OBSERVE runs. That is exactly how this case failed: it waited
+    // five scheduler intervals for a set the engine was right to be
+    // refusing, and reported the scheduler.
+    //
+    // The hold is not this case's: nothing else in the suite crashes
+    // anything. It comes from a case that takes a SHARED facility away
+    // - workflow-config's runner-down case stops the Host Workflow
+    // Runner, which interrupts whatever local hook the scheduler
+    // happened to be executing, and this fixture runs a local hook
+    // every seventy-odd seconds. So the hold lands on a set that case
+    // never names.
+    //
+    // Settled here rather than only there, because a case that depends
+    // on a clean slate should establish one rather than trust every
+    // earlier case to have left one.
+    const inherited = await acknowledgeHolds(
+      bm.api,
+      set!,
+      "e2e: cleared before the crash case so the scheduler will run this set; this hold was " +
+        "left by an earlier case that interrupted a hook belonging to it"
+    );
+    if (inherited.length > 0) {
+      console.log(
+        "e2e: " + set + " arrived at the crash case already held (" + inherited.length +
+          " hold(s)), which is why the scheduler had stopped running it; cleared"
+      );
+    }
+
     // Crash INTO a live hook. Nothing here starts the run: the
     // destructive gate refuses the product's own Run control on every
     // deployment (backupd#92), so this waits for the scheduler, catches
@@ -231,9 +263,9 @@ test.describe("a workflow run that was interrupted", () => {
       "e2e: settled by the suite so the scheduler will run this set again; the case that caused " +
         "this hold ended without clearing it"
     );
-    if (settled > 0) {
+    if (settled.length > 0) {
       console.log(
-        "e2e: acknowledged " + settled + " leftover recovery hold(s) on " + set +
+        "e2e: acknowledged " + settled.length + " leftover recovery hold(s) on " + set +
           " so later cases are not starved of a scheduled run"
       );
     }

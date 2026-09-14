@@ -27,6 +27,7 @@ import {
   SECRET_VALUE_VAR,
   SFTP_ONLY_SET_VAR,
   WORKFLOW_SET_VAR,
+  acknowledgeHolds,
   needsFixture,
   readBackupSetWorkflow,
   readWorkflowSettings,
@@ -233,6 +234,32 @@ test.describe("a backup set's workflow configuration, in a browser", () => {
       await expect(card.getByText("runner_health", { exact: true })).toBeVisible({ timeout: 60_000 });
       await expect(card).toContainText("Hooks not valid");
     });
+
+    // Taking the runner away interrupts whatever local hook the
+    // scheduler happened to be executing, and that is not confined to
+    // the set this case names: every hooked set in the deployment runs
+    // on a one-minute cadence, so the outage lands on whichever one was
+    // mid-hook. A run left with an obligation nobody settled becomes a
+    // hold, and a held set is never scheduled again - which starves any
+    // later case that can only OBSERVE runs, and reports as a scheduler
+    // that stopped working.
+    //
+    // So this case settles what its own outage caused, across every
+    // set, and says which ones. Acknowledged rather than resumed: a
+    // resume executes hooks, and nothing here knows what those hooks
+    // would do to a source machine.
+    const settled = await acknowledgeHolds(
+      bm.api,
+      null,
+      "e2e: the Host Workflow Runner was stopped by a test and interrupted this run's hooks; " +
+        "settled so the scheduler will run the set again"
+    );
+    if (settled.length > 0) {
+      console.log(
+        "e2e: the runner outage left " + settled.length + " hold(s) on " +
+          [...new Set(settled)].join(", ") + "; acknowledged so later cases are not starved"
+      );
+    }
   });
 
   test("a secret-backed variable shows where it comes from and never what it is", async ({ bm, deployment, page }) => {
