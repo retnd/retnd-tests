@@ -193,8 +193,14 @@ test.describe("a backup set's workflow configuration, in a browser", () => {
     // The engine's own check id, which is a closed vocabulary and not a
     // sentence: `exec_capability` is the one that means "this account
     // authenticates and cannot run a command".
-    await expect(card.getByText("exec_capability", { exact: true })).toBeVisible({ timeout: 60_000 });
-    await expect(card).toContainText("error");
+    const finding = card.getByText("exec_capability", { exact: true });
+    await expect(finding).toBeVisible({ timeout: 60_000 });
+    // Scoped to the finding's own row rather than swept over the card:
+    // "error" appears in plenty of prose, and a case that matched it
+    // anywhere would pass against an exec_capability finding reported
+    // as a warning - which is the difference between "your hooks will
+    // not run" and "you might want to look at this".
+    await expect(finding.locator("..")).toContainText("error");
     await expect(card).toContainText("Hooks not valid");
 
     // And the half that keeps this from reading as a fault: the set

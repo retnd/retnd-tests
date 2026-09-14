@@ -190,10 +190,6 @@ export class WorkflowScreens {
     return this.stagesCard().getByRole("button").filter({ hasText: scriptName });
   }
 
-  everyStepRow(): Locator {
-    return this.stagesCard().getByRole("button");
-  }
-
   /** The single mounted log viewer. Named for the step it is showing, so
    *  "the terminal switched" and "a second terminal appeared" are
    *  different observations rather than the same one. */
@@ -210,9 +206,5 @@ export class WorkflowScreens {
   /** The scrollback itself, as opposed to the panel around it. */
   output(scriptName: string): Locator {
     return this.page.getByRole("log", { name: "Captured output of " + scriptName, exact: true });
-  }
-
-  followControl(scriptName: string): Locator {
-    return this.terminal(scriptName).getByRole("button", { name: /^(Following output|Follow output)$/ });
   }
 }
