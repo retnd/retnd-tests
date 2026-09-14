@@ -1,3 +1,6 @@
+import { request } from "@playwright/test";
+
+import { signIn } from "../harness/session";
 import {
   HOST_RUNNER,
   INHERITING_ONLY,
@@ -244,22 +247,13 @@ test.describe("a backup set's workflow configuration, in a browser", () => {
     // later case that can only OBSERVE runs, and reports as a scheduler
     // that stopped working.
     //
-    // So this case settles what its own outage caused, across every
-    // set, and says which ones. Acknowledged rather than resumed: a
-    // resume executes hooks, and nothing here knows what those hooks
-    // would do to a source machine.
-    const settled = await acknowledgeHolds(
-      bm.api,
-      null,
-      "e2e: the Host Workflow Runner was stopped by a test and interrupted this run's hooks; " +
-        "settled so the scheduler will run the set again"
-    );
-    if (settled.length > 0) {
-      console.log(
-        "e2e: the runner outage left " + settled.length + " hold(s) on " +
-          [...new Set(settled)].join(", ") + "; acknowledged so later cases are not starved"
-      );
-    }
+    // The settle happens in this file's afterAll and not on this line,
+    // and the timing is the whole point: an interrupted run does not
+    // become a hold until it FINALISES, seconds to minutes after the
+    // outage. A settle taken here is structurally guaranteed to look
+    // before the hold exists, find nothing, and leave the set blocked
+    // for everything after it - which is exactly what a run ending
+    // with two unsettled holds on a set nobody named showed.
   });
 
   test("a secret-backed variable shows where it comes from and never what it is", async ({ bm, deployment, page }) => {
@@ -383,5 +377,42 @@ test.describe("a backup set's workflow configuration, in a browser", () => {
     // and it is invisible from the banner alone.
     const after = await readWorkflowSettings(bm.api);
     expect(after?.before_dir ?? "").toBe(before?.before_dir ?? "");
+  });
+
+  // Settle what the runner outage above left behind, once it can exist.
+  //
+  // Here rather than in the case, because a hold is created when the
+  // interrupted run FINALISES and not when it is interrupted: by the
+  // time this file's remaining cases have run, that has happened. A
+  // held set is never scheduled again, and the file after this one
+  // waits for the scheduler to run one - so a hold left here does not
+  // fail this file, it starves that one and reports as a scheduler
+  // that stopped working.
+  //
+  // Deployment-wide rather than per set: the runner is shared, so the
+  // outage lands on whichever set was mid-hook and this file cannot
+  // know which.
+  test.afterAll(async ({ deployment }) => {
+    const jar = (await signIn(deployment)).map((c) => c.name + "=" + c.value).join("; ");
+    const api = await request.newContext({
+      baseURL: deployment.baseURL,
+      extraHTTPHeaders: { cookie: jar }
+    });
+    try {
+      const settled = await acknowledgeHolds(
+        api,
+        null,
+        "e2e: the Host Workflow Runner was stopped by a test, which interrupted this run's " +
+          "hooks; settled so the scheduler will run the set again"
+      );
+      if (settled.length > 0) {
+        console.log(
+          "e2e: the runner outage left " + settled.length + " hold(s) on " +
+            [...new Set(settled)].join(", ") + "; acknowledged so later files are not starved"
+        );
+      }
+    } finally {
+      await api.dispose();
+    }
   });
 });
