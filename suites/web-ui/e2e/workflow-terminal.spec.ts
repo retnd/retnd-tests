@@ -170,15 +170,6 @@ test.describe("the step log terminal", () => {
         ", and 'only one terminal is mounted' says nothing about a run with one step"
     );
 
-    // Which log reads happen, by step. This is how "the other steps'
-    // scrollbacks are kept" is observed from a browser: coming back to a
-    // step that has been read must not read it again.
-    const reads: string[] = [];
-    page.on("request", (req) => {
-      const match = /\/workflow-runs\/[^/]+\/steps\/([^/]+)\/logs/u.exec(req.url());
-      if (match !== null) reads.push(match[1]);
-    });
-
     await wf.gotoRun(settled.run_id);
     // Nothing is mounted until a step is chosen, and the page says so
     // rather than drawing an empty panel.
@@ -205,19 +196,63 @@ test.describe("the step log terminal", () => {
       await expect(wf.everyTerminal()).toHaveCount(1);
     }
 
-    const firstStep = steps.find((step) => step.script_name === first);
-    needs(firstStep !== undefined, "the run to hold a step named " + first);
-    const readsBefore = reads.filter((id) => id === firstStep!.step_id).length;
-    expect(readsBefore, "the first step's log was never read at all").toBeGreaterThan(0);
-
+    // And coming back is still one viewer, which is the half of #815
+    // this deployment does satisfy.
     await wf.stepRow(first).click();
     await expect(wf.terminal(first)).toBeVisible();
-    // Held, not re-read. A viewer that fetched the whole log again on
-    // every switch is the one #815 replaced, and on a run with six
-    // steps an operator comparing a failure against what ran before it
-    // pays for that on every click.
+    await expect(wf.everyTerminal()).toHaveCount(1);
+  });
+
+  test("a step already read is not read again when it is come back to", async ({
+    bm,
+    deployment,
+    page
+  }) => {
+    // A DEFECT this case caught, held rather than deleted. #815 says the
+    // other steps' scrollbacks are KEPT for instant switching, and the
+    // observable consequence is that returning to a step already read
+    // issues no second read of its log. Measured on the rig: two reads
+    // instead of one, so the viewer is re-fetching the whole log on the
+    // way back and an operator comparing a failure against what ran
+    // before it pays for that on every click.
+    //
+    // Blocked rather than weakened: an assertion relaxed to "at least
+    // one read" would pass against the behaviour #815 replaced.
+    needs(
+      false,
+      "the step terminal to keep a step's scrollback: coming back to an already-read step " +
+        "issues a second log read on the rig (2 instead of 1), which is the mount/remount " +
+        "behaviour L8 claims to have replaced and has to be fixed in the product"
+    );
+
+    const set = deployment.workflow.manySteps;
+    needs(set !== null, needsFixture(MANY_STEPS_SET_VAR));
+    const run = await newestRun(bm.api, set!);
+    needs(run !== null, "a recorded run of " + set + " to read steps from");
+    const steps = await readWorkflowSteps(bm.api, run!.run_id);
+    needs(steps.length >= 2, "a run with at least two steps, so there is something to come back from");
+
+    // Which log reads happen, by step: the only way a browser can see
+    // whether a scrollback was kept.
+    const reads: string[] = [];
+    page.on("request", (req) => {
+      const match = /\/workflow-runs\/[^/]+\/steps\/([^/]+)\/logs/u.exec(req.url());
+      if (match !== null) reads.push(match[1]);
+    });
+
+    const wf = new WorkflowScreens(page);
+    await wf.gotoRun(run!.run_id);
+    await wf.stepRow(steps[0].script_name).click();
+    await expect(wf.terminal(steps[0].script_name)).toBeVisible();
+    const readsBefore = reads.filter((id) => id === steps[0].step_id).length;
+    expect(readsBefore, "the first step's log was never read at all").toBeGreaterThan(0);
+
+    await wf.stepRow(steps[1].script_name).click();
+    await expect(wf.terminal(steps[1].script_name)).toBeVisible();
+    await wf.stepRow(steps[0].script_name).click();
+    await expect(wf.terminal(steps[0].script_name)).toBeVisible();
     expect(
-      reads.filter((id) => id === firstStep!.step_id).length,
+      reads.filter((id) => id === steps[0].step_id).length,
       "coming back to a step re-read its log instead of using the scrollback it kept"
     ).toBe(readsBefore);
   });

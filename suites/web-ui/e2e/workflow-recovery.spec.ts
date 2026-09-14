@@ -7,17 +7,16 @@ import { expect, needs, test } from "./fixtures";
 import {
   CRASH_SET_VAR,
   NEEDS_WORKFLOW_CONTROL,
+  catchRunInFlight,
   crashEngine,
   needsFixture,
-  runAppearMs,
-  newestRun,
   readWorkflowRecovery,
   readWorkflowRun,
   resolveWorkflowControl,
+  runAppearMs,
   waitForHold,
-  waitForNewRun,
   waitForNoHold,
-  waitForRunningStep
+  waitForSetIdle
 } from "../harness/workflow";
 
 /**
@@ -79,34 +78,31 @@ test.describe("a workflow run that was interrupted", () => {
     const set = deployment.workflow.crashSet;
     needs(set !== null, needsFixture(CRASH_SET_VAR));
 
-    const wf = new WorkflowScreens(page);
-    await wf.gotoSet(set!);
-    const previous = await newestRun(bm.api, set!);
-    await expect(wf.runControl()).toBeEnabled();
-    // NOT pressed: `POST /api/v1/operations` is refused with
-    // DESTRUCTIVE_OPERATIONS_DISABLED on every deployment, because
-    // `NewEngine` never sets a destructive gate (backupd#92). That is a
-    // pre-existing product gate and nothing to do with EPIC L, so this
-    // case OBSERVES the run the scheduler starts instead of initiating
-    // one. Every assertion below is still made in a browser against a
-    // run whose hooks really executed; only the button press is
-    // unavailable.
-
-    // Crash INTO a live hook. A crash against an idle deployment
-    // produces nothing to reconcile, and a case that waited a fixed
-    // number of seconds instead would be asserting against whatever the
-    // engine happened to be doing.
-    const started = await waitForNewRun(bm.api, set!, previous?.run_id ?? null, runAppearMs());
-    const running = await waitForRunningStep(bm.api, started.run_id);
-    expect(running.script_name).toBe(CRASH_HOLD);
+    // Crash INTO a live hook. Nothing here starts the run: the
+    // destructive gate refuses the product's own Run control on every
+    // deployment (backupd#92), so this waits for the scheduler and
+    // catches the run while its hold script is executing. A run
+    // observed a moment after it finished is an ordinary outcome at a
+    // one-minute cadence, and catchRunInFlight waits for the next one
+    // rather than crashing an idle engine and finding nothing to
+    // reconcile.
+    const caught = await catchRunInFlight(bm.api, set!);
+    const started = caught.run;
+    expect(caught.step.script_name).toBe(CRASH_HOLD);
     await crashEngine(control!);
 
     // What reconciliation found, read from the hold set the Run control
-    // is gated on.
-    const hold = await waitForHold(bm.api, set!);
+    // is gated on. One run can raise more than one hold - the engine
+    // records the global scope and the set scope separately - so this
+    // asks for a hold belonging to this set and checks it is about the
+    // run that was interrupted, rather than assuming there is exactly
+    // one.
+    const hold = await waitForHold(bm.api, set!, runAppearMs());
     expect(hold.run_id).toBe(started.run_id);
     const reconciled = await readWorkflowRun(bm.api, started.run_id);
     expect(reconciled?.state).toBe("recovery_required");
+
+    const wf = new WorkflowScreens(page);
 
     // The operator's view: the set will not run, and the only thing on
     // screen explaining why is the banner.
@@ -127,7 +123,12 @@ test.describe("a workflow run that was interrupted", () => {
     await waitForNoHold(bm.api, set!);
     // And the control comes back, which is the whole point of settling
     // it: a set that stayed blocked after a successful resume would have
-    // to be unblocked from a terminal.
+    // to be unblocked from a terminal. Gated on the set being idle
+    // first, because the same control is legitimately disabled while a
+    // scheduled run of this set is in flight, and at a one-minute
+    // cadence that is a large fraction of the time.
+    await waitForSetIdle(bm.api, set!);
+    await page.reload();
     await expect(wf.runControl()).toBeEnabled();
 
     // The cleanup really executed: the "after" hook this run was owed
@@ -149,15 +150,14 @@ test.describe("a workflow run that was interrupted", () => {
     const set = deployment.workflow.crashSet;
     needs(set !== null, needsFixture(CRASH_SET_VAR));
 
-    const wf = new WorkflowScreens(page);
-    await wf.gotoSet(set!);
-    const previous = await newestRun(bm.api, set!);
-    await expect(wf.runControl()).toBeEnabled();
-    // Observed rather than initiated; see the first case in this file.
-    const started = await waitForNewRun(bm.api, set!, previous?.run_id ?? null, runAppearMs());
-    await waitForRunningStep(bm.api, started.run_id);
+    // Same sequencing as the case above: caught mid-hook rather than
+    // initiated, because nothing here can start a run.
+    const caught = await catchRunInFlight(bm.api, set!);
     await crashEngine(control!);
-    await waitForHold(bm.api, set!);
+    await waitForHold(bm.api, set!, runAppearMs());
+
+    const wf = new WorkflowScreens(page);
+    expect(caught.step.script_name).toBe(CRASH_HOLD);
 
     await wf.gotoSet(set!);
     const banner = wf.recoveryBanner();
@@ -181,6 +181,11 @@ test.describe("a workflow run that was interrupted", () => {
 
     await expect(banner).toBeHidden({ timeout: 120_000 });
     await waitForNoHold(bm.api, set!);
+    // Idle first: this control is legitimately disabled while a
+    // scheduled run of the set is in flight, which at a one-minute
+    // cadence it often is.
+    await waitForSetIdle(bm.api, set!);
+    await page.reload();
     await expect(wf.runControl()).toBeEnabled();
   });
 

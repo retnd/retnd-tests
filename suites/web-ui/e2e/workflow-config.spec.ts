@@ -332,15 +332,23 @@ test.describe("a backup set's workflow configuration, in a browser", () => {
     await field.fill(dir!);
     await field.locator("..").getByRole("button", { name: "Save", exact: true }).click();
 
-    const refusal = page.getByText("This configuration was NOT saved");
-    await expect(refusal).toBeVisible({ timeout: 60_000 });
-    const banner = page.getByRole("alert").filter({ hasText: "This configuration was NOT saved" });
+    // The refusal, wherever the card draws it. Scoped to the Workflow
+    // card rather than to `role="alert"`: the banner this renders in
+    // does not claim that role, and a case that required it would be
+    // asserting a markup choice instead of the refusal. Matched
+    // case-insensitively on the one clause both wordings share, because
+    // the service says "the configuration was not saved" and the card's
+    // own lead-in says "This configuration was NOT saved".
+    const card = page
+      .locator("section.card")
+      .filter({ has: page.getByRole("heading", { level: 2, name: "Workflow", exact: true }) });
+    await expect(card).toContainText(/configuration was not saved/i, { timeout: 60_000 });
     // Which script, where it lives, which rule fired and at what
     // position. A refusal that said only "refused" would send an
     // operator to read every file in a directory.
-    await expect(banner).toContainText(REJECTED_SCRIPT);
-    await expect(banner).toContainText(dir!);
-    await expect(banner).toContainText(REJECTED_ERROR_CODE + " at " + REJECTED_POSITION);
+    await expect(card).toContainText(REJECTED_SCRIPT);
+    await expect(card).toContainText(dir!);
+    await expect(card).toContainText(REJECTED_ERROR_CODE + " at " + REJECTED_POSITION);
 
     // And the refusal was a refusal: the deployment still configures
     // whatever it configured before this case touched it. A gate that

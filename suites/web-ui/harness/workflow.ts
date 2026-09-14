@@ -767,6 +767,65 @@ export async function waitForRunToSettle(
   }
 }
 
+/** Waits until this set has nothing in flight.
+ *
+ *  The Run control is disabled while a run of the set is busy, which on
+ *  a deployment scheduled at the product's one-minute floor is a large
+ *  fraction of the time. A case asserting that the control came BACK
+ *  after a hold was settled has to wait for the set to be idle first, or
+ *  it is asserting the scheduler's timing rather than the gate. */
+export async function waitForSetIdle(
+  api: APIRequestContext,
+  backupSetId: string,
+  timeoutMs = runAppearMs()
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const run = await newestRun(api, backupSetId);
+    if (run === null || TERMINAL_RUN_STATES[run.state] === true) return;
+    if (Date.now() >= deadline) {
+      throw new Error(
+        backupSetId + " still had a run in flight (" + run.state + ") after " +
+          String(Math.round(timeoutMs / 1000)) + "s, so whether its Run control is available " +
+          "says nothing about the recovery gate."
+      );
+    }
+    await sleep(RUN_POLL_MS);
+  }
+}
+
+/** Catches this set with a step actually executing.
+ *
+ *  The crash cases need a live hook to crash INTO, and nothing here can
+ *  start one: they wait for the scheduler. The window is the fixture's
+ *  own hold inside a cycle, so a run observed a moment after it finished
+ *  is an ordinary outcome rather than a failure, and this waits for the
+ *  next one instead of reporting the miss. Two misses is a fixture whose
+ *  hook is too short to be caught, which is worth failing on.
+ *
+ *  Returns the run and the step that was executing when it was seen. */
+export async function catchRunInFlight(
+  api: APIRequestContext,
+  backupSetId: string,
+  attempts = 3
+): Promise<{ run: WireWorkflowRun; step: WireWorkflowStep }> {
+  let previous = (await newestRun(api, backupSetId))?.run_id ?? null;
+  const missed: string[] = [];
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const run = await waitForNewRun(api, backupSetId, previous, runAppearMs());
+    previous = run.run_id;
+    try {
+      return { run, step: await waitForRunningStep(api, run.run_id) };
+    } catch (missedIt) {
+      missed.push(run.run_id + ": " + (missedIt instanceof Error ? missedIt.message : String(missedIt)));
+    }
+  }
+  throw new Error(
+    "never caught " + backupSetId + " with a step in flight across " + attempts + " scheduled " +
+      "runs, so there was never a live hook to act on:\n  " + missed.join("\n  ")
+  );
+}
+
 /** Waits until a run has a step in `state`, so a case that has to act
  *  MID-RUN (crash the engine, read a live terminal) acts while there is
  *  really something in flight rather than at a moment it guessed. */
