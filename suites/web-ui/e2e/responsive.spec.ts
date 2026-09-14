@@ -118,23 +118,15 @@ test.describe("small app window", () => {
   });
 
   test("the step log terminal fits the window it is read in", async ({ bm, page }) => {
-    // A DEFECT this case caught rather than a premise it got wrong, and
-    // it is held here rather than deleted. Measured on the rig at
-    // 940x720: the mounted terminal's box is 1178px wide, so the one
-    // panel most likely to push a document sideways does exactly that,
-    // with the wrap control on by default. §31 says a small app window
-    // stays fully usable.
+    // This case found backupd#916: at 940x720 the mounted terminal's
+    // box measured 1178px, so the one panel most likely to push a
+    // document sideways did exactly that, with the wrap control on by
+    // default. §31 says a small app window stays fully usable.
     //
-    // Blocked rather than weakened: an assertion relaxed to accept
-    // 1178px would go on passing after the layout is fixed and would
-    // stop being about a terminal that fits.
-    needs(
-      false,
-      "backupd#916 to be fixed: the step log terminal measures 1178px in a 940px window, so the " +
-        "one panel most likely to push a document sideways does. This case found it; un-skip " +
-        "the moment the fix lands rather than relaxing the width"
-    );
-
+    // The fix caps the section, its fact grid and its log scroller at
+    // the column they are read in, so what is below is now the
+    // regression guard: it fails against the build the defect was
+    // reported on and passes against the one that fixed it.
     const runs = await readWorkflowRuns(bm.api);
     needs(runs !== null && runs.length > 0, "a recorded workflow run to open");
     const steps = await readWorkflowSteps(bm.api, runs![0].run_id);

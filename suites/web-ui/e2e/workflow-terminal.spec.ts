@@ -4,6 +4,7 @@ import { TRUNCATION_MARKER, WorkflowScreens } from "./workflow-page";
 import { HOSTILE, MANY_AFTER, MANY_BEFORE, SLOW_SCRIPT } from "./workflow-scripts";
 import { expect, needs, test } from "./fixtures";
 import {
+  TERMINAL_RUN_STATES,
   HOSTILE_SET_VAR,
   MANY_STEPS_SET_VAR,
   SLOW_SET_VAR,
@@ -208,27 +209,28 @@ test.describe("the step log terminal", () => {
     deployment,
     page
   }) => {
-    // A DEFECT this case caught, held rather than deleted. #815 says the
-    // other steps' scrollbacks are KEPT for instant switching, and the
-    // observable consequence is that returning to a step already read
-    // issues no second read of its log. Measured on the rig: two reads
-    // instead of one, so the viewer is re-fetching the whole log on the
-    // way back and an operator comparing a failure against what ran
-    // before it pays for that on every click.
+    // This case found backupd#917. #815 says the other steps'
+    // scrollbacks are KEPT for instant switching, and the observable
+    // consequence is that returning to a step already read issues no
+    // second read of its log; it was issuing one, so the viewer was
+    // re-fetching the whole log on the way back and an operator
+    // comparing a failure against what ran before it paid for that on
+    // every click.
     //
-    // Blocked rather than weakened: an assertion relaxed to "at least
-    // one read" would pass against the behaviour #815 replaced.
-    needs(
-      false,
-      "backupd#917 to be fixed: coming back to an already-read step issues a second log read (2 " +
-        "instead of 1), which is the mount/remount behaviour L8 claims to have replaced. This " +
-        "case found it; un-skip the moment the fix lands rather than relaxing the count"
-    );
-
+    // The fix is deliberately narrow and so is this case: a step is
+    // held IN FULL only when it has been read at least once, its page
+    // reported complete, and no error is pending. A step still RUNNING
+    // resumes its follower as before, which is why this reads a run
+    // that has finished.
     const set = deployment.workflow.manySteps;
     needs(set !== null, needsFixture(MANY_STEPS_SET_VAR));
     const run = await newestRun(bm.api, set!);
     needs(run !== null, "a recorded run of " + set + " to read steps from");
+    needs(
+      TERMINAL_RUN_STATES[run!.state] === true,
+      "a FINISHED run of " + set + ": a step that is still executing keeps its follower running " +
+        "by design, so a read on return would be correct rather than the defect this guards"
+    );
     const steps = await readWorkflowSteps(bm.api, run!.run_id);
     needs(steps.length >= 2, "a run with at least two steps, so there is something to come back from");
 
@@ -244,13 +246,26 @@ test.describe("the step log terminal", () => {
     await wf.gotoRun(run!.run_id);
     await wf.stepRow(steps[0].script_name).click();
     await expect(wf.terminal(steps[0].script_name)).toBeVisible();
-    const readsBefore = reads.filter((id) => id === steps[0].step_id).length;
+
+    // Let the first selection finish reading before the count is taken.
+    // A log that arrives in more than one page issues more than one
+    // read, and a snapshot taken mid-sequence would count the rest of
+    // the FIRST visit as if it were the second.
+    const readsOf = (): number => reads.filter((id) => id === steps[0].step_id).length;
+    let readsBefore = readsOf();
+    for (let settled = 0; settled < 8; settled++) {
+      await sleep(500);
+      const now = readsOf();
+      if (now === readsBefore) break;
+      readsBefore = now;
+    }
     expect(readsBefore, "the first step's log was never read at all").toBeGreaterThan(0);
 
     await wf.stepRow(steps[1].script_name).click();
     await expect(wf.terminal(steps[1].script_name)).toBeVisible();
     await wf.stepRow(steps[0].script_name).click();
     await expect(wf.terminal(steps[0].script_name)).toBeVisible();
+    await sleep(1_000);
     expect(
       reads.filter((id) => id === steps[0].step_id).length,
       "coming back to a step re-read its log instead of using the scrollback it kept"
