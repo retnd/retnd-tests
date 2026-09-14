@@ -220,9 +220,9 @@ test.describe("the step log terminal", () => {
     // one read" would pass against the behaviour #815 replaced.
     needs(
       false,
-      "the step terminal to keep a step's scrollback: coming back to an already-read step " +
-        "issues a second log read on the rig (2 instead of 1), which is the mount/remount " +
-        "behaviour L8 claims to have replaced and has to be fixed in the product"
+      "backupd#917 to be fixed: coming back to an already-read step issues a second log read (2 " +
+        "instead of 1), which is the mount/remount behaviour L8 claims to have replaced. This " +
+        "case found it; un-skip the moment the fix lands rather than relaxing the count"
     );
 
     const set = deployment.workflow.manySteps;

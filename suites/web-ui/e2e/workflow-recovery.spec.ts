@@ -111,10 +111,23 @@ test.describe("a workflow run that was interrupted", () => {
     await expect(banner).toBeVisible();
     await expect(banner).toContainText(started.run_id);
     await expect(banner).toContainText("may still be quiesced, mounted or paused");
-    // Not "unavailable because the page is busy": the engine refuses the
-    // next run of a held set outright, so a pressable control here would
-    // be offering something that answers 409 every time.
-    await expect(wf.runControl()).toBeDisabled();
+    // Disabled AND disabled FOR THIS REASON. A bare disabled assertion
+    // is not enough on a scheduled deployment: the same control is
+    // unavailable while a run of the set is busy, so "it was disabled"
+    // can be true for a reason that has nothing to do with the hold.
+    // The hold was confirmed through the recovery API above and the
+    // banner explaining it is on screen, and the control's own hover
+    // title names the hold when the deployment draws hover titles at
+    // all (they are a user setting, so its absence is not a failure -
+    // its presence saying something ELSE is).
+    const run = wf.runControl();
+    await expect(run).toBeDisabled();
+    const why = await run.getAttribute("title");
+    if (why !== null) {
+      expect(why, "the Run control is disabled for a reason other than the hold").toContain(
+        "held for recovery"
+      );
+    }
 
     // The way out that actually unwinds the hook, from that run's own
     // retained spool.
@@ -162,7 +175,15 @@ test.describe("a workflow run that was interrupted", () => {
     await wf.gotoSet(set!);
     const banner = wf.recoveryBanner();
     await expect(banner).toBeVisible();
-    await expect(wf.runControl()).toBeDisabled();
+    // Disabled for the hold, not merely disabled; see the case above.
+    const run = wf.runControl();
+    await expect(run).toBeDisabled();
+    const why = await run.getAttribute("title");
+    if (why !== null) {
+      expect(why, "the Run control is disabled for a reason other than the hold").toContain(
+        "held for recovery"
+      );
+    }
 
     await wf.acknowledgeControl().click();
     const submit = wf.recordAcknowledgement();
