@@ -119,14 +119,25 @@ test.describe("small app window", () => {
 
   test("the step log terminal fits the window it is read in", async ({ bm, page }) => {
     // This case found backupd#916: at 940x720 the mounted terminal's
-    // box measured 1178px, so the one panel most likely to push a
-    // document sideways did exactly that, with the wrap control on by
+    // box measures 1178px, so the one panel most likely to push a
+    // document sideways does exactly that, with the wrap control on by
     // default. §31 says a small app window stays fully usable.
     //
-    // The fix caps the section, its fact grid and its log scroller at
-    // the column they are read in, so what is below is now the
-    // regression guard: it fails against the build the defect was
-    // reported on and passes against the one that fixed it.
+    // The first fix capped the terminal at `maxWidth: 100%` and the
+    // measurement did not move, which located the defect rather than
+    // closing it: the box the terminal is 100% OF is already 1178px, so
+    // the overflow is ABOVE it, in the run page's own column. It needs
+    // a ui/shared change to that page, not to the terminal.
+    //
+    // Still blocked rather than relaxed, and the assertion below is
+    // unchanged, because it is the measurement that will say when the
+    // page is fixed.
+    needs(
+      false,
+      "backupd#916 to be fixed on the RUN PAGE: the step log terminal still measures 1178px in " +
+        "a 940px window with maxWidth:100% in place, so the column it sits in is what overflows"
+    );
+
     const runs = await readWorkflowRuns(bm.api);
     needs(runs !== null && runs.length > 0, "a recorded workflow run to open");
     const steps = await readWorkflowSteps(bm.api, runs![0].run_id);

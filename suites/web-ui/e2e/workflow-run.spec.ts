@@ -25,6 +25,7 @@ import {
   needsFixture,
   runAppearMs,
   newestRun,
+  readWorkflowSteps,
   waitForNewRun,
   waitForRunToSettle,
   withGlobalBeforeDir
@@ -147,21 +148,24 @@ test.describe("a workflow run, driven from the browser", () => {
 
     const started = await waitForNewRun(bm.api, set!, before?.run_id ?? null, runAppearMs());
     const settled = await waitForRunToSettle(bm.api, started.run_id);
-    expect(settled.state, "the remote-exec fixture's run ended in " + settled.state).toBe("success");
 
+    // Deliberately NOT "the run ended in success". What this case is
+    // about is whether a hook sent over an exec channel executed on the
+    // far side, and that is a claim about the BEFORE step. Whether the
+    // whole run then completed its cleanup is a second claim, and it
+    // has its own case below - folding the two together would make a
+    // failure in either one report as the other.
     await wf.gotoRun(settled.run_id);
-    for (const script of [REMOTE_BEFORE, REMOTE_AFTER]) {
-      const row = wf.stepRow(script);
-      await expect(row).toHaveCount(1);
-      await expect(row).toContainText("Remote");
-      // The negative matters as much as the positive: a remote hook
-      // attributed to the host runner would be telling an operator
-      // their script ran on the manager.
-      await expect(row).not.toContainText(HOST_RUNNER);
-      // #918's own half: a remote hook that exits is reported by its
-      // status and its code, not as a lost transport.
-      await expect(row).toContainText("exit 0");
-    }
+    const row = wf.stepRow(REMOTE_BEFORE);
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText("Remote");
+    // The negative matters as much as the positive: a remote hook
+    // attributed to the host runner would be telling an operator their
+    // script ran on the manager.
+    await expect(row).not.toContainText(HOST_RUNNER);
+    // #918's own half: a hook that exits is reported by its status and
+    // its code rather than as a lost transport.
+    await expect(row).toContainText("exit 0");
 
     await wf.stepRow(REMOTE_BEFORE).click();
     const output = wf.output(REMOTE_BEFORE);
@@ -183,6 +187,42 @@ test.describe("a workflow run, driven from the browser", () => {
     const panel = wf.terminal(REMOTE_BEFORE);
     await expect(panel).toContainText("Executed on");
     await expect(panel).not.toContainText(HOST_RUNNER);
+  });
+
+  test("a remote run finishes the cleanup its after stage owes", async ({
+    bm,
+    deployment,
+    page
+  }) => {
+    const set = deployment.workflow.execSet;
+    needs(set !== null, needsFixture(EXEC_SET_VAR));
+
+    // The second half of the remote claim, split from the first so a
+    // failure here reports as what it is. With backupd#915 fixed the
+    // before hook gets through and the run reaches its after stage;
+    // this is the case that says whether the stage COMPLETED, which is
+    // the difference between a source machine that was un-quiesced and
+    // one that was not.
+    //
+    // The assertion carries its own evidence, because the answer to
+    // "why did the cleanup fail" is the step's exit code and what it
+    // printed, and a bare red that omits both costs a whole rig run to
+    // find out.
+    const run = await newestRun(bm.api, set!);
+    needs(run !== null, "a recorded run of " + set + " to read the after stage from");
+    const steps = await readWorkflowSteps(bm.api, run!.run_id);
+    const after = steps.find((step) => step.script_name === REMOTE_AFTER);
+    needs(after !== undefined, "the run to hold a step named " + REMOTE_AFTER);
+
+    const evidence =
+      REMOTE_AFTER + " ended " + after!.state + " with exit " +
+      (after!.exit_code === null || after!.exit_code === undefined ? "not recorded" : after!.exit_code) +
+      " (run " + run!.run_id + ", cleanup " + run!.cleanup_status + ")";
+    expect(after!.state, evidence).toBe("success");
+
+    const wf = new WorkflowScreens(page);
+    await wf.gotoRun(run!.run_id);
+    await expect(wf.verdict("Cleanup"), evidence).toContainText("Success");
   });
 
   test("a failing before hook skips the backup instead of running it", async ({ bm, deployment, page }) => {
