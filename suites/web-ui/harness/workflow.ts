@@ -817,7 +817,7 @@ export async function waitForSetIdle(
 export async function catchRunInFlight(
   api: APIRequestContext,
   backupSetId: string,
-  attempts = 3
+  attempts = 2
 ): Promise<{ run: WireWorkflowRun; step: WireWorkflowStep }> {
   const budget = runAppearMs() * 2;
   const missed: string[] = [];
