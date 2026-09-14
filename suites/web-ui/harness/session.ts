@@ -85,6 +85,26 @@ export function csrfCookieValue(cookies: readonly Cookie[]): string {
   return current === "" ? cookieValue(cookies, LEGACY_CSRF_COOKIE) : current;
 }
 
+/** The headers a mutating request has to carry, read out of the cookie
+ *  the same request context is already holding.
+ *
+ *  Here rather than beside the arrange steps that use it, because there
+ *  are now two modules that arrange the deployment through its API -
+ *  `harness/api.ts` and `harness/workflow.ts` - and a second copy of this
+ *  would be a second place to get the legacy cookie name wrong. */
+export async function csrfHeaders(api: APIRequestContext): Promise<Record<string, string>> {
+  const token = csrfCookieValue((await api.storageState()).cookies);
+  if (token === "") {
+    throw new Error(
+      "this request context holds neither a " + CSRF_COOKIE + " nor a " + LEGACY_CSRF_COOKIE +
+        " cookie, so a mutating call would be refused with CSRF_TOKEN_MISSING. A context that has " +
+        "never loaded a page from this origin is the usual cause."
+    );
+  }
+
+  return { [CSRF_HEADER]: token, "content-type": "application/json" };
+}
+
 /** The session this jar carries, under whichever name issued it. */
 export function sessionCookieValue(cookies: readonly Cookie[]): string {
   const current = cookieValue(cookies, SESSION_COOKIE);

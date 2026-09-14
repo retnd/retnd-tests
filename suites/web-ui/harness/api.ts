@@ -29,7 +29,8 @@
 
 import type { APIRequestContext } from "@playwright/test";
 
-import { CSRF_COOKIE, CSRF_HEADER, LEGACY_CSRF_COOKIE, csrfCookieValue } from "./session";
+import { csrfHeaders } from "./session";
+import { type WorkflowFacts, describeWorkflowFacts, readWorkflowFacts } from "./workflow";
 
 const BASE = "/api/v1";
 
@@ -151,6 +152,12 @@ export interface DeploymentFacts {
    *  cannot invent is the only anchor that can tell a real catalogue from
    *  a convincing fixture. Filled in by the fixture from RM_BACKUP_SET. */
   seededBackupSet: string | null;
+  /** What this deployment's workflow surface looks like (EPIC L,
+   *  backupd#816). Read here rather than in each spec because every
+   *  workflow case's first precondition is the same one - whether this
+   *  build serves the routes at all - and a build predating EPIC L must
+   *  skip them with that sentence rather than fail them. */
+  workflow: WorkflowFacts;
 }
 
 async function readJson<T>(api: APIRequestContext, path: string, fallback: T): Promise<T> {
@@ -203,7 +210,8 @@ export async function readFacts(api: APIRequestContext): Promise<Omit<Deployment
     lastCycle: (operations.operations ?? []).find((op) => op.cycle != null)?.cycle ?? null,
     mediums: (settings.mediums ?? []).filter((m) => m.id !== "local"),
     storageLevel: (storage.manager?.level as DeploymentFacts["storageLevel"]) ?? "",
-    serviceVersion: version.core_version ?? "(unreported)"
+    serviceVersion: version.core_version ?? "(unreported)",
+    workflow: await readWorkflowFacts(api)
   };
 }
 
@@ -223,22 +231,9 @@ export function describeFacts(facts: DeploymentFacts): string {
         facts.lastCycle.artifacts_through + " through"
       : "no finished run cycle",
     facts.mediums.length + " declared storage medium(s)",
-    "storage " + (facts.storageLevel === "" ? "unknown" : facts.storageLevel)
+    "storage " + (facts.storageLevel === "" ? "unknown" : facts.storageLevel),
+    describeWorkflowFacts(facts.workflow)
   ].join(", ");
-}
-
-/** The CSRF header a mutating request has to carry, read out of the
- *  cookie the same request context is already holding. */
-async function csrfHeaders(api: APIRequestContext): Promise<Record<string, string>> {
-  const token = csrfCookieValue((await api.storageState()).cookies);
-  if (token === "") {
-    throw new Error(
-      "this request context holds neither a " + CSRF_COOKIE + " nor a " + LEGACY_CSRF_COOKIE +
-        " cookie, so a mutating call would be refused with CSRF_TOKEN_MISSING. A context that has " +
-        "never loaded a page from this origin is the usual cause."
-    );
-  }
-  return { [CSRF_HEADER]: token, "content-type": "application/json" };
 }
 
 /** The settings document, as the service currently has it. */

@@ -7,6 +7,8 @@ import {
   unreadable
 } from "./contrast";
 import { expect, needs, test } from "./fixtures";
+import { WorkflowScreens } from "./workflow-page";
+import { readWorkflowRuns, readWorkflowSteps } from "../harness/workflow";
 
 /**
  * backupd#618: dark mode drew black text on native controls, worst
@@ -150,6 +152,30 @@ for (const theme of ["dark", "light"] as const) {
       await expect(dialog.locator("input")).toHaveCount(1);
 
       expect(report(unreadable(controls)), "unreadable controls in the SSH wizard").toBe("");
+    });
+
+    test("the workflow run page and its step terminal stay readable", async ({ bm, page }) => {
+      const runs = await readWorkflowRuns(bm.api);
+      needs(
+        runs !== null && runs.length > 0,
+        "a recorded workflow run: the run page and the step terminal only exist once something " +
+          "has run, and EPIC L's screens are the newest palette in the product"
+      );
+      const steps = await readWorkflowSteps(bm.api, runs![0].run_id);
+      needs(steps.length > 0, "a run holding at least one step, so a terminal can be opened");
+
+      const wf = new WorkflowScreens(page);
+      await wf.gotoRun(runs![0].run_id);
+      expect(await bm.theme(), "the theme survived navigating to the run page").toBe(theme);
+      await wf.stepRow(steps[0].script_name).click();
+      await expect(wf.terminal(steps[0].script_name)).toBeVisible();
+
+      // The terminal paints from its own `--term-*` tokens rather than
+      // from the page's, which is exactly how a second palette drifts:
+      // every other surface gets checked by the sweep above and this one
+      // is not on any of the six paths it walks.
+      const readings = await contrastReadings(page);
+      expect(report(unreadable(readings)), "unreadable text on the run page in " + theme + " mode").toBe("");
     });
 
     test("the wizard's primary button clears AA on the accent it sits on", async ({ bm }) => {

@@ -1,4 +1,6 @@
 import { expect, needs, test } from "./fixtures";
+import { WorkflowScreens } from "./workflow-page";
+import { readWorkflowRuns, readWorkflowSteps } from "../harness/workflow";
 
 /** §31 — desktop-first, but a small app window must stay fully usable. This
  *  project runs at 940x720; the regression it guards is a clipped table column.
@@ -86,5 +88,45 @@ test.describe("small app window", () => {
     expect(box).not.toBeNull();
     expect(box!.y).toBeGreaterThanOrEqual(0);
     expect(box!.height).toBeLessThanOrEqual(720);
+  });
+
+  test("the workflow run page reflows instead of clipping", async ({ bm, page }) => {
+    const runs = await readWorkflowRuns(bm.api);
+    needs(
+      runs !== null && runs.length > 0,
+      "a recorded workflow run: EPIC L's widest screen is the run page, and it does not exist " +
+        "until something has run"
+    );
+    const steps = await readWorkflowSteps(bm.api, runs![0].run_id);
+
+    const wf = new WorkflowScreens(page);
+    await wf.gotoRun(runs![0].run_id);
+
+    // Three verdict cells that collapse to one column rather than
+    // shrinking past the width of the words in them. Each is read by
+    // name, so a build that dropped one fails here rather than passing
+    // on the two that still fit.
+    for (const which of ["Backup", "Workflow", "Cleanup"] as const) {
+      const box = await wf.verdict(which).boundingBox();
+      expect(box, which + " verdict has no box at 940x720").not.toBeNull();
+      expect(box!.width, which + " verdict is narrower than its own words").toBeGreaterThan(180);
+    }
+
+    if (steps.length > 0) {
+      await wf.stepRow(steps[0].script_name).click();
+      const terminal = wf.terminal(steps[0].script_name);
+      await expect(terminal).toBeVisible();
+      const box = await terminal.boundingBox();
+      expect(box).not.toBeNull();
+      // A log of long lines is the one panel most likely to push the
+      // document sideways, and the wrap control is on by default so it
+      // must not.
+      expect(box!.width).toBeLessThanOrEqual(940);
+    }
+
+    const overflowing = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+    );
+    expect(overflowing, "horizontal page scroll on the workflow run page").toBe(false);
   });
 });
