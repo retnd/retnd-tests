@@ -9,6 +9,7 @@ import {
   HAPPY_AFTER_LINE,
   HAPPY_BEFORE,
   HAPPY_BEFORE_LINE,
+  REMOTE_AFTER,
   REMOTE_BEFORE,
   REMOTE_BEFORE_LINE
 } from "./workflow-scripts";
@@ -129,21 +130,15 @@ test.describe("a workflow run, driven from the browser", () => {
   test("a remote hook really runs on the source machine", async ({ bm, deployment, page }) => {
     const set = deployment.workflow.execSet;
     needs(set !== null, needsFixture(EXEC_SET_VAR));
-    // backupd#915: a remote hook that PASSES the exec-capability probe
-    // still dies at run time with `transport_lost` about seventy
-    // milliseconds in, so the run this case is written against does not
-    // reach a success this deployment could show. Blocked rather than
-    // weakened: an assertion rewritten to accept the failure would go on
-    // passing after the bug is fixed and would stop being about a hook
-    // that ran. The capability half is NOT blocked and is asserted in
-    // workflow-config.spec.ts, which is what keeps the remote posture
-    // covered meanwhile.
-    needs(
-      false,
-      "backupd#915 to be fixed: a remote hook fails at run time with transport_lost although " +
-        "exec_capability validates, so no deployment can currently show a remote hook that ran"
-    );
-
+    // This case found backupd#915: a remote hook that PASSED the
+    // exec-capability probe still died at run time with
+    // `transport_lost` about seventy milliseconds in, so a deployment
+    // could prove it was ABLE to run a remote hook and never run one.
+    // Fixed in #918, and what is below is now the regression guard -
+    // the capability probe is asserted separately in
+    // workflow-config.spec.ts, and the two together are the whole
+    // claim: the connection can execute, and a hook sent over it
+    // really executed.
     const wf = new WorkflowScreens(page);
     await wf.gotoSet(set!);
     const before = await newestRun(bm.api, set!);
@@ -155,18 +150,39 @@ test.describe("a workflow run, driven from the browser", () => {
     expect(settled.state, "the remote-exec fixture's run ended in " + settled.state).toBe("success");
 
     await wf.gotoRun(settled.run_id);
-    const row = wf.stepRow(REMOTE_BEFORE);
-    await expect(row).toContainText("Remote");
-    // The negative matters as much as the positive: a remote hook
-    // attributed to the host runner would be telling an operator their
-    // script ran on the manager.
-    await expect(row).not.toContainText(HOST_RUNNER);
+    for (const script of [REMOTE_BEFORE, REMOTE_AFTER]) {
+      const row = wf.stepRow(script);
+      await expect(row).toHaveCount(1);
+      await expect(row).toContainText("Remote");
+      // The negative matters as much as the positive: a remote hook
+      // attributed to the host runner would be telling an operator
+      // their script ran on the manager.
+      await expect(row).not.toContainText(HOST_RUNNER);
+      // #918's own half: a remote hook that exits is reported by its
+      // status and its code, not as a lost transport.
+      await expect(row).toContainText("exit 0");
+    }
 
-    await row.click();
-    // The line the script printed on the far side. Nothing on the
-    // manager could have produced it: the hook is only ever sent over
-    // the exec channel.
-    await expect(wf.output(REMOTE_BEFORE)).toContainText(REMOTE_BEFORE_LINE, { timeout: 30_000 });
+    await wf.stepRow(REMOTE_BEFORE).click();
+    const output = wf.output(REMOTE_BEFORE);
+    await expect(output).toContainText(REMOTE_BEFORE_LINE, { timeout: 30_000 });
+    // The hostname is the whole case: the script prints the host it ran
+    // on, and the panel says which machine the product believes
+    // executed it. A local hook that happened to succeed cannot satisfy
+    // both - it would print the engine's host, and the panel would name
+    // the Host Workflow Runner.
+    const printed = await output.innerText();
+    const named = new RegExp(REMOTE_BEFORE_LINE + "\\s+on\\s+(\\S+)").exec(printed);
+    expect(
+      named,
+      "the remote hook did not print the host it ran on: " + JSON.stringify(printed.slice(0, 200))
+    ).not.toBeNull();
+    // "Executed on" carries the remote host when the client can name
+    // one and the execution connection's reference otherwise. Either is
+    // a claim about a machine that is not this one.
+    const panel = wf.terminal(REMOTE_BEFORE);
+    await expect(panel).toContainText("Executed on");
+    await expect(panel).not.toContainText(HOST_RUNNER);
   });
 
   test("a failing before hook skips the backup instead of running it", async ({ bm, deployment, page }) => {
