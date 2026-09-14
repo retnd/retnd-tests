@@ -84,10 +84,19 @@ export const FINDINGS_SCRIPT = "10-findings.local.sh";
 export const FINDINGS_WARNING_CODE = "BSH002";
 export const FINDINGS_INFO_CODE = "BSH001";
 
-/** And the one whose finding IS at error severity: BSH003, a recursive
- *  remove rooted at `/`. It is the only fixture that proves the gate
- *  rather than the report. */
+/** And the one whose finding IS at error severity: BSH003, a forced
+ *  recursive delete whose expansion can be empty. It is the only fixture
+ *  that proves the GATE rather than the report, and it is attached to no
+ *  set for a reason the rig found by trying: a save that points at it is
+ *  REFUSED, by the CLI and by the API alike, so a set configured with it
+ *  is not a state any route can reach.
+ *
+ *  The position is the rule's own, read off the refusal the engine
+ *  printed: pinning it is what keeps this case from passing on a
+ *  different script in the same directory. */
+export const REJECTED_SCRIPT = "10-reject.local.sh";
 export const REJECTED_ERROR_CODE = "BSH003";
+export const REJECTED_POSITION = "23:8";
 
 /** Six scripts across two stages, for the case that counts mounted
  *  terminals. */

@@ -121,6 +121,17 @@ Two asymmetries shape this section and neither is a defect:
   that a browser can drive today end to end, and `specs/contract-gaps.spec.ts`
   pins their 403-on-CSRF so a gate appearing in front of them goes red
   here.
+- **Both configuration writes are verified BEFORE they persist, by both
+  surfaces.** A write that points a stage directory at a script which
+  does not parse, or which carries an error-severity finding, is refused
+  and nothing is saved — `backup-set workflow patch` prints the refusal
+  and exits non-zero, and the API answers `WORKFLOW_SCRIPT_REJECTED`
+  with the blocking scripts, which the cards draw in full. So "a backup
+  set configured with a rejecting hook" is not a state any route can
+  reach, and a spec that wanted one would be asking for something the
+  product is right to refuse. Suite B drives the refusal instead
+  (`e2e/workflow-config.spec.ts`), and checks the deployment's
+  configuration is unchanged afterwards.
 
 | UI function | CLI equivalent | Equivalent state means | Status |
 |---|---|---|---|
