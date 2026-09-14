@@ -797,11 +797,21 @@ export async function waitForSetIdle(
 /** Catches this set with a step actually executing.
  *
  *  The crash cases need a live hook to crash INTO, and nothing here can
- *  start one: they wait for the scheduler. The window is the fixture's
- *  own hold inside a cycle, so a run observed a moment after it finished
- *  is an ordinary outcome rather than a failure, and this waits for the
- *  next one instead of reporting the miss. Two misses is a fixture whose
- *  hook is too short to be caught, which is worth failing on.
+ *  start one: they wait for the scheduler. Two things make that harder
+ *  than it sounds, and both are handled here rather than in each case.
+ *
+ *  First, the set may ALREADY be mid-hook when a case arrives, and
+ *  waiting for a NEW run in that situation throws away the live one and
+ *  then waits out the whole of its cycle. So the run in flight right
+ *  now is used when there is one.
+ *
+ *  Second, the budget. `runAppearMs` is two and a half scheduler
+ *  intervals, which fits an ordinary set; the crash fixture is the
+ *  slowest set in the deployment - its own hook holds for the better
+ *  part of a minute before its backup even starts - so the gap between
+ *  one of its runs STARTING and the next is longer than the interval,
+ *  and a case that budgeted one interval reported the scheduler as
+ *  broken when it was merely behind. Each attempt gets double.
  *
  *  Returns the run and the step that was executing when it was seen. */
 export async function catchRunInFlight(
@@ -809,10 +819,22 @@ export async function catchRunInFlight(
   backupSetId: string,
   attempts = 3
 ): Promise<{ run: WireWorkflowRun; step: WireWorkflowStep }> {
-  let previous = (await newestRun(api, backupSetId))?.run_id ?? null;
+  const budget = runAppearMs() * 2;
   const missed: string[] = [];
+
+  // Already executing? Then this IS the window, and waiting for the
+  // next run would be waiting out the one that is open.
+  const current = await newestRun(api, backupSetId);
+  let previous = current?.run_id ?? null;
+  if (current !== null && TERMINAL_RUN_STATES[current.state] !== true) {
+    const live = (await readWorkflowSteps(api, current.run_id)).find(
+      (step) => step.state === "running"
+    );
+    if (live !== undefined) return { run: current, step: live };
+  }
+
   for (let attempt = 0; attempt < attempts; attempt++) {
-    const run = await waitForNewRun(api, backupSetId, previous, runAppearMs());
+    const run = await waitForNewRun(api, backupSetId, previous, budget);
     previous = run.run_id;
     try {
       return { run, step: await waitForRunningStep(api, run.run_id) };
@@ -960,7 +982,21 @@ export async function acknowledgeHolds(
         BASE + "/workflow-recovery/" + encodeURIComponent(hold.run_id) + "/acknowledge",
         { headers, data: { reason } }
       );
-      if (response.status() < 400) settled++;
+      if (response.status() < 400) {
+        settled++;
+        continue;
+      }
+      // Said out loud, because a refusal here is not a tidy-up that
+      // failed: the hold stays, the engine will not schedule that set
+      // again, and every later case waiting for a run of it is starved
+      // for a reason none of them can report. The status is the whole
+      // diagnosis - 403 would mean this route sits behind the same gate
+      // that refuses a run, which is a finding about the product and
+      // not about the suite.
+      console.log(
+        "e2e: could not acknowledge hold " + hold.run_id + " on " + backupSetId + ": HTTP " +
+          response.status() + " " + (await response.text()).slice(0, 200)
+      );
     }
   } catch {
     return settled;
