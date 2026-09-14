@@ -70,15 +70,21 @@ export const CRASH_SET_VAR = "RM_WF_CRASH_SET";
 export const MANY_STEPS_SET_VAR = "RM_WF_MANY_STEPS_SET";
 
 /** The set whose hooks carry deliberate lint findings BELOW the severity
- *  that gates a save, and the one whose findings are at error severity.
+ *  that gates a save, and the DIRECTORY holding the one script whose
+ *  finding is at error severity.
  *
- *  Two sets rather than one, because the findings panel and the save
- *  GATE are different claims: a warning is reported and saves fine, an
- *  error refuses. Every other seeded script is deliberately lint-clean,
- *  so an empty panel elsewhere is the contrast that makes a populated one
+ *  A directory rather than a second set, and the difference is the whole
+ *  finding: an error-severity finding is refused AT SAVE TIME, by the CLI
+ *  and by the API alike, so "a backup set configured with a BSH003 hook"
+ *  is not a state any route can reach. The directory therefore sits
+ *  attached to nothing, and the case that uses it drives the REFUSAL
+ *  through the browser - which proves the gate rather than the report.
+ *
+ *  Every other seeded script is deliberately lint-clean, so an empty
+ *  findings panel elsewhere is the contrast that makes a populated one
  *  mean something. */
 export const FINDINGS_SET_VAR = "RM_WF_FINDINGS_SET";
-export const REJECTED_SET_VAR = "RM_WF_REJECTED_SET";
+export const REJECTED_DIR_VAR = "RM_WF_REJECTED_DIR";
 
 /** The plaintext behind the secret-backed variable the secret set's hook
  *  echoes. Exported by the rig SO THAT this suite can assert it never
@@ -120,7 +126,7 @@ export interface WorkflowFixtures {
   crashSet: string | null;
   manySteps: string | null;
   findingsSet: string | null;
-  rejectedSet: string | null;
+  rejectedDir: string | null;
   secretValue: string | null;
   scriptPrefix: string | null;
   bypassedRun: string | null;
@@ -163,7 +169,7 @@ export function resolveWorkflowFixtures(env: NodeJS.ProcessEnv = process.env): W
     crashSet: setVar(env, CRASH_SET_VAR),
     manySteps: setVar(env, MANY_STEPS_SET_VAR),
     findingsSet: setVar(env, FINDINGS_SET_VAR),
-    rejectedSet: setVar(env, REJECTED_SET_VAR),
+    rejectedDir: plainVar(env, REJECTED_DIR_VAR),
     secretValue: plainVar(env, SECRET_VALUE_VAR),
     scriptPrefix: plainVar(env, SCRIPT_PREFIX_VAR),
     bypassedRun: plainVar(env, BYPASSED_RUN_VAR),

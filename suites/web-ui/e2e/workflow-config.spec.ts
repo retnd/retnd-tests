@@ -10,6 +10,8 @@ import {
   FINDINGS_WARNING_CODE,
   HAPPY_BEFORE,
   REJECTED_ERROR_CODE,
+  REJECTED_POSITION,
+  REJECTED_SCRIPT,
   REMOTE_BEFORE,
   SECRET_ENV_NAME,
   SFTP_ONLY_SCRIPT
@@ -20,13 +22,14 @@ import {
   FINDINGS_SET_VAR,
   NEEDS_WORKFLOW_CONTROL,
   NO_HOOKS_SET_VAR,
-  REJECTED_SET_VAR,
+  REJECTED_DIR_VAR,
   SECRET_SET_VAR,
   SECRET_VALUE_VAR,
   SFTP_ONLY_SET_VAR,
   WORKFLOW_SET_VAR,
   needsFixture,
   readBackupSetWorkflow,
+  readWorkflowSettings,
   resolveWorkflowControl,
   withRunnerStopped
 } from "../harness/workflow";
@@ -307,21 +310,43 @@ test.describe("a backup set's workflow configuration, in a browser", () => {
     );
   });
 
-  test("a hook with an error-severity finding is not called valid", async ({ bm, deployment, page }) => {
-    const set = deployment.workflow.rejectedSet;
-    needs(set !== null, needsFixture(REJECTED_SET_VAR));
+  test("a stage directory holding an error-severity hook is refused, and nothing is saved", async ({
+    bm,
+    deployment,
+    page
+  }) => {
+    const dir = deployment.workflow.rejectedDir;
+    needs(dir !== null, needsFixture(REJECTED_DIR_VAR));
 
-    const wf = new WorkflowScreens(page);
-    await wf.gotoSet(set!);
-    await wf.checkControl().click();
-    const card = wf.card();
-    await expect(wf.scriptTable()).toBeVisible({ timeout: 30_000 });
+    // Deliberately NOT a set with the directory already configured:
+    // there is no such state. The engine verifies every script a write
+    // points at BEFORE persisting, and refuses the write, so the only
+    // way to observe an error-severity finding is to attempt the save
+    // and be told no. That is also the better assertion - it is the
+    // gate, and the gate is what stands between an operator and a hook
+    // that runs `rm -rf` on a path an empty variable left behind.
+    const before = await readWorkflowSettings(bm.api);
+    await page.goto("/settings");
+    const field = page.locator("#workflow-setting-beforeDir");
+    await expect(field).toBeVisible();
+    await field.fill(dir!);
+    await field.locator("..").getByRole("button", { name: "Save", exact: true }).click();
 
-    // The gate, not the report. An error-severity finding is what
-    // REFUSES a save of a workflow configuration, and a card that
-    // reported one while still claiming the hooks are valid would be
-    // offering a save the service is about to refuse.
-    await expect(card).toContainText("Hooks not valid");
-    await expect(card.getByText(REJECTED_ERROR_CODE, { exact: true }).first()).toBeVisible();
+    const refusal = page.getByText("This configuration was NOT saved");
+    await expect(refusal).toBeVisible({ timeout: 60_000 });
+    const banner = page.getByRole("alert").filter({ hasText: "This configuration was NOT saved" });
+    // Which script, where it lives, which rule fired and at what
+    // position. A refusal that said only "refused" would send an
+    // operator to read every file in a directory.
+    await expect(banner).toContainText(REJECTED_SCRIPT);
+    await expect(banner).toContainText(dir!);
+    await expect(banner).toContainText(REJECTED_ERROR_CODE + " at " + REJECTED_POSITION);
+
+    // And the refusal was a refusal: the deployment still configures
+    // whatever it configured before this case touched it. A gate that
+    // reported a refusal and wrote anyway is the failure worth catching,
+    // and it is invisible from the banner alone.
+    const after = await readWorkflowSettings(bm.api);
+    expect(after?.before_dir ?? "").toBe(before?.before_dir ?? "");
   });
 });
