@@ -130,9 +130,9 @@ test.describe("small app window", () => {
     // stop being about a terminal that fits.
     needs(
       false,
-      "the step log terminal to fit a 940px window: it measures 1178px on the rig, which is an " +
-        "L8 layout defect this case found and which has to be fixed in the product before this " +
-        "can assert"
+      "backupd#916 to be fixed: the step log terminal measures 1178px in a 940px window, so the " +
+        "one panel most likely to push a document sideways does. This case found it; un-skip " +
+        "the moment the fix lands rather than relaxing the width"
     );
 
     const runs = await readWorkflowRuns(bm.api);
