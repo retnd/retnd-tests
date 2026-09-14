@@ -131,29 +131,21 @@ test.describe("a workflow run, driven from the browser", () => {
   test("a remote hook really runs on the source machine", async ({ bm, deployment, page }) => {
     const set = deployment.workflow.execSet;
     needs(set !== null, needsFixture(EXEC_SET_VAR));
-    // This case found backupd#915 - a remote hook that PASSED the
-    // exec-capability probe died at run time with `transport_lost`
-    // about seventy milliseconds in - and #918 fixed that one. What
-    // the rig then measured is a DIFFERENT loss of the exec channel,
-    // filed as backupd#919, so a hook sent over the connection still
-    // does not run to completion.
+    // This case found two defects, one after the other, and it is the
+    // regression guard for both. backupd#915: a remote hook that
+    // PASSED the exec-capability probe died at run time with
+    // `transport_lost` about seventy milliseconds in, closed by #918.
+    // Then backupd#919, which the same red uncovered and which had
+    // been true since L2/L3: RemoteExecutor passed the STEP ID as
+    // remoteexec's token, step ids are "%04d~scope~phase~script", and
+    // the token rule refuses a tilde BEFORE any session opens - so no
+    // remote hook had ever run, and a validation refusal was being
+    // reported as a lost transport.
     //
-    // Blocked rather than weakened: an assertion rewritten to accept
-    // whatever the run currently produces would go on passing after
-    // #919 is fixed and would stop being about a hook that ran. The
-    // capability half is NOT blocked - workflow-config.spec.ts asserts
-    // that the connection accepts an exec channel and proves it runs
-    // the bytes it is sent - and the two together are the whole claim,
-    // so this is the half that is outstanding rather than the pair.
-    needs(
-      false,
-      "backupd#919 to be fixed: a remote hook is refused before any channel opens, because " +
-        "RemoteExecutor passes the STEP ID as remoteexec's token and a step id carries tildes " +
-        "that the token rule rejects - so the refusal is reported as a lost transport. Distinct " +
-        "from #915, which #918 closed, and the reason exec_capability validates while no " +
-        "deployment can show a remote hook that ran to completion"
-    );
-
+    // Which is why this case asserts the far-side hostname rather than
+    // a status: a product can report a remote hook as succeeded
+    // without one ever leaving the manager, and the printed host is
+    // the only evidence that separates the two.
     const wf = new WorkflowScreens(page);
     await wf.gotoSet(set!);
     const before = await newestRun(bm.api, set!);
@@ -216,22 +208,13 @@ test.describe("a workflow run, driven from the browser", () => {
     // is the difference between a source machine that was un-quiesced
     // and one that was not.
     //
-    // Blocked on the same defect as the case above. #918 closed #915
-    // and the before hook now gets through, and the run then reaches
-    // cleanup_failed because the exec channel is lost again - filed as
-    // backupd#919. Until that is fixed this cannot assert a completed
-    // cleanup, and relaxing it to accept the failure would hide the
-    // fix when it lands.
-    needs(
-      false,
-      "backupd#919 to be fixed: the remote after stage cannot complete while every remote hook " +
-        "is refused on its token before a channel opens, so the run reaches cleanup_failed"
-    );
-
-    // Kept below the block rather than deleted: the assertion carries
-    // its own evidence - the after step's state and exit code - which
-    // is the answer to "why did the cleanup fail" and is what this
-    // case will report the moment it is un-blocked.
+    // Blocked on backupd#919 until the token fix landed, and kept
+    // whole rather than relaxed while it was: an assertion rewritten
+    // to accept cleanup_failed would have gone on passing afterwards.
+    //
+    // The assertion carries its own evidence - the after step's state
+    // and exit code - because "why did the cleanup fail" is a question
+    // a bare red costs a whole rig run to ask.
     const run = await newestRun(bm.api, set!);
     needs(run !== null, "a recorded run of " + set + " to read the after stage from");
     const steps = await readWorkflowSteps(bm.api, run!.run_id);
