@@ -948,14 +948,21 @@ export async function crashIntoHook(
   );
 }
 
-/** Acknowledges every hold this set is carrying, through the API.
+/** Acknowledges the holds this deployment is carrying, through the API.
  *
  *  A cleanup step and not an assertion: a set with an unresolved hold
- *  is a set the ENGINE will not run again, so a crash case that fails
- *  before it settles its own hold does not fail alone - it starves
- *  every later case that waits for the scheduler to come round to that
- *  set, and those report "the scheduler did not run this set", which
- *  says nothing about what actually broke.
+ *  is a set the ENGINE will not run again, so a case that fails before
+ *  it settles a hold does not fail alone - it starves every later case
+ *  that waits for the scheduler to come round to that set, and those
+ *  report "the scheduler did not run this set", which says nothing
+ *  about what actually broke.
+ *
+ *  `backupSetId` narrows it to one set; `null` settles every hold on
+ *  the deployment. The wide form is for the cases that take a shared
+ *  facility away - stopping the Host Workflow Runner interrupts hooks
+ *  belonging to WHATEVER set the scheduler happened to be running, not
+ *  only the set the case names - so a case that cannot know whose run
+ *  it disturbed settles all of them rather than guessing.
  *
  *  Acknowledge rather than resume, deliberately: resuming EXECUTES the
  *  hooks a run still owed, which is a thing under test and not a thing
@@ -964,26 +971,26 @@ export async function crashIntoHook(
  *  which is exactly what a test harness tidying up after itself is
  *  doing.
  *
- *  Returns how many it settled, and never throws: it runs on the way
- *  out of a case that may already be failing, and an error here would
- *  replace the reason anybody is reading the report. */
+ *  Returns the set ids it settled a hold for, and never throws: it runs
+ *  on the way out of a case that may already be failing, and an error
+ *  here would replace the reason anybody is reading the report. */
 export async function acknowledgeHolds(
   api: APIRequestContext,
-  backupSetId: string,
+  backupSetId: string | null,
   reason: string
-): Promise<number> {
-  let settled = 0;
+): Promise<string[]> {
+  const settled: string[] = [];
   try {
     const holds = await readWorkflowRecovery(api);
     const headers = await csrfHeaders(api);
     for (const hold of holds ?? []) {
-      if (hold.backup_set_id !== backupSetId) continue;
+      if (backupSetId !== null && hold.backup_set_id !== backupSetId) continue;
       const response = await api.post(
         BASE + "/workflow-recovery/" + encodeURIComponent(hold.run_id) + "/acknowledge",
         { headers, data: { reason } }
       );
       if (response.status() < 400) {
-        settled++;
+        settled.push(hold.backup_set_id);
         continue;
       }
       // Said out loud, because a refusal here is not a tidy-up that
@@ -994,7 +1001,7 @@ export async function acknowledgeHolds(
       // that refuses a run, which is a finding about the product and
       // not about the suite.
       console.log(
-        "e2e: could not acknowledge hold " + hold.run_id + " on " + backupSetId + ": HTTP " +
+        "e2e: could not acknowledge hold " + hold.run_id + " on " + hold.backup_set_id + ": HTTP " +
           response.status() + " " + (await response.text()).slice(0, 200)
       );
     }
