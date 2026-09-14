@@ -142,6 +142,14 @@ test.describe("small app window", () => {
     await expect(terminal).toBeVisible();
     const box = await terminal.boundingBox();
     expect(box).not.toBeNull();
-    expect(box!.width).toBeLessThanOrEqual(940);
+    // Against the WINDOW this case is being read in, not the literal
+    // 940 the small-window project uses. This file's describe is named
+    // for that project but the generic one runs it too, at 1440x900,
+    // where a 1178px terminal is correct and a hardcoded 940 is simply
+    // the wrong question. The claim is the same at either size: the
+    // panel fits the window.
+    const window = page.viewportSize();
+    expect(window, "this run has no viewport to measure against").not.toBeNull();
+    expect(box!.width).toBeLessThanOrEqual(window!.width);
   });
 });

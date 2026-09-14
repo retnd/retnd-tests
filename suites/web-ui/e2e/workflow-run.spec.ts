@@ -147,9 +147,11 @@ test.describe("a workflow run, driven from the browser", () => {
     // so this is the half that is outstanding rather than the pair.
     needs(
       false,
-      "backupd#919 to be fixed: a remote hook loses its exec channel at run time although " +
-        "exec_capability validates, so no deployment can currently show a remote hook that ran " +
-        "to completion. This is a second, distinct loss from #915, which #918 closed"
+      "backupd#919 to be fixed: a remote hook is refused before any channel opens, because " +
+        "RemoteExecutor passes the STEP ID as remoteexec's token and a step id carries tildes " +
+        "that the token rule rejects - so the refusal is reported as a lost transport. Distinct " +
+        "from #915, which #918 closed, and the reason exec_capability validates while no " +
+        "deployment can show a remote hook that ran to completion"
     );
 
     const wf = new WorkflowScreens(page);
@@ -222,8 +224,8 @@ test.describe("a workflow run, driven from the browser", () => {
     // fix when it lands.
     needs(
       false,
-      "backupd#919 to be fixed: the remote after stage cannot complete while a hook loses its " +
-        "exec channel at run time, so the run reaches cleanup_failed"
+      "backupd#919 to be fixed: the remote after stage cannot complete while every remote hook " +
+        "is refused on its token before a channel opens, so the run reaches cleanup_failed"
     );
 
     // Kept below the block rather than deleted: the assertion carries
