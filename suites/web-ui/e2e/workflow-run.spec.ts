@@ -176,23 +176,36 @@ test.describe("a workflow run, driven from the browser", () => {
     await wf.stepRow(REMOTE_BEFORE).click();
     const output = wf.output(REMOTE_BEFORE);
     await expect(output).toContainText(REMOTE_BEFORE_LINE, { timeout: 30_000 });
-    // The hostname is the whole case: the script prints the host it ran
-    // on, and the panel says which machine the product believes
-    // executed it. A local hook that happened to succeed cannot satisfy
-    // both - it would print the engine's host, and the panel would name
-    // the Host Workflow Runner.
+    // The hostname is the whole case, and it has to be checked against
+    // something rather than merely be present. The script prints the
+    // machine IT thinks it is on; the panel's "Executed on" is the
+    // machine the PRODUCT says it used. Requiring the two to agree is
+    // what makes this a proof of far-side execution: a non-empty token
+    // proves nothing, and a hook that had quietly run on the manager
+    // would print the engine's host while the panel named the Host
+    // Workflow Runner, which fails both halves.
     const printed = await output.innerText();
     const named = new RegExp(REMOTE_BEFORE_LINE + "\\s+on\\s+(\\S+)").exec(printed);
     expect(
       named,
       "the remote hook did not print the host it ran on: " + JSON.stringify(printed.slice(0, 200))
     ).not.toBeNull();
+
     // "Executed on" carries the remote host when the client can name
-    // one and the execution connection's reference otherwise. Either is
-    // a claim about a machine that is not this one.
+    // one and the execution connection's reference otherwise.
     const panel = wf.terminal(REMOTE_BEFORE);
     await expect(panel).toContainText("Executed on");
     await expect(panel).not.toContainText(HOST_RUNNER);
+    const executor = await panel
+      .locator("dt", { hasText: /^Executed on$/u })
+      .locator("xpath=following-sibling::dd[1]")
+      .innerText();
+    expect(
+      executor,
+      "the hook printed that it ran on " + JSON.stringify(named![1]) + " and the product says " +
+        "it executed on " + JSON.stringify(executor) + ", so one of them is describing a " +
+        "different machine"
+    ).toContain(named![1]);
   });
 
   test("a remote run finishes the cleanup its after stage owes", async ({
