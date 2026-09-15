@@ -1,6 +1,6 @@
 # Contract versus observed
 
-Every file here records a place where `backupd`'s real behaviour
+Every file here records a place where `retnd`'s real behaviour
 disagrees with what its documentation, its own usage text, or its own
 stated conventions say it should do.
 
@@ -8,7 +8,7 @@ The rule that produced them is the one thing that keeps this repository a
 validator rather than a change detector. When a case is written, its
 expectation comes from a document. When the binary then does something
 else, the expectation does not move. The disagreement gets written down
-here, filed against `backupd`, and the case is marked
+here, filed against `retnd`, and the case is marked
 `known_discrepancy: backupdproject/backupd#N` so the runner treats it as
 a strict expected failure.
 

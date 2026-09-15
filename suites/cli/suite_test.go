@@ -88,7 +88,7 @@ func TestCLIContract(t *testing.T) {
 		t.Fatal("no cases found under suites/cli/cases: a suite that runs nothing is not a suite that passes")
 	}
 
-	only := os.Getenv("RM_TAGS")
+	only := os.Getenv("RETND_TAGS")
 	ran := 0
 	for _, c := range cases {
 		if only != "" && !matchesTags(c, only) {
@@ -100,7 +100,7 @@ func TestCLIContract(t *testing.T) {
 		})
 	}
 	if ran == 0 {
-		t.Fatalf("RM_TAGS=%q selected none of the %d case(s)", only, len(cases))
+		t.Fatalf("RETND_TAGS=%q selected none of the %d case(s)", only, len(cases))
 	}
 	t.Logf("ran %d of %d case(s)", ran, len(cases))
 }
@@ -164,7 +164,7 @@ func matchesTags(c harness.Case, spec string) bool {
 
 // newWork builds a per-case work directory inside the repository rather
 // than in the system temp area. Two reasons: a failed case leaves its
-// fixture behind where it is easy to look at (RM_KEEP_WORK=1 keeps it),
+// fixture behind where it is easy to look at (RETND_KEEP_WORK=1 keeps it),
 // and every file this suite creates or destroys stays inside the
 // workspace it belongs to.
 func newWork(t *testing.T, name string) string {
@@ -174,7 +174,7 @@ func newWork(t *testing.T, name string) string {
 	if err != nil {
 		t.Fatalf("creating a work directory: %v", err)
 	}
-	if os.Getenv("RM_KEEP_WORK") == "" {
+	if os.Getenv("RETND_KEEP_WORK") == "" {
 		t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	} else {
 		t.Cleanup(func() { t.Logf("work directory kept at %s", dir) })

@@ -10,8 +10,8 @@
 // `page.route`, and that is a legitimate thing to do: it substitutes the
 // bytes on the wire and leaves the app, the bundle, the router and the
 // error boundary real. But it substitutes them INSIDE the browser, so the
-// hop #795 is actually about - `backupd-web serve-ui` trying to reach
-// `backupd-web serve` and failing - never happens. The reported NAS's
+// hop #795 is actually about - `retnd-web serve-ui` trying to reach
+// `retnd-web serve` and failing - never happens. The reported NAS's
 // serve-ui logged `dial tcp: lookup rclone-manager on 127.0.0.11:53: no
 // such host` and answered the browser itself; nothing a route handler
 // does can produce that, because the request never leaves the page.
@@ -45,7 +45,7 @@
 //
 // One directory, shared between the host (which has Docker) and the client
 // container (which deliberately does not). `--break-engine` creates it,
-// mounts it under RM_ARTIFACTS_DIR, names it in RM_ENGINE_CONTROL, and
+// mounts it under RETND_ARTIFACTS_DIR, names it in RETND_ENGINE_CONTROL, and
 // runs a watcher beside the client for the lifetime of the run. Two
 // requests, and for each of them two possible answers:
 //
@@ -89,10 +89,10 @@ import { setTimeout as sleep } from "node:timers/promises";
  *  It means "this run may make the engine unreachable", not "the engine is
  *  unreachable right now": the rig leaves the stack whole and hands the
  *  suite the ability to break it, for the mid-session reason above. */
-export const ENGINE_UNREACHABLE_VAR = "RM_ENGINE_UNREACHABLE";
+export const ENGINE_UNREACHABLE_VAR = "RETND_ENGINE_UNREACHABLE";
 
 /** The control directory, as the CLIENT container sees it. */
-export const ENGINE_CONTROL_VAR = "RM_ENGINE_CONTROL";
+export const ENGINE_CONTROL_VAR = "RETND_ENGINE_CONTROL";
 
 /** The rig's six file names. Written down here because this module and
  *  `scripts/e2e/three-machine-web-ui.sh`, in the other repository, are the

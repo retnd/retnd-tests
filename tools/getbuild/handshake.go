@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// VersionInfo is what `backupd version` reports, parsed.
+// VersionInfo is what `retnd version` reports, parsed.
 type VersionInfo struct {
 	BinaryVersion string
 	Rclone        string
@@ -62,15 +62,23 @@ func parseVersion(out string) VersionInfo {
 		}
 		switch fields[0] {
 		// Every spelling the product has ever printed, deliberately not
-		// one. The command is `backupd` from this rename on, was `rbm`
-		// from 0.3.3, and `backup-manager` before that; the pin is
-		// allowed to point at any build across those lines, so this
-		// parser (which runs before any case does) has to still say which
-		// commit an older build is. The version command's own printed
-		// name is asserted where an assertion belongs, in
-		// cases/version/happy.yaml, which is a single spelling and goes
-		// red if the product prints a different one.
-		case "backupd", "rbm", "backup-manager":
+		// one. The command is `retnd` from EPIC R (backupd#885) on, was
+		// `backupd` from backupd#794, `rbm` from 0.3.3, and
+		// `backup-manager` before that; the pin is allowed to point at
+		// any build across those lines, so this parser (which runs
+		// before any case does) has to still say which commit an older
+		// build is. The version command's own printed name is asserted
+		// where an assertion belongs, in cases/version/happy.yaml, which
+		// is a single spelling and goes red if the product prints a
+		// different one.
+		//
+		// This is the one place in this repository where the retired
+		// names are READ rather than referenced, and it is why the list
+		// grows by one per rename instead of moving: a parser that only
+		// knew the current name would abort the run on an older pin with
+		// "no version line", which reads as a broken binary rather than
+		// as an older one.
+		case "retnd", "backupd", "rbm", "backup-manager":
 			info.BinaryVersion = fields[1]
 		case "rclone":
 			info.Rclone = fields[1]

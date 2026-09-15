@@ -18,22 +18,22 @@ test.describe("application shell", () => {
   test("renders the lockup, service chip and every section link", async ({ bm, page }) => {
     await bm.goto("/");
 
-    await expect(page.getByRole("img", { name: "Backupd" })).toBeVisible();
+    await expect(page.getByRole("img", { name: "retnd" })).toBeVisible();
     // Scoped to the header rather than `.first()`, because this case is
     // about the LOCKUP. Against a real deployment the product name is on
-    // the page twice (the header, and the footer's "Backupd
+    // the page twice (the header, and the footer's "retnd
     // running on ..."), which resolved two elements and failed strict
     // mode on the first real run; the mock's page had fewer of them.
     // `.first()` would have made it pass by picking whichever came first
     // in the DOM, which is not the same claim.
     //
     // `exact` is the second half, and backupd#794 is why: the mark's own
-    // <title>Backupd</title> is text too, and getByText matches
+    // <title>retnd</title> is text too, and getByText matches
     // case-insensitively on a substring, so after the rename the header
     // held two matches - one of them an SVG title that is never visible.
     // Exact matching is case-sensitive, so it selects the wordmark and
     // not the accessible name beside it.
-    await expect(page.getByRole("banner").getByText("backupd", { exact: true })).toBeVisible();
+    await expect(page.getByRole("banner").getByText("retnd", { exact: true })).toBeVisible();
     // Scoped to the header (role "banner") — the dashboard body's own
     // health summary widget repeats "Service running" with a different
     // suffix (uptime, not version), so an unscoped match is ambiguous once
@@ -105,7 +105,7 @@ test.describe("application shell", () => {
 
   test("names the platform it is running on", async ({ bm, page }) => {
     await bm.goto("/");
-    // exact: true — the footer line ("Backupd running on <platform>")
+    // exact: true — the footer line ("retnd running on <platform>")
     // otherwise makes this an ambiguous substring match too.
     await expect(page.getByText("Running on", { exact: true })).toBeVisible();
   });

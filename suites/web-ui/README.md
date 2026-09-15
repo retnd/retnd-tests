@@ -1,15 +1,15 @@
 # Suite B: the Web UI, against a real deployment
 
 This suite used to drive a Vite dev server. It drives a running
-`backupd` now: a browser in one container, `backupd-web serve-ui` and
-`backupd-web serve` in another, a real sshd holding real backup files in a
+`retnd` now: a browser in one container, `retnd-web serve-ui` and
+`retnd-web serve` in another, a real sshd holding real backup files in a
 third, and SQLite behind all of it.
 
 ```sh
 cd suites/web-ui && npm ci && npx playwright install chromium   # once
-RM_BASE_URL=http://backupd:8080 \
-RM_ADMIN_USERNAME=e2e-operator \
-RM_ADMIN_PASSWORD=... \
+RETND_BASE_URL=http://retnd:8080 \
+RETND_ADMIN_USERNAME=e2e-operator \
+RETND_ADMIN_PASSWORD=... \
   npm run e2e
 ```
 
@@ -36,7 +36,7 @@ every `?scenario=` state a spec drove was a fixture inside the browser,
 and no test in this repository could fail on anything below it. Not the
 session, not the reverse proxy, not the engine, not the database.
 
-That gap cost something specific. `backupd` was the Activity
+That gap cost something specific. `retnd` was the Activity
 page erroring in a browser while the server answered HTTP 200 with 64KB
 of valid JSON in 20ms. `activity-failure.spec.ts` has a case beside it
 called "activity, when the feed reads fine, still lists the recorded
@@ -57,23 +57,23 @@ instead.
 
 | variable | what it is |
 |---|---|
-| `RM_BASE_URL` | where the Web UI answers on the private network, e.g. `http://backupd:8080`. A container name, resolved by Docker's embedded DNS, not a published host port |
-| `RM_ADMIN_USERNAME` | the throwaway administrator this run signs in as |
-| `RM_ADMIN_PASSWORD` | its password. Held in this process's environment and written nowhere: no file, no argv, no report |
-| `RM_ARTIFACTS_DIR` | where the evidence goes. Traces, screenshots and videos land in `<dir>/test-results` and the HTML report in `<dir>/html-report`, both a level below the directory itself: Playwright removes its own output directory on startup and a bind mount cannot be unlinked from inside the container |
+| `RETND_BASE_URL` | where the Web UI answers on the private network, e.g. `http://retnd:8080`. A container name, resolved by Docker's embedded DNS, not a published host port |
+| `RETND_ADMIN_USERNAME` | the throwaway administrator this run signs in as |
+| `RETND_ADMIN_PASSWORD` | its password. Held in this process's environment and written nowhere: no file, no argv, no report |
+| `RETND_ARTIFACTS_DIR` | where the evidence goes. Traces, screenshots and videos land in `<dir>/test-results` and the HTML report in `<dir>/html-report`, both a level below the directory itself: Playwright removes its own output directory on startup and a bind mount cannot be unlinked from inside the container |
 
 And the optional ones, each of which unlocks cases that otherwise state
 why they are skipped:
 
 | variable | what it unlocks |
 |---|---|
-| `RM_BACKUP_SET` | the set the topology seeded, in `source/set` form (`e2e/vps`). It is the anchor `real-path.spec.ts` uses: a name this suite did not choose and the bundle cannot invent |
-| `RM_BOOTSTRAP_TOKEN` | the single-use enrolment token, for a deployment that has no administrator yet. Without it the run needs one already enrolled |
-| `RM_VPS_HOST`, `RM_VPS_PORT`, `RM_VPS_USER`, `RM_VPS_PATH` | the source machine, for the wizard cases that probe a real host and prove a real connection |
-| `RM_PLATFORM` | which provider bundle the image serves. It DESCRIBES the image; it does not choose one |
-| `RM_ALLOW_DESTRUCTIVE=1` | the cases that destroy data nothing puts back: applying a retention plan, and removing a declared storage destination |
-| `RM_WORKERS` | more than one browser at a time. Read the note in `harness/deployment.ts` before setting it |
-| `RM_NO_SANDBOX=1` | `--no-sandbox`, for an image that runs Chromium as root |
+| `RETND_BACKUP_SET` | the set the topology seeded, in `source/set` form (`e2e/vps`). It is the anchor `real-path.spec.ts` uses: a name this suite did not choose and the bundle cannot invent |
+| `RETND_BOOTSTRAP_TOKEN` | the single-use enrolment token, for a deployment that has no administrator yet. Without it the run needs one already enrolled |
+| `RETND_VPS_HOST`, `RETND_VPS_PORT`, `RETND_VPS_USER`, `RETND_VPS_PATH` | the source machine, for the wizard cases that probe a real host and prove a real connection |
+| `RETND_PLATFORM` | which provider bundle the image serves. It DESCRIBES the image; it does not choose one |
+| `RETND_ALLOW_DESTRUCTIVE=1` | the cases that destroy data nothing puts back: applying a retention plan, and removing a declared storage destination |
+| `RETND_WORKERS` | more than one browser at a time. Read the note in `harness/deployment.ts` before setting it |
+| `RETND_NO_SANDBOX=1` | `--no-sandbox`, for an image that runs Chromium as root |
 
 ## Signing in, for real
 
@@ -83,12 +83,13 @@ refused. It now does what the client does (`harness/session.ts`):
 
 1. GET any page. `apps/common/csrf`'s `EnsureCookie` runs in front of
    every response precisely so a fresh client has a token before it needs
-   one, and sets `backupd_csrf` (`bm_csrf` on a build from before
-    renamed it; the harness reads either).
+   one, and sets `retnd_csrf` (`backupd_csrf` on a build from before EPIC
+   R, `bm_csrf` on one from before backupd#794; the harness reads all
+   three, newest first, exactly as the product does).
 2. POST `/api/v1/auth/login` carrying that cookie and its value again in
    `X-CSRF-Token`. The cookie is what a cross-site attacker can make a
    browser send; the header is what it cannot read to construct.
-3. A 204, and a `backupd_session` cookie the browser then carries.
+3. A 204, and a `retnd_session` cookie the browser then carries.
 
 A deployment with no administrator is enrolled instead, through
 `/api/v1/auth/enroll` with the single-use `X-Bootstrap-Token`, when the
@@ -233,7 +234,7 @@ None of them was reachable from the mock, and none of them is exotic.
   built (`VITE_PLATFORM`, and `serve-ui --profile`), so a deployment is
   one provider. `scripts/e2e-all-providers.mjs` re-ran the provider spec
   seven times by restarting Vite with a different value; nothing here can
-  do that, and the sweep is not pretended at. `RM_PLATFORM` says which
+  do that, and the sweep is not pretended at. `RETND_PLATFORM` says which
   one this image is, and the expectations table in
   `provider-treatment.spec.ts` is kept whole so a second image is the
   only thing a second provider needs.

@@ -85,7 +85,7 @@ test.describe("quarantine", () => {
     ).toBeVisible();
   });
 
-  /** Four since backupd #229, which shipped the button for the
+  /** Four since retnd #229, which shipped the button for the
    *  reinstatement path #220 had already built end to end. Named rather than
    *  counted: a bare count says nothing about WHICH actions a row offers, so
    *  swapping one for another used to pass it. */
@@ -104,7 +104,7 @@ test.describe("quarantine", () => {
   });
 
   /** Reinstating is the only one of the four that cannot be undone: it
-   *  permanently forfeits the backup's remote deletion (backupd ADR
+   *  permanently forfeits the backup's remote deletion (retnd ADR
    *  0004, FR-15), so the remote source is preserved for good. It must
    *  therefore not read as a fourth Retry ingestion, and this pins the
    *  difference rather than trusting the label to carry it. */

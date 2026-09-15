@@ -4,7 +4,7 @@ Every case file under `cases/` appears here, and a test in
 `suite_test.go` fails if one does not, so a case cannot be added without
 the matrix showing it and a gap cannot be hidden by leaving a row out.
 
-The command list was re-derived from `core/cmd/backupd/main.go` at
+The command list was re-derived from `core/cmd/retnd/main.go` at
 the pinned commit rather than trusted from a snapshot. It registers
 twelve commands, plus `activity`, which backupd#598 adds.
 
@@ -15,30 +15,37 @@ below said by omission rather than out loud, and the gap mattered:
 `settings patch` is the one CLI write that can move where a retention
 tier's backups live, and nothing black-box had ever driven it.
 
-Fifteen of those seventeen cases are RED against the commit
-`build-under-test.json` names, and are supposed to be: they describe
-verbs that commit does not have. That is the specs-first half of the
+Fifteen of those seventeen cases USED to be red against the commit
+`build-under-test.json` named, and were supposed to be: they described
+verbs that commit did not have. That is the specs-first half of the
 lockstep this repository has used since
 [#48](https://github.com/backupdproject/backupd-tests/pull/48), whose
 cases sat red the same way until
 [#42](https://github.com/backupdproject/backupd-tests/pull/42)'s pin move
-landed on the build that had them. Until the pin moves onto
-backupd#629's merge, `scripts/gate-local.sh` is red on exactly
-those fifteen, and `RM_MODE=local` against a build of that branch is what
-runs them green. The two that pass at both are
+landed on the build that had them. They are green now: EPIC R's lockstep
+moved the pin past backupd#629 along with everything else it had been
+stuck behind. The two that passed at both pins are
 `medium/f1-config-missing` and `settings/f1-config-missing`: the
 `--config` contract is older than any of this, and those two are the
 family's regression guard rather than new coverage.
 
-**Almost every case here is RED against the pin right now**, and for the
-same specs-first reason. `build-under-test.json` names 87a9dc7, which
-still calls itself `backupd`; the matrix asserts `backupd` throughout,
-which is what
-[backupd#648](https://github.com/backupdproject/backupd/issues/648)
-makes it print. The pin moves in backupd's own merge, and these go
-green there. Retargeting them was not a rename of one word per file: the
-old spelling also survives in three places that are not the command, and
-those are named at the end of the Global section below.
+**Every case here is GREEN against the pin**, and that is new. It has not
+been true since the pin stuck at 87a9dc7, a commit two renames back that
+calls itself `backup-manager`: from backupd#794 onward the matrix
+asserted a name that build does not print, so almost all of it was red
+for the specs-first reason this section is about, and the note here used
+to say so.
+
+EPIC R's lockstep (backupd#895) closes it. The pin names a build that
+calls itself `retnd`, the matrix asserts `retnd` throughout, and the two
+are checked against each other rather than asserted: 97 of 97 green
+against the pinned build, and 59 of 97 RED against a build of 87a9dc7,
+which is what makes this a matrix about the product rather than about
+itself.
+
+Retargeting was not a rename of one word per file. The old spelling
+survives on purpose in places that are not the command, and those are
+named at the end of the Global section below.
 
 **Cases pin one claim each.** `artifacts/happy` checks that the listing
 lists, with lifecycle states drawn from FR-10's documented vocabulary; the
@@ -66,31 +73,41 @@ lives. `harness/selftest` proves each of the four can actually fail.
 | `global/g1-no-arguments` | exit 2, usage on stderr, nothing on stdout |
 | `global/g2-unknown-command` | exit 2, the unrecognised name quoted, then the usage banner |
 | `global/g3-usage-lists-every-command` | the banner lists all twelve commands, so one added or removed without documenting it fails here |
-| `global/g4-config-default-is-the-packaged-directory` | the banner's `--config` default is `/etc/backupd/config/config.yaml`, and a directory there resolves to `config.yaml` inside it (#196) |
+| `global/g4-config-default-is-the-packaged-directory` | the banner's `--config` default is `/etc/retnd/config/config.yaml`, and a directory there resolves to `config.yaml` inside it (#196) |
 | `global/g5-usage-explains-the-mode-line` | the banner says which commands announce a `mode:` line and what `engine-attached`, `direct` and `unconfirmed` each mean ([#536](https://github.com/backupdproject/backupd/issues/536), [#544](https://github.com/backupdproject/backupd/issues/544)); doubles as the positive control for every `absent: "mode: engine-attached"` in the matrix |
 | `global/f6-unknown-flag` | exit 2 on a flag the command does not define |
-| `global/g6-the-old-name-reaches-the-same-binary` | the build under test, reached through a file called `backupd`, still answers `version` with `backupd` on the first line |
-| `global/g7-the-old-name-still-says-backupd` | reached through the old name, an unknown command still prefixes its diagnostic `backupd: ` and still prints `usage: backupd`, so one host cannot tell two operators two different things |
+| `global/g6-the-old-name-reaches-the-same-binary` | the build under test, reached through a file called `backupd`, answers `version` with `retnd` on the first line |
+| `global/g7-the-old-name-still-says-retnd` | reached through that same retired filename, an unknown command still prefixes its diagnostic `retnd: ` and still prints `usage: retnd`, so the filename never decides what the command calls itself |
 
-**The two names.** The command is `backupd` from 0.3.3
-([backupd#648](https://github.com/backupdproject/backupd/issues/648)),
-`backupd` until then, and the old spelling still runs: the image
-links it beside the new one so nothing an operator already automated has
-to change. Every case in this matrix asserts the printed name is `backupd`,
-including the two above, which reach the binary through the old filename.
-That pairing is the whole claim: the name a build prints is a fact about
-the build, so both files have to print the same one.
+**The retired name.** The command is `retnd` from EPIC R
+([backupd#885](https://github.com/backupdproject/backupd/issues/885)),
+was `backupd` from
+[backupd#794](https://github.com/backupdproject/backupd/issues/794) and
+`rbm` from 0.3.3
+([backupd#648](https://github.com/backupdproject/backupd/issues/648)).
 
-What the pair does not cover is whether the shipped image actually
-contains both names. `invoke_as` makes the link in the harness, and the
-`go` builder the pin uses does not produce an image at all, so the case
-is about the binary and `container/Dockerfile` owns the packaging half.
-The three spellings that are *not* the command stay where they are and
-are asserted that way: the config directory at `/etc/backupd`
-(`global/g4-config-default-is-the-packaged-directory`), the image
-reference `ghcr.io/backupdproject/backupd`, and the Go package path
-`core/cmd/backupd` that this document derives its command list
-from.
+The old spelling does NOT still run. R1.3
+([backupd#888](https://github.com/backupdproject/backupd/issues/888))
+retired `backupd` rather than aliasing it — the image ships no link under
+it — so the two cases above are no longer about an alias the product
+provides. They are about the property that survives it: this binary reads
+`os.Args[1:]` and never `argv[0]`, so what it calls itself is a fact
+about the build rather than about how somebody reached it. Every case in
+this matrix asserts the printed name is `retnd`, and those two assert it
+through a filename that is not `retnd` at all.
+
+That makes them the only outside check on it. `invoke_as` makes the link
+in the harness, so the claim is about the binary; the `go` builder the
+pin uses produces no image, so packaging is `container/Dockerfile`'s half
+(`/retnd`, `/retnd-web`, and `/backupd-web` as a one-release hardlink).
+
+Two things merely NAMED after the command moved with it and one did not,
+and all three are asserted where they are: the config directory is
+`/etc/retnd` (`global/g4-config-default-is-the-packaged-directory`), the
+Go package path this document derives its command list from is
+`core/cmd/retnd`, and the image reference is still
+`ghcr.io/backupdproject/backupd` — a registry path is not redirected and
+moves with the organisation cutover, not with the in-tree rename.
 
 ## The shared failure family
 
@@ -100,7 +117,7 @@ other command that opens a config, so a command that stops honouring
 
 | Case | Fixture | Expectation |
 |---|---|---|
-| `check/f1-config-missing` | none | exit 1, `backupd: ` naming the path |
+| `check/f1-config-missing` | none | exit 1, `retnd: ` naming the path |
 | `check/f2-malformed-yaml` | `malformed-yaml` | exit 1, stderr naming a parse problem |
 | `check/f3-duplicate-backup-set-id` | `invalid-duplicate-set` | exit 1, stderr naming the offending field path (FR-7) |
 | `check/f3-unsupported-remote-type` | `invalid-remote-type` | exit 1, stderr naming the type and the field (FR-4) |
@@ -201,6 +218,6 @@ Stated rather than implied.
 - **The disk-pressure and quarantine surfaces** FR-21 and FR-10 describe
   are visible in `status` output but have no fixture that drives a set
   into them.
-- **`backupd-web`** (`backupd-web` before 0.3.3, and still linked
-  under that name) and its `serve`, `serve-ui` and `healthcheck`
+- **`retnd-web`** (`/backupd-web` in the image too, as a one-release
+  hardlink beside it) and its `serve`, `serve-ui` and `healthcheck`
   commands are Suites B and C's territory and are not covered here.

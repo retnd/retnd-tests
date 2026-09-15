@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# The local gate for this repository, mirroring how backupd gates
+# The local gate for this repository, mirroring how retnd gates
 # itself: a pre-commit hook runs this, and a red result refuses the
 # commit. See docs/ci-signal.md.
 #
 # Everything here passes -count=1. The binary under test, the fixtures'
-# replay output and the backupd checkout all live outside this Go
+# replay output and the retnd checkout all live outside this Go
 # module, and the test cache cannot see any of them change, so a cached
 # "ok" would be a statement about a build that is no longer there.
 set -euo pipefail
@@ -37,11 +37,11 @@ go test ./suites/cli -count=1
 # Suite B's own unit tests, which need no browser: the port helper's
 # E2E_PORT validation and the seven-provider spawner's argv. Suites B and C
 # themselves are not in this gate, because they need a Chromium and this
-# repository is cloned onto machines that have none; backupd's gate
+# repository is cloned onto machines that have none; retnd's gate
 # runs Suite B on every commit, which is where the browser signal belongs.
 #
 # Refused rather than skipped when the dependencies are missing. A gate that
-# prints a skip and carries on is the shape backupd's #160 was about,
+# prints a skip and carries on is the shape retnd's #160 was about,
 # and importing it here would be a strange thing to do in the repository
 # whose whole argument is that a check nobody notices stopping is worse than
 # no check.
@@ -61,10 +61,10 @@ done
 # clean, which is why this is a wiring change rather than a cleanup.
 #
 # What it does not turn on is noUnusedLocals/noUnusedParameters. That used
-# to be because Suite B's e2e/ was byte-identical to backupd's
+# to be because Suite B's e2e/ was byte-identical to retnd's
 # ui/shared/e2e/ and editing it here to satisfy a check here would have
 # traded the migration's proof for something weaker. That reason expired
-# with backupd #217, which deleted the upstream directory, so both
+# with retnd #217, which deleted the upstream directory, so both
 # options are this repository's to turn on, in a change of its own.
 echo "==> Suite B and Suite C type checks"
 (cd suites/web-ui && npm run --silent typecheck)

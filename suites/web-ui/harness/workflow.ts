@@ -57,17 +57,17 @@ const BASE = "/api/v1";
  * `e2e/workflow-happy` would keep passing after the rig renamed it, by
  * skipping every case that mentioned it.
  */
-export const WORKFLOW_SET_VAR = "RM_WORKFLOW_SET";
-export const EXEC_SET_VAR = "RM_EXEC_SET";
-export const SFTP_ONLY_SET_VAR = "RM_SFTP_ONLY_SET";
-export const NO_HOOKS_SET_VAR = "RM_WF_NO_HOOKS_SET";
-export const BEFORE_FAIL_SET_VAR = "RM_WF_BEFORE_FAIL_SET";
-export const AFTER_FAIL_SET_VAR = "RM_WF_AFTER_FAIL_SET";
-export const HOSTILE_SET_VAR = "RM_WF_HOSTILE_SET";
-export const SECRET_SET_VAR = "RM_WF_SECRET_SET";
-export const SLOW_SET_VAR = "RM_WF_SLOW_SET";
-export const CRASH_SET_VAR = "RM_WF_CRASH_SET";
-export const MANY_STEPS_SET_VAR = "RM_WF_MANY_STEPS_SET";
+export const WORKFLOW_SET_VAR = "RETND_WORKFLOW_SET";
+export const EXEC_SET_VAR = "RETND_EXEC_SET";
+export const SFTP_ONLY_SET_VAR = "RETND_SFTP_ONLY_SET";
+export const NO_HOOKS_SET_VAR = "RETND_WF_NO_HOOKS_SET";
+export const BEFORE_FAIL_SET_VAR = "RETND_WF_BEFORE_FAIL_SET";
+export const AFTER_FAIL_SET_VAR = "RETND_WF_AFTER_FAIL_SET";
+export const HOSTILE_SET_VAR = "RETND_WF_HOSTILE_SET";
+export const SECRET_SET_VAR = "RETND_WF_SECRET_SET";
+export const SLOW_SET_VAR = "RETND_WF_SLOW_SET";
+export const CRASH_SET_VAR = "RETND_WF_CRASH_SET";
+export const MANY_STEPS_SET_VAR = "RETND_WF_MANY_STEPS_SET";
 
 /** The set whose hooks carry deliberate lint findings BELOW the severity
  *  that gates a save, and the DIRECTORY holding the one script whose
@@ -83,19 +83,19 @@ export const MANY_STEPS_SET_VAR = "RM_WF_MANY_STEPS_SET";
  *  Every other seeded script is deliberately lint-clean, so an empty
  *  findings panel elsewhere is the contrast that makes a populated one
  *  mean something. */
-export const FINDINGS_SET_VAR = "RM_WF_FINDINGS_SET";
-export const REJECTED_DIR_VAR = "RM_WF_REJECTED_DIR";
+export const FINDINGS_SET_VAR = "RETND_WF_FINDINGS_SET";
+export const REJECTED_DIR_VAR = "RETND_WF_REJECTED_DIR";
 
 /** The plaintext behind the secret-backed variable the secret set's hook
  *  echoes. Exported by the rig SO THAT this suite can assert it never
  *  reaches a page: it is the only value in this repository whose presence
  *  anywhere in a DOM is a defect. */
-export const SECRET_VALUE_VAR = "RM_WF_SECRET_VALUE";
+export const SECRET_VALUE_VAR = "RETND_WF_SECRET_VALUE";
 
 /** The engine-visible root of the seeded script tree, for a case that
  *  wants to assert the directory a stage reports is the directory the rig
  *  actually wrote. */
-export const SCRIPT_PREFIX_VAR = "RM_WF_SCRIPT_PREFIX";
+export const SCRIPT_PREFIX_VAR = "RETND_WF_SCRIPT_PREFIX";
 
 /** Run ids for the three states a browser cannot cause.
  *
@@ -105,9 +105,9 @@ export const SCRIPT_PREFIX_VAR = "RM_WF_SCRIPT_PREFIX";
  *  assert what the product RENDERS for it. Unset means the rig could not
  *  produce that state this time, and the case says so rather than
  *  pretending a run of another shape is one. */
-export const BYPASSED_RUN_VAR = "RM_WF_BYPASSED_RUN";
-export const CANCELED_RUN_VAR = "RM_WF_CANCELED_RUN";
-export const UNCONFIRMED_RUN_VAR = "RM_WF_UNCONFIRMED_RUN";
+export const BYPASSED_RUN_VAR = "RETND_WF_BYPASSED_RUN";
+export const CANCELED_RUN_VAR = "RETND_WF_CANCELED_RUN";
+export const UNCONFIRMED_RUN_VAR = "RETND_WF_UNCONFIRMED_RUN";
 
 /** Which fixture states this run was given. Every field is nullable and
  *  none has a default, for `harness/deployment.ts`'s reason: a workflow
@@ -194,7 +194,7 @@ export function needsFixture(varName: string): string {
 
 /** The control directory, as the CLIENT container sees it. Set by the rig
  *  whenever it is running the workflow watcher beside the client. */
-export const WORKFLOW_CONTROL_VAR = "RM_WORKFLOW_CONTROL";
+export const WORKFLOW_CONTROL_VAR = "RETND_WORKFLOW_CONTROL";
 
 /** The rig's request names. Written down here because this module and
  *  `scripts/e2e/three-machine-web-ui.sh`, in the other repository, are the
@@ -665,7 +665,7 @@ const HOLD_SWEEP_MS = 5_000;
  *  shorter interval is refused, so "a run within 60 seconds" is not
  *  achievable on any legal configuration and a suite that assumed one
  *  would report a stall on a healthy deployment. */
-export const POLL_SECONDS_VAR = "RM_WF_POLL_SECONDS";
+export const POLL_SECONDS_VAR = "RETND_WF_POLL_SECONDS";
 
 /** How long a run is given to APPEAR.
  *

@@ -1,4 +1,4 @@
-// Command getbuild resolves the pinned backupd build, runs the
+// Command getbuild resolves the pinned retnd build, runs the
 // identity handshake against it, and prints where the binaries landed.
 //
 // It is the one-command answer to "which build would the suites test

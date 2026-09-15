@@ -9,7 +9,7 @@ argv: [artifacts, --config, "${CONFIG}", --source, production, "production/postg
 exit: 2
 stdout: empty
 stderr:
-  - line: "backupd: artifacts: --source/--backup-set cannot be combined with an artifact argument"
+  - line: "retnd: artifacts: --source/--backup-set cannot be combined with an artifact argument"
 state: unchanged
 contract:
   - "usage text: artifacts [--source S] [--backup-set B] - list journal artifacts"

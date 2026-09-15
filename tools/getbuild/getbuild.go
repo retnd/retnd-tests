@@ -1,10 +1,10 @@
-// Package getbuild resolves the backupd build that a suite run
+// Package getbuild resolves the retnd build that a suite run
 // tests against, from the single checked-in pin in build-under-test.json.
 //
 // The point of the pin is that "which build did this suite certify" is a
 // property of the repository, not of whoever happened to run it. Every
 // mode below therefore ends in the same place: a Build value naming an
-// absolute path to an backupd binary plus the commit that binary is
+// absolute path to a retnd binary plus the commit that binary is
 // supposed to have been built from. The suites then make the binary prove
 // that claim itself (see Handshake), because a path on disk is not
 // evidence of provenance.
@@ -25,16 +25,21 @@ type Pin struct {
 	// Mode is source, registry or local. See the package doc and
 	// docs/pinning.md for what each one promises.
 	Mode string `json:"mode"`
-	// Commit is the full backupd sha the build must report.
+	// Commit is the full retnd sha the build must report.
 	Commit string `json:"commit"`
 	// Version is what the build's -X main.version was set to. Informational
 	// in every mode; the commit is what the handshake checks.
 	Version string `json:"version"`
 	// SourceBuilder selects how source mode turns a checkout into binaries:
-	// "go" compiles ./cmd/backupd directly (seconds, and enough for
+	// "go" compiles ./cmd/retnd directly (seconds, and enough for
 	// the CLI contract), "docker" builds container/Dockerfile and extracts
-	// the CLI from the image operators actually receive. The package path
-	// keeps the old spelling; the command it produces is `backupd`.
+	// the CLI from the image operators actually receive. The package
+	// directory and the command are the same word: backupd#888 moved
+	// core/cmd/backupd to core/cmd/retnd in the commit that moved the
+	// constant, so a pin naming a build from either side of that rename
+	// needs a different package path, not just a different binary name.
+	// Source mode only ever builds the pinned sha, and the pin is a
+	// post-rename one.
 	SourceBuilder string `json:"source_builder"`
 	Image         string `json:"image"`
 	Notes         string `json:"notes"`
@@ -42,9 +47,9 @@ type Pin struct {
 
 // Build is a resolved build under test.
 type Build struct {
-	// CLI is the absolute path to the backupd binary.
+	// CLI is the absolute path to the retnd binary.
 	CLI string
-	// Web is the absolute path to backupd-web, empty when the
+	// Web is the absolute path to retnd-web, empty when the
 	// resolution route did not produce one (go-builder source mode does
 	// not, since Suite A never needs it).
 	Web string
@@ -54,7 +59,7 @@ type Build struct {
 	Mode string
 	// Provenance is a one-line human description of where it came from.
 	Provenance string
-	// Checkout is the backupd source tree this build came from,
+	// Checkout is the retnd source tree this build came from,
 	// empty when the route did not involve one. Suite B needs it: the
 	// browser suite serves the app from that tree's ui/shared, so the page
 	// under test and the binary under test come from the same commit
@@ -62,8 +67,8 @@ type Build struct {
 	Checkout string
 }
 
-// DefaultRepoURL is where source mode clones backupd from when
-// RM_SOURCE_REPO does not override it. A local checkout path works there
+// DefaultRepoURL is where source mode clones retnd from when
+// RETND_SOURCE_REPO does not override it. A local checkout path works there
 // too and is much faster, which is what the gate scripts use.
 const DefaultRepoURL = "https://github.com/backupdproject/backupd.git"
 
@@ -91,16 +96,16 @@ func LoadPin(repoRoot string) (Pin, error) {
 //
 // Environment overrides, all documented in docs/pinning.md:
 //
-//	RM_MODE          force a mode, ignoring the pin's own
-//	RM_BINARY        local mode: the backupd binary to test
-//	RM_WEB_BINARY    local mode: the backupd-web binary, optional
-//	RM_COMMIT        local mode: the commit that binary claims to be
-//	RM_SOURCE_DIR    local mode: a checkout to read HEAD from when RM_COMMIT is unset
-//	RM_SOURCE_REPO   source mode: clone from here instead of DefaultRepoURL
-//	RM_CACHE_DIR     where source mode keeps checkouts and built binaries
+//	RETND_MODE          force a mode, ignoring the pin's own
+//	RETND_BINARY        local mode: the retnd binary to test
+//	RETND_WEB_BINARY    local mode: the retnd-web binary, optional
+//	RETND_COMMIT        local mode: the commit that binary claims to be
+//	RETND_SOURCE_DIR    local mode: a checkout to read HEAD from when RETND_COMMIT is unset
+//	RETND_SOURCE_REPO   source mode: clone from here instead of DefaultRepoURL
+//	RETND_CACHE_DIR     where source mode keeps checkouts and built binaries
 func Resolve(repoRoot string, pin Pin) (Build, error) {
 	mode := pin.Mode
-	if override := os.Getenv("RM_MODE"); override != "" {
+	if override := os.Getenv("RETND_MODE"); override != "" {
 		mode = override
 	}
 	switch mode {
@@ -118,24 +123,24 @@ func Resolve(repoRoot string, pin Pin) (Build, error) {
 }
 
 func resolveLocal() (Build, error) {
-	bin := os.Getenv("RM_BINARY")
+	bin := os.Getenv("RETND_BINARY")
 	if bin == "" {
-		return Build{}, errors.New("local mode needs RM_BINARY pointing at an backupd binary")
+		return Build{}, errors.New("local mode needs RETND_BINARY pointing at a retnd binary")
 	}
 	abs, err := filepath.Abs(bin)
 	if err != nil {
 		return Build{}, err
 	}
 	if _, err := os.Stat(abs); err != nil {
-		return Build{}, fmt.Errorf("RM_BINARY: %w", err)
+		return Build{}, fmt.Errorf("RETND_BINARY: %w", err)
 	}
 
-	commit := os.Getenv("RM_COMMIT")
+	commit := os.Getenv("RETND_COMMIT")
 	if commit == "" {
-		if dir := os.Getenv("RM_SOURCE_DIR"); dir != "" {
+		if dir := os.Getenv("RETND_SOURCE_DIR"); dir != "" {
 			out, err := exec.Command("git", "-C", dir, "rev-parse", "HEAD").Output()
 			if err != nil {
-				return Build{}, fmt.Errorf("reading HEAD from RM_SOURCE_DIR %s: %w", dir, err)
+				return Build{}, fmt.Errorf("reading HEAD from RETND_SOURCE_DIR %s: %w", dir, err)
 			}
 			commit = strings.TrimSpace(string(out))
 		}
@@ -146,15 +151,15 @@ func resolveLocal() (Build, error) {
 	// not know what this binary is" has to stop the run, not relax it.
 	if commit == "" {
 		return Build{}, errors.New(
-			"local mode needs the commit the binary claims to be: set RM_COMMIT, or RM_SOURCE_DIR to a checkout whose HEAD it was built from")
+			"local mode needs the commit the binary claims to be: set RETND_COMMIT, or RETND_SOURCE_DIR to a checkout whose HEAD it was built from")
 	}
 
-	web, _ := filepath.Abs(os.Getenv("RM_WEB_BINARY"))
-	if os.Getenv("RM_WEB_BINARY") == "" {
+	web, _ := filepath.Abs(os.Getenv("RETND_WEB_BINARY"))
+	if os.Getenv("RETND_WEB_BINARY") == "" {
 		web = ""
 	}
-	checkout, _ := filepath.Abs(os.Getenv("RM_SOURCE_DIR"))
-	if os.Getenv("RM_SOURCE_DIR") == "" {
+	checkout, _ := filepath.Abs(os.Getenv("RETND_SOURCE_DIR"))
+	if os.Getenv("RETND_SOURCE_DIR") == "" {
 		checkout = ""
 	}
 	return Build{
@@ -162,7 +167,7 @@ func resolveLocal() (Build, error) {
 		Web:            web,
 		ExpectedCommit: commit,
 		Mode:           "local",
-		Provenance:     "local override RM_BINARY=" + abs,
+		Provenance:     "local override RETND_BINARY=" + abs,
 		Checkout:       checkout,
 	}, nil
 }
@@ -189,12 +194,12 @@ func resolveSource(pin Pin) (Build, error) {
 	// way anyway, so that the one case that DOES care which name it typed
 	// (cases/global/g6-…, through Case.InvokeAs) is reaching a second
 	// name rather than the one it was already using.
-	cli := filepath.Join(binDir, "backupd")
+	cli := filepath.Join(binDir, "retnd")
 	web := ""
 
 	switch builder {
 	case "go":
-		web = filepath.Join(binDir, "backupd-web")
+		web = filepath.Join(binDir, "retnd-web")
 		version := pin.Version
 		if version == "" {
 			version = pin.Commit[:7]
@@ -204,8 +209,8 @@ func resolveSource(pin Pin) (Build, error) {
 		// answering through the CLI and through the web engine, and two
 		// independently chosen builds would make that claim about nothing.
 		for _, target := range []struct{ out, module, pkg string }{
-			{cli, "core", "./cmd/backupd"},
-			{web, "apps/generic", "./cmd/backupd-web"},
+			{cli, "core", "./cmd/retnd"},
+			{web, "apps/generic", "./cmd/retnd-web"},
 		} {
 			if _, err := os.Stat(target.out); err == nil {
 				continue
@@ -252,8 +257,8 @@ func resolveSource(pin Pin) (Build, error) {
 // the resulting image, so a run can test the artifact operators actually
 // receive rather than a host compile of the same source.
 func dockerBuild(checkout, binDir string, pin Pin) (cli, web string, err error) {
-	cli = filepath.Join(binDir, "backupd")
-	web = filepath.Join(binDir, "backupd-web")
+	cli = filepath.Join(binDir, "retnd")
+	web = filepath.Join(binDir, "retnd-web")
 	if _, statErr := os.Stat(cli); statErr == nil {
 		if _, statErr := os.Stat(web); statErr == nil {
 			return cli, web, nil
@@ -263,7 +268,7 @@ func dockerBuild(checkout, binDir string, pin Pin) (cli, web string, err error) 
 		return "", "", err
 	}
 
-	tag := "backupd-tests/but:" + pin.Commit[:12]
+	tag := "retnd-tests/but:" + pin.Commit[:12]
 	version := pin.Version
 	if version == "" {
 		version = pin.Commit[:7]
@@ -286,17 +291,25 @@ func dockerBuild(checkout, binDir string, pin Pin) (cli, web string, err error) 
 	container := strings.TrimSpace(string(created))
 	defer func() { _ = exec.Command("docker", "rm", "-f", container).Run() }()
 
-	// -L, and it is load-bearing from 0.3.3 on. The image's binaries are
-	// /backupd and /backupd-web now, and /backupd and /backupd-web
-	// are symbolic links beside them so an operator's existing scripts
-	// keep working (container/Dockerfile). `docker cp` copies a link AS a
-	// link unless told otherwise, so without this flag what lands here is
-	// a four-byte dangling symlink to /backupd, and the first thing that
-	// happens next is the identity handshake trying to exec it. Following
-	// the link is a no-op on a pre-rename image, where these two paths
-	// are ordinary files, so one flag covers both sides of the rename and
-	// this extraction needs to know nothing about which name is which.
-	for src, dst := range map[string]string{"/backupd": cli, "/backupd-web": web} {
+	// -L, and it has been load-bearing since 0.3.3 for a reason that has
+	// changed shape twice and has not gone away. The extracted paths are
+	// the image's PRIMARY names, /retnd and /retnd-web, and what sits
+	// beside them is a second name for one of them: container/Dockerfile
+	// ships /backupd-web as a real hardlink to /retnd-web for one
+	// release, and deliberately ships no /backupd at all, because no
+	// compose file this project published ever named /backupd in a
+	// `command:` or a `healthcheck:`.
+	//
+	// A hardlink needs no flag. A SYMLINK does, and that is what the
+	// 0.3.3 image had in this position: `docker cp` copies a link AS a
+	// link unless told otherwise, so without -L what landed here was a
+	// four-byte dangling symlink, and the next thing that happened was
+	// the identity handshake trying to exec it. The flag is a no-op
+	// against an image whose two paths are ordinary files, which is
+	// every image from backupd#890 on, so one flag covers every side of
+	// every rename and this extraction needs to know nothing about which
+	// name is which.
+	for src, dst := range map[string]string{"/retnd": cli, "/retnd-web": web} {
 		cp := exec.Command("docker", "cp", "-L", container+":"+src, dst)
 		cp.Stderr = os.Stderr
 		if err := cp.Run(); err != nil {
@@ -307,21 +320,21 @@ func dockerBuild(checkout, binDir string, pin Pin) (cli, web string, err error) 
 }
 
 func sourceRepo() string {
-	if v := os.Getenv("RM_SOURCE_REPO"); v != "" {
+	if v := os.Getenv("RETND_SOURCE_REPO"); v != "" {
 		return v
 	}
 	return DefaultRepoURL
 }
 
 func cacheDir() string {
-	if v := os.Getenv("RM_CACHE_DIR"); v != "" {
+	if v := os.Getenv("RETND_CACHE_DIR"); v != "" {
 		return v
 	}
 	if v := os.Getenv("XDG_CACHE_HOME"); v != "" {
-		return filepath.Join(v, "backupd-tests")
+		return filepath.Join(v, "retnd-tests")
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".cache", "backupd-tests")
+	return filepath.Join(home, ".cache", "retnd-tests")
 }
 
 // ensureCheckout makes dir a checkout of exactly commit, cloning it on

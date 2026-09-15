@@ -15,7 +15,7 @@ import { expect, needs, test } from "./fixtures";
  *  embedded bundle per profile, so a deployment IS one provider. Driving
  *  the other six means building the other six images.
  *
- *  So `RM_PLATFORM` describes which bundle the image under test carries,
+ *  So `RETND_PLATFORM` describes which bundle the image under test carries,
  *  and the run asserts that one provider's treatment properly rather than
  *  pretending at a sweep it cannot do. The expectations table below is
  *  kept whole, because the moment the topology builds a second image the
@@ -33,12 +33,12 @@ const EXPECTED: Record<
   { name: string; integration: string; nativeAuth: boolean; nativeNotify: boolean; picker: boolean; chrome: boolean; mount: string }
 > = {
   generic: { name: "Generic Docker / Linux", integration: "Standalone web app", nativeAuth: false, nativeNotify: false, picker: false, chrome: false, mount: "/data/backups" },
-  ugos: { name: "UGREEN UGOS Pro", integration: "Native app", nativeAuth: true, nativeNotify: true, picker: true, chrome: true, mount: "/volume1/backupd" },
-  synology: { name: "Synology DSM", integration: "Embedded web app", nativeAuth: false, nativeNotify: false, picker: false, chrome: true, mount: "/volume1/backupd" },
-  truenas: { name: "TrueNAS", integration: "Container app", nativeAuth: false, nativeNotify: false, picker: false, chrome: false, mount: "/mnt/tank/backupd/backups" },
-  unraid: { name: "Unraid", integration: "Container app", nativeAuth: false, nativeNotify: false, picker: false, chrome: false, mount: "/mnt/user/backups/backupd" },
-  openmediavault: { name: "OpenMediaVault", integration: "Compose plugin container", nativeAuth: false, nativeNotify: false, picker: false, chrome: false, mount: "/srv/dev-disk-by-uuid/backups/backupd" },
-  proxmox: { name: "Proxmox VE", integration: "Standalone web app", nativeAuth: false, nativeNotify: false, picker: false, chrome: false, mount: "/mnt/backupd" }
+  ugos: { name: "UGREEN UGOS Pro", integration: "Native app", nativeAuth: true, nativeNotify: true, picker: true, chrome: true, mount: "/volume1/retnd" },
+  synology: { name: "Synology DSM", integration: "Embedded web app", nativeAuth: false, nativeNotify: false, picker: false, chrome: true, mount: "/volume1/retnd" },
+  truenas: { name: "TrueNAS", integration: "Container app", nativeAuth: false, nativeNotify: false, picker: false, chrome: false, mount: "/mnt/tank/retnd/backups" },
+  unraid: { name: "Unraid", integration: "Container app", nativeAuth: false, nativeNotify: false, picker: false, chrome: false, mount: "/mnt/user/backups/retnd" },
+  openmediavault: { name: "OpenMediaVault", integration: "Compose plugin container", nativeAuth: false, nativeNotify: false, picker: false, chrome: false, mount: "/srv/dev-disk-by-uuid/backups/retnd" },
+  proxmox: { name: "Proxmox VE", integration: "Standalone web app", nativeAuth: false, nativeNotify: false, picker: false, chrome: false, mount: "/mnt/retnd" }
 };
 
 const expected = EXPECTED[PLATFORM];
@@ -62,28 +62,28 @@ test.describe("provider: " + PLATFORM, () => {
     }
   });
 
-  test("retains Backupd product identity, not provider branding", async ({ page }) => {
+  test("retains retnd product identity, not provider branding", async ({ page }) => {
     await page.goto("/");
     // .first(): the product name is legitimately on this page more than
     // once against a real deployment (the header lockup and the footer's
-    // "Backupd running on ..."), and an unscoped strict-mode
+    // "retnd running on ..."), and an unscoped strict-mode
     // locator resolves to both. The mock rendered fewer of them, which is
     // why this only showed up on the first real run.
     //
-    // `exact` keeps it off the mark's own <title>Backupd</title>, which
+    // `exact` keeps it off the mark's own <title>retnd</title>, which
     // is matched by a case-insensitive substring and is never visible, so
     // after backupd#794's rename `.first()` was resolving to a hidden
     // element and this case failed on a page that was perfectly branded.
-    await expect(page.getByText("backupd", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("retnd", { exact: true }).first()).toBeVisible();
     // Case-insensitively, because the claim is about whose product this
     // is and not about how the wordmark is set: ui/shared/index.html
-    // titles the document `backupd`, lowercase, the same way the header
-    // draws it, while the mark's accessible name is `Backupd`. A
+    // titles the document `retnd`, lowercase, the same way the header
+    // draws it, while the mark's accessible name is `retnd`. A
     // case-sensitive match here pinned a typographic choice and failed on
     // a page carrying the product's identity correctly in three places.
-    expect(await page.title()).toMatch(/backupd/i);
+    expect(await page.title()).toMatch(/retnd/i);
     // And provider branding is what must NOT be in the title: this is
-    // Backupd running on a NAS, never the NAS's own product.
+    // retnd running on a NAS, never the NAS's own product.
     expect(await page.title()).not.toMatch(new RegExp(expected.name, "i"));
   });
 
@@ -97,11 +97,11 @@ test.describe("provider: " + PLATFORM, () => {
 
   test("draws window chrome only when the platform is embedded", async ({ page }) => {
     await page.goto("/");
-    // Anchored on the em dash the titlebar actually uses ("Backupd
+    // Anchored on the em dash the titlebar actually uses ("retnd
     // — <platform>", AppShell.tsx) — the looser ".*" also matched the
-    // page footer's "Backupd running on <platform>", which exists
+    // page footer's "retnd running on <platform>", which exists
     // regardless of chrome and made this always find something.
-    const titlebar = page.getByText(new RegExp("Backupd — " + expected.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    const titlebar = page.getByText(new RegExp("retnd — " + expected.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     if (expected.chrome) {
       await expect(titlebar.first()).toBeVisible();
     } else {
@@ -140,7 +140,7 @@ test.describe("provider: " + PLATFORM, () => {
       // so this text is legitimately repeated more than once on this page.
       await expect(page.getByText(new RegExp(expected.name + " session")).first()).toBeVisible();
     } else {
-      await expect(page.getByText("Backupd local account").first()).toBeVisible();
+      await expect(page.getByText("retnd local account").first()).toBeVisible();
     }
   });
 

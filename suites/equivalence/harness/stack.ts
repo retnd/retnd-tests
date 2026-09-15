@@ -34,15 +34,15 @@ export async function freePort(): Promise<number> {
   });
 }
 
-/** The ui/shared whose production bundle the browser loads. RM_UI_DIR when
- *  the caller names one (backupd's own gate does), otherwise the
+/** The ui/shared whose production bundle the browser loads. RETND_UI_DIR when
+ *  the caller names one (retnd's own gate does), otherwise the
  *  pinned build's own checkout, so the page and the engine come from one
  *  commit rather than two independently chosen ones. */
 export function resolveUiDir(build: Build): string {
-  const explicit = (process.env.RM_UI_DIR ?? "").trim();
+  const explicit = (process.env.RETND_UI_DIR ?? "").trim();
   const dir = explicit !== "" ? resolve(explicit) : resolve(build.source_dir ?? "", "ui/shared");
   if (!existsSync(resolve(dir, "package.json"))) {
-    throw new Error(`no ui/shared at ${dir}. Set RM_UI_DIR to a checkout's ui/shared.`);
+    throw new Error(`no ui/shared at ${dir}. Set RETND_UI_DIR to a checkout's ui/shared.`);
   }
   if (!existsSync(resolve(dir, "node_modules"))) {
     throw new Error(`${dir} has no installed dependencies, so it cannot be built. Fix it with: cd ${dir} && npm ci`);
@@ -162,10 +162,10 @@ export async function bootStack(build: Build, work: string, bundle: string): Pro
   // Any GET issues the double-submit CSRF cookie; /health/live is the one
   // route outside the authenticated group, so it is reachable cold.
   const cold = await fetch(`${engineUrl}/health/live`);
-  const csrf = /bm_csrf=([^;]+)/.exec(cold.headers.get("set-cookie") ?? "")?.[1];
+  const csrf = /retnd_csrf=([^;]+)/.exec(cold.headers.get("set-cookie") ?? "")?.[1];
   if (!csrf) {
     await stop();
-    throw new Error("the engine issued no bm_csrf cookie, so enrolment cannot be submitted");
+    throw new Error("the engine issued no retnd_csrf cookie, so enrolment cannot be submitted");
   }
 
   const enrolled = await fetch(`${engineUrl}/api/v1/auth/enroll`, {
@@ -174,7 +174,7 @@ export async function bootStack(build: Build, work: string, bundle: string): Pro
       "Content-Type": "application/json",
       "X-CSRF-Token": csrf,
       "X-Bootstrap-Token": token,
-      Cookie: `bm_csrf=${csrf}`
+      Cookie: `retnd_csrf=${csrf}`
     },
     body: JSON.stringify({ username, password })
   });

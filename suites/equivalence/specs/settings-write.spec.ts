@@ -43,7 +43,7 @@ test.describe("settings write: last-known-good protection", () => {
 
     // ---- the CLI side: FR-5 says the config file is the CLI's write
     // surface for policy, and `check` is how it is validated afterwards.
-    // There is no `backupd settings set`; the matrix says so rather
+    // There is no `retnd settings set`; the matrix says so rather
     // than inventing one.
     const config = pair.cli.config;
     const edited = readFileSync(config, "utf8").replace("protect_last_known_good: true", "protect_last_known_good: false");

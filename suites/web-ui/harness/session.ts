@@ -12,13 +12,13 @@
 //
 //  1. GET any page. `apps/common/csrf`'s EnsureCookie runs in front of
 //     EVERY response this service sends, precisely so a fresh client has a
-//     token to echo before it needs one, and sets `backupd_csrf` (or, on a
-//     build from before backupd#794, `bm_csrf` - see LEGACY_CSRF_COOKIE).
+//     token to echo before it needs one, and sets `retnd_csrf` (or, on an
+//     older build, `backupd_csrf` or `bm_csrf` - see LEGACY_CSRF_COOKIE).
 //  2. POST /api/v1/auth/login carrying that cookie AND its value again in
 //     the `X-CSRF-Token` header. The cookie is what a cross-site attacker
 //     can make a browser send; the header is what it cannot read to
 //     construct, and the service compares the two in constant time.
-//  3. A 204 with a `backupd_session` cookie. That cookie is what the
+//  3. A 204 with a `retnd_session` cookie. That cookie is what the
 //     browser then carries, and everything else in this suite runs on it.
 //
 // A fresh install has no administrator to log in as, and enrolment is the
@@ -45,29 +45,50 @@ import { BOOTSTRAP_TOKEN_VAR, PASSWORD_VAR, USERNAME_VAR } from "./deployment";
 /** apps/common/csrf's double-submit pair. Written down rather than
  *  imported, because nothing here depends on the product's source tree,
  *  and repeated in the comment above with the reason it is two things. */
-export const CSRF_COOKIE = "backupd_csrf";
+export const CSRF_COOKIE = "retnd_csrf";
 export const CSRF_HEADER = "X-CSRF-Token";
 /** apps/common/auth/local's session cookie, and its single-use enrolment
  *  header (BootstrapTokenHeader). */
-export const SESSION_COOKIE = "backupd_session";
+export const SESSION_COOKIE = "retnd_session";
 export const BOOTSTRAP_HEADER = "X-Bootstrap-Token";
 
-/** What those two cookies were called before backupd#794 renamed the
- *  project, and why both names are still here.
+/** What those two cookies were called before this product's last two
+ *  renames, and why all three names are still here.
  *
- *  The product reads either and writes only the current one
- *  (apps/common/csrf's `LegacyCookieName`, and `LegacySessionCookieName`
- *  beside it), so a bundle cached from before the rename keeps working
- *  while a fresh client is issued the new name. This suite has to do the
- *  same for a different reason: it is pinned at a build under test that
- *  may be either side of that rename, and a run against a 0.3.x image
- *  should assert on the product rather than die in a fixture.
+ *  The product reads any of the three and writes only the current one:
+ *  `apps/common/csrf` holds them in exactly this order in `cookieNames`
+ *  (`CookieName`, `LegacyCookieName`, `EarlierCookieName`), with
+ *  `apps/common/auth/local`'s `sessionCookieNames` beside it, so a bundle
+ *  cached from before either rename keeps working while a fresh client is
+ *  issued the new name. This suite mirrors that list rather than
+ *  inventing its own order, for a different reason than the product has:
+ *  it is pinned at a build under test that may be on either side of
+ *  either rename, and a run against an older image should assert on the
+ *  product rather than die in a fixture.
  *
- *  The old names alone are exactly how this suite spent a release
+ *  `backupd_*` is what EPIC R (backupd#885) renamed; `bm_*` is what
+ *  backupd#794 renamed before it, and that window closes with the
+ *  product's, in the same release and by the same issue — this list
+ *  shortens when `apps/common/csrf`'s does, not before and not after.
+ *
+ *  The old names ALONE are exactly how this suite spent a release
  *  reporting nothing: every case failed in the worker fixture with "GET /
- *  set no bm_csrf cookie" before it could assert anything at all. */
-export const LEGACY_CSRF_COOKIE = "bm_csrf";
-export const LEGACY_SESSION_COOKIE = "bm_session";
+ *  set no bm_csrf cookie" before it could assert anything at all. Which
+ *  is the argument for reading every name and preferring the newest,
+ *  rather than for tracking one. */
+export const LEGACY_CSRF_COOKIE = "backupd_csrf";
+export const LEGACY_SESSION_COOKIE = "backupd_session";
+export const EARLIER_CSRF_COOKIE = "bm_csrf";
+export const EARLIER_SESSION_COOKIE = "bm_session";
+
+/** Every accepted CSRF cookie name, newest first, and the session's the
+ *  same. Mirrors `apps/common/csrf`'s `cookieNames` exactly. */
+export const CSRF_COOKIE_NAMES = [CSRF_COOKIE, LEGACY_CSRF_COOKIE, EARLIER_CSRF_COOKIE] as const;
+export const SESSION_COOKIE_NAMES = [
+  SESSION_COOKIE,
+  LEGACY_SESSION_COOKIE,
+  EARLIER_SESSION_COOKIE
+] as const;
 
 /** Reads one cookie's value out of what a request context is holding. */
 export function cookieValue(cookies: readonly Cookie[], name: string): string {
@@ -77,12 +98,11 @@ export function cookieValue(cookies: readonly Cookie[], name: string): string {
 
 /** The CSRF token this jar carries, under whichever name issued it.
  *
- *  Current name first, exactly like `ui/shared/src/api/client.ts`: a jar
- *  that somehow holds both is one mid-rename, and the current one is the
- *  one the service just set. */
+ *  Newest name first, exactly like `apps/common/csrf`'s own read and
+ *  `ui/shared/src/api/client.ts`: a jar holding more than one is a jar
+ *  mid-rename, and the newest is the one the service just set. */
 export function csrfCookieValue(cookies: readonly Cookie[]): string {
-  const current = cookieValue(cookies, CSRF_COOKIE);
-  return current === "" ? cookieValue(cookies, LEGACY_CSRF_COOKIE) : current;
+  return firstNamed(cookies, CSRF_COOKIE_NAMES);
 }
 
 /** The headers a mutating request has to carry, read out of the cookie
@@ -96,8 +116,9 @@ export async function csrfHeaders(api: APIRequestContext): Promise<Record<string
   const token = csrfCookieValue((await api.storageState()).cookies);
   if (token === "") {
     throw new Error(
-      "this request context holds neither a " + CSRF_COOKIE + " nor a " + LEGACY_CSRF_COOKIE +
-        " cookie, so a mutating call would be refused with CSRF_TOKEN_MISSING. A context that has " +
+      "this request context carries no CSRF cookie under any accepted name (" +
+        CSRF_COOKIE_NAMES.join(", ") +
+        "), so a mutating call would be refused with CSRF_TOKEN_MISSING. A context that has " +
         "never loaded a page from this origin is the usual cause."
     );
   }
@@ -107,8 +128,21 @@ export async function csrfHeaders(api: APIRequestContext): Promise<Record<string
 
 /** The session this jar carries, under whichever name issued it. */
 export function sessionCookieValue(cookies: readonly Cookie[]): string {
-  const current = cookieValue(cookies, SESSION_COOKIE);
-  return current === "" ? cookieValue(cookies, LEGACY_SESSION_COOKIE) : current;
+  return firstNamed(cookies, SESSION_COOKIE_NAMES);
+}
+
+/** The value under the first of `names` that this jar actually carries.
+ *
+ *  Empty string rather than undefined when none of them is there: every
+ *  caller compares against "" to decide whether the handshake got
+ *  anywhere, and a caller that had to check for undefined too is a caller
+ *  that will forget. */
+function firstNamed(cookies: readonly Cookie[], names: readonly string[]): string {
+  for (const name of names) {
+    const value = cookieValue(cookies, name);
+    if (value !== "") return value;
+  }
+  return "";
 }
 
 /** The cookies a signed-in browser needs, in Playwright's own shape so
@@ -130,7 +164,8 @@ async function csrfToken(api: APIRequestContext): Promise<string> {
   const token = csrfCookieValue((await api.storageState()).cookies);
   if (token === "") {
     throw new Error(
-      "GET / set neither a " + CSRF_COOKIE + " nor a " + LEGACY_CSRF_COOKIE + " cookie, so there is " +
+      "GET / set no CSRF cookie under any accepted name (" + CSRF_COOKIE_NAMES.join(", ") +
+        "), so there is " +
         "no token to echo back and every state-changing request would be refused with " +
         "CSRF_TOKEN_MISSING. Either the URL is not this product, or it is being served without " +
         "apps/common/csrf's middleware."
@@ -206,8 +241,8 @@ function sessionFrom(state: { cookies: Cookie[] }, how: string): SessionCookies 
   const cookies = state.cookies;
   if (sessionCookieValue(cookies) === "") {
     throw new Error(
-      how + " reported success but set neither a " + SESSION_COOKIE + " nor a " +
-        LEGACY_SESSION_COOKIE + " cookie, so nothing is signed in. " +
+      how + " reported success but set no session cookie under any accepted name (" +
+        SESSION_COOKIE_NAMES.join(", ") + "), so nothing is signed in. " +
         "A proxy in front of the service that drops Set-Cookie looks exactly like this."
     );
   }

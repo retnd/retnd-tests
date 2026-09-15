@@ -6,7 +6,7 @@
 // because the run's job was to start a Vite dev server over the mock API
 // and point a browser at it. This one resolves a URL, because the run's
 // job is now to drive a deployment somebody else already stood up: a
-// browser in one container, `backupd-web serve-ui` in another, a real sshd in
+// browser in one container, `retnd-web serve-ui` in another, a real sshd in
 // a third, all on a private Docker network, with SQLite behind the whole
 // thing.
 //
@@ -52,7 +52,7 @@ export interface SourceMachine {
 
 export interface Deployment {
   /** Where the Web UI answers, on the private network the runner is on.
-   *  A container name and a port, e.g. `http://backupd:8080`. */
+   *  A container name and a port, e.g. `http://retnd:8080`. */
   baseURL: string;
   /** The throwaway administrator this run signs in as. Held in memory for
    *  the length of the run and written nowhere. */
@@ -83,20 +83,20 @@ export interface Deployment {
   workflow: WorkflowFixtures;
 }
 
-export const BASE_URL_VAR = "RM_BASE_URL";
-export const USERNAME_VAR = "RM_ADMIN_USERNAME";
-export const PASSWORD_VAR = "RM_ADMIN_PASSWORD";
-export const BOOTSTRAP_TOKEN_VAR = "RM_BOOTSTRAP_TOKEN";
-export const BACKUP_SET_VAR = "RM_BACKUP_SET";
-export const PLATFORM_VAR = "RM_PLATFORM";
-export const DESTRUCTIVE_VAR = "RM_ALLOW_DESTRUCTIVE";
-export const WORKERS_VAR = "RM_WORKERS";
-export const OUTPUT_DIR_VAR = "RM_ARTIFACTS_DIR";
-export const NO_SANDBOX_VAR = "RM_NO_SANDBOX";
-export const SOURCE_HOST_VAR = "RM_VPS_HOST";
-export const SOURCE_PORT_VAR = "RM_VPS_PORT";
-export const SOURCE_USER_VAR = "RM_VPS_USER";
-export const SOURCE_PATH_VAR = "RM_VPS_PATH";
+export const BASE_URL_VAR = "RETND_BASE_URL";
+export const USERNAME_VAR = "RETND_ADMIN_USERNAME";
+export const PASSWORD_VAR = "RETND_ADMIN_PASSWORD";
+export const BOOTSTRAP_TOKEN_VAR = "RETND_BOOTSTRAP_TOKEN";
+export const BACKUP_SET_VAR = "RETND_BACKUP_SET";
+export const PLATFORM_VAR = "RETND_PLATFORM";
+export const DESTRUCTIVE_VAR = "RETND_ALLOW_DESTRUCTIVE";
+export const WORKERS_VAR = "RETND_WORKERS";
+export const OUTPUT_DIR_VAR = "RETND_ARTIFACTS_DIR";
+export const NO_SANDBOX_VAR = "RETND_NO_SANDBOX";
+export const SOURCE_HOST_VAR = "RETND_VPS_HOST";
+export const SOURCE_PORT_VAR = "RETND_VPS_PORT";
+export const SOURCE_USER_VAR = "RETND_VPS_USER";
+export const SOURCE_PATH_VAR = "RETND_VPS_PATH";
 
 function required(env: NodeJS.ProcessEnv, name: string, what: string): string {
   const value = (env[name] ?? "").trim();
@@ -127,7 +127,7 @@ export function resolveBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
     env,
     BASE_URL_VAR,
     "It names the container serving the Web UI on the private Docker network, " +
-      "resolved by Docker's embedded DNS, e.g. http://backupd:8080."
+      "resolved by Docker's embedded DNS, e.g. http://retnd:8080."
   );
 
   let parsed: URL;
@@ -135,13 +135,13 @@ export function resolveBaseUrl(env: NodeJS.ProcessEnv = process.env): string {
     parsed = new URL(raw);
   } catch {
     throw new Error(
-      BASE_URL_VAR + " is not a URL. It wants a scheme and a host, e.g. http://backupd:8080."
+      BASE_URL_VAR + " is not a URL. It wants a scheme and a host, e.g. http://retnd:8080."
     );
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    // A bare `backupd:8080` lands here rather than in the catch
+    // A bare `retnd:8080` lands here rather than in the catch
     // above, because URL parses it happily as a scheme called
-    // `backupd`. So the message names the likely mistake as well as
+    // `retnd`. So the message names the likely mistake as well as
     // the rule: what is missing is `http://`, not the host.
     throw new Error(
       BASE_URL_VAR + "=" + JSON.stringify(raw) + " is not a URL a browser can be pointed at: " +
@@ -243,7 +243,7 @@ export function resolveDeployment(env: NodeJS.ProcessEnv = process.env): Deploym
  *  other worker is in the middle of changing. Against the mock that could
  *  not happen: each browser had its own in-memory fixture.
  *
- *  `RM_WORKERS` exists for a run that has been narrowed to read-only
+ *  `RETND_WORKERS` exists for a run that has been narrowed to read-only
  *  specs and wants them faster. It is not a knob to turn when the suite is
  *  slow. */
 export function resolveWorkers(env: NodeJS.ProcessEnv = process.env): number {
@@ -276,7 +276,7 @@ export function resolveChromiumArgs(env: NodeJS.ProcessEnv = process.env): strin
 /** Where this run's evidence goes: traces, screenshots, videos, and the
  *  HTML report.
  *
- *  Two SUBDIRECTORIES of `RM_ARTIFACTS_DIR`, never the directory itself,
+ *  Two SUBDIRECTORIES of `RETND_ARTIFACTS_DIR`, never the directory itself,
  *  and that is not tidiness. Playwright removes its own `outputDir`
  *  between runs, so pointing it at the mount point makes the run die
  *  before it starts a browser:

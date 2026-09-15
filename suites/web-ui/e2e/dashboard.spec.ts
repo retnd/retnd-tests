@@ -359,7 +359,7 @@ test.describe("a deployment with nothing configured yet", () => {
   test("shows an actionable empty state", async ({ bm, page }) => {
     await bm.goto("/");
     await expect(page.getByText("No backup sets yet")).toBeVisible();
-    await expect(page.getByText(/Connect Backupd to your first server/)).toBeVisible();
+    await expect(page.getByText(/Connect retnd to your first server/)).toBeVisible();
     await page.getByRole("button", { name: "Add backup set" }).click();
     await expect(bm.heading("Add backup set")).toBeVisible();
   });
