@@ -1,4 +1,6 @@
 import { expect, needs, test } from "./fixtures";
+import { WorkflowScreens } from "./workflow-page";
+import { readWorkflowRuns, readWorkflowSteps } from "../harness/workflow";
 
 /** §31 — desktop-first, but a small app window must stay fully usable. This
  *  project runs at 940x720; the regression it guards is a clipped table column.
@@ -86,5 +88,68 @@ test.describe("small app window", () => {
     expect(box).not.toBeNull();
     expect(box!.y).toBeGreaterThanOrEqual(0);
     expect(box!.height).toBeLessThanOrEqual(720);
+  });
+
+  test("the workflow run page reflows instead of clipping", async ({ bm, page }) => {
+    const runs = await readWorkflowRuns(bm.api);
+    needs(
+      runs !== null && runs.length > 0,
+      "a recorded workflow run: EPIC L's widest screen is the run page, and it does not exist " +
+        "until something has run"
+    );
+
+    const wf = new WorkflowScreens(page);
+    await wf.gotoRun(runs![0].run_id);
+
+    // Three verdict cells that collapse to one column rather than
+    // shrinking past the width of the words in them. Each is read by
+    // name, so a build that dropped one fails here rather than passing
+    // on the two that still fit.
+    for (const which of ["Backup", "Workflow", "Cleanup"] as const) {
+      const box = await wf.verdict(which).boundingBox();
+      expect(box, which + " verdict has no box at 940x720").not.toBeNull();
+      expect(box!.width, which + " verdict is narrower than its own words").toBeGreaterThan(180);
+    }
+
+    const overflowing = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+    );
+    expect(overflowing, "horizontal page scroll on the workflow run page").toBe(false);
+  });
+
+  test("the step log terminal fits the window it is read in", async ({ bm, page }) => {
+    // This case found backupd#916: at 940x720 the mounted terminal's
+    // box measured 1178px, so the one panel most likely to push a
+    // document sideways did exactly that, with the wrap control on by
+    // default. §31 says a small app window stays fully usable.
+    //
+    // It took two fixes, and the first is why this measurement is
+    // worth keeping rather than replacing with a check of the
+    // terminal's own CSS: capping the terminal at `maxWidth: 100%`
+    // moved nothing, because the column it is 100% OF was itself
+    // 1178px. The run page's step-row grid was the other half. A case
+    // that asserted the declaration would have gone green on the first
+    // fix and said nothing about the window.
+    const runs = await readWorkflowRuns(bm.api);
+    needs(runs !== null && runs.length > 0, "a recorded workflow run to open");
+    const steps = await readWorkflowSteps(bm.api, runs![0].run_id);
+    needs(steps.length > 0, "a run holding at least one step, so a terminal can be opened");
+
+    const wf = new WorkflowScreens(page);
+    await wf.gotoRun(runs![0].run_id);
+    await wf.stepRow(steps[0].script_name).click();
+    const terminal = wf.terminal(steps[0].script_name);
+    await expect(terminal).toBeVisible();
+    const box = await terminal.boundingBox();
+    expect(box).not.toBeNull();
+    // Against the WINDOW this case is being read in, not the literal
+    // 940 the small-window project uses. This file's describe is named
+    // for that project but the generic one runs it too, at 1440x900,
+    // where a 1178px terminal is correct and a hardcoded 940 is simply
+    // the wrong question. The claim is the same at either size: the
+    // panel fits the window.
+    const window = page.viewportSize();
+    expect(window, "this run has no viewport to measure against").not.toBeNull();
+    expect(box!.width).toBeLessThanOrEqual(window!.width);
   });
 });

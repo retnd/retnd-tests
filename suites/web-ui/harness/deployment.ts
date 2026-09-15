@@ -15,6 +15,14 @@
 // `http://localhost:...` is how a suite goes back to testing nothing
 // while still reporting green, which is the failure this whole repository
 // exists to prevent.
+//
+// EPIC L (backupd#816) added a second family of them. The workflow
+// fixtures - which seeded backup set carries which hook scenario, and
+// where the control directory that can crash the engine mid-run is - live
+// in `harness/workflow.ts` beside the protocol they belong to, and are
+// carried here so that one call resolves everything this run was told.
+
+import { type WorkflowFixtures, resolveWorkflowFixtures } from "./workflow";
 
 /** The providers a Web UI bundle can be built for. The bundle is chosen at
  *  BUILD time (VITE_PLATFORM, and `serve-ui --profile`), so a run drives
@@ -68,6 +76,11 @@ export interface Deployment {
    *  the deployment says it is disposable. */
   allowDestructive: boolean;
   source: SourceMachine | null;
+  /** Which workflow fixture states the rig seeded, and under which
+   *  backup set names. Every field nullable: a rig that seeded none of
+   *  them is an ordinary Suite B deployment, and the workflow specs say
+   *  so rather than asserting against a set with no hooks in it. */
+  workflow: WorkflowFixtures;
 }
 
 export const BASE_URL_VAR = "RM_BASE_URL";
@@ -215,7 +228,8 @@ export function resolveDeployment(env: NodeJS.ProcessEnv = process.env): Deploym
     seededBackupSet: seeded === "" ? null : seeded,
     platform: resolvePlatform(env),
     allowDestructive: (env[DESTRUCTIVE_VAR] ?? "").trim() === "1",
-    source: resolveSource(env)
+    source: resolveSource(env),
+    workflow: resolveWorkflowFixtures(env)
   };
 }
 
