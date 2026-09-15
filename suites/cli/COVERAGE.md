@@ -19,9 +19,9 @@ Fifteen of those seventeen cases USED to be red against the commit
 `build-under-test.json` named, and were supposed to be: they described
 verbs that commit did not have. That is the specs-first half of the
 lockstep this repository has used since
-[#48](https://github.com/backupdproject/backupd-tests/pull/48), whose
+[#48](https://github.com/retnd/retnd-tests/pull/48), whose
 cases sat red the same way until
-[#42](https://github.com/backupdproject/backupd-tests/pull/42)'s pin move
+[#42](https://github.com/retnd/retnd-tests/pull/42)'s pin move
 landed on the build that had them. They are green now: EPIC R's lockstep
 moved the pin past backupd#629 along with everything else it had been
 stuck behind. The two that passed at both pins are
@@ -106,7 +106,7 @@ and all three are asserted where they are: the config directory is
 `/etc/retnd` (`global/g4-config-default-is-the-packaged-directory`), the
 Go package path this document derives its command list from is
 `core/cmd/retnd`, and the image reference is still
-`ghcr.io/backupdproject/backupd` — a registry path is not redirected and
+`ghcr.io/retnd/retnd` — a registry path is not redirected and
 moves with the organisation cutover, not with the in-tree rename.
 
 ## The shared failure family
@@ -203,7 +203,7 @@ Stated rather than implied.
   possible: before it, every artifact a single-cycle fixture ingested
   landed in one bucket and there was no tier arithmetic to observe. What
   is still uncovered is the rest of
-  [backupdproject/backupd-tests#3](https://github.com/backupdproject/backupd-tests/issues/3):
+  [retnd/retnd-tests#3](https://github.com/retnd/retnd-tests/issues/3):
   the `quarter`, `half_year`, `year` and custom `days` granularities, a
   file dated exactly on a window edge, `week_starts_on`, timezone
   handling, and the cross-midnight case where an artifact produced late

@@ -15,8 +15,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/backupdproject/backupd-tests/suites/cli/harness"
-	"github.com/backupdproject/backupd-tests/tools/getbuild"
+	"github.com/retnd/retnd-tests/suites/cli/harness"
+	"github.com/retnd/retnd-tests/tools/getbuild"
 )
 
 var (

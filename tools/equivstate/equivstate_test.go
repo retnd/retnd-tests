@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/backupdproject/backupd-tests/tools/equivstate"
+	"github.com/retnd/retnd-tests/tools/equivstate"
 )
 
 // The point of these tests is the RED half of Suite C's plan: a state

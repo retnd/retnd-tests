@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/backupdproject/backupd-tests/suites/cli/harness"
+	"github.com/retnd/retnd-tests/suites/cli/harness"
 )
 
 var runner *harness.Runner

@@ -1,4 +1,4 @@
-module github.com/backupdproject/backupd-tests
+module github.com/retnd/retnd-tests
 
 go 1.27.0
 

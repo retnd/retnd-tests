@@ -19,7 +19,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/backupdproject/backupd-tests/tools/equivstate"
+	"github.com/retnd/retnd-tests/tools/equivstate"
 )
 
 type list []string

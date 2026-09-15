@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	fixtures "github.com/backupdproject/backupd-tests/fixtures/lib"
+	fixtures "github.com/retnd/retnd-tests/fixtures/lib"
 )
 
 // Normalizer rewrites machine-specific text out of a command's output,

@@ -18,9 +18,9 @@ import (
 	"path/filepath"
 	"time"
 
-	getbuild "github.com/backupdproject/backupd-tests/tools/getbuild"
+	getbuild "github.com/retnd/retnd-tests/tools/getbuild"
 
-	fixtures "github.com/backupdproject/backupd-tests/fixtures/lib"
+	fixtures "github.com/retnd/retnd-tests/fixtures/lib"
 )
 
 func main() {

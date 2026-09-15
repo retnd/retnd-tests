@@ -4,7 +4,7 @@
 
 # backupd-tests
 
-End-to-end test suites for [`retnd`](https://github.com/backupdproject/backupd),
+End-to-end test suites for [`retnd`](https://github.com/retnd/retnd),
 run from outside it, against a build it has already released.
 
 Three suites live here:
@@ -28,7 +28,7 @@ testing what an operator has. From out here, a suite has exactly what a
 real deployment has: a binary, a YAML config file, a state directory,
 exit codes, printed output, and a browser. That is what catches a
 contract break, and it is why **nothing in this repository may import
-`github.com/backupdproject/backupd/core/...`**. The moment it does, it
+`github.com/retnd/retnd/core/...`**. The moment it does, it
 stops being an outside consumer and starts checking the product against
 itself.
 
@@ -81,7 +81,7 @@ and this repository has to keep them apart from the command:
   (R1.5, [backupd#890](https://github.com/backupdproject/backupd/issues/890));
 - the Go package path, which **did** move, to `core/cmd/retnd`, in the
   same commit that moved the constant (R1.3);
-- the published image, `ghcr.io/backupdproject/backupd`, which has **not**
+- the published image, `ghcr.io/retnd/retnd`, which has **not**
   moved and is not this epic's in-tree half to move: a registry path is
   not redirected, and it changes with the organisation cutover (FR-41).
 
@@ -102,7 +102,7 @@ a use of it, or a compat window with an owner:
 | `/backupd-web` in `docs/pinning.md`, `suites/cli/COVERAGE.md`, `tools/getbuild/getbuild.go` and g6's doc | a path that really is in the image: R1.5 (backupd#890) kept it for one release as a hardlink to `/retnd-web`, because published compose files name it in `command:` | closes with the hardlink |
 | `core/cmd/backupd` in `docs/pinning.md` and `tools/getbuild/getbuild.go` | the package directory the Go builder used to compile, named in the sentence explaining why source mode cannot build a pre-rename sha | permanent |
 | `BACKUP_MANAGER_API_URL` in `suites/equivalence/harness/fixtures.ts` | not a reference — the product's CURRENT variable name, unrenamed in `core/cmd/retnd/route.go`. Row 19 of the rename inventory, owned there, not here; spelling it any other way here would make a true comment false | until the product renames it |
-| `go.mod`'s module path, this repository's own name in the heading above and in clone/checkout paths, every `backupdproject/…` URL and every `backupd#N` reference | repository coordinates, which do not resolve under the new name until the organisation cutover | FR-41 |
+| every `backupdproject/backupd#N`, `/issues/N` and `/pull/N` link, and every bare `backupd#N` reference | a record of where work was TRACKED. FR-41's cutover happened on 2026-09-15: `go.mod`'s module path, this repository's own name, the clone and checkout paths and the registry path all moved to `retnd/retnd-tests` and `ghcr.io/retnd/retnd` with it. What is left is issue and pull-request history, which GitHub's transfer preserves by number and redirects by URL, and rewriting a record of where something was filed falsifies it | permanent |
 
 Reproduce with:
 

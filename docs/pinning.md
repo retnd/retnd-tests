@@ -20,7 +20,7 @@ it, and moving to a newer build is a reviewable one-line change.
 
 Clone `retnd` at `commit` into a per-commit cache directory and
 build the binaries from it. This is the only honest mode today, because
-nothing has been pushed to `ghcr.io/backupdproject/backupd` yet.
+nothing has been pushed to `ghcr.io/retnd/retnd` yet.
 
 `source_builder` chooses how:
 
@@ -77,7 +77,7 @@ answers with the name that still exists.
 
 ### `registry`
 
-Pull the digest-pinned image from `ghcr.io/backupdproject/backupd`,
+Pull the digest-pinned image from `ghcr.io/retnd/retnd`,
 extract both binaries, and cross-check their sha256 against
 `container/release-manifest.json` **as it exists at the pinned commit**,
 not as `main` has it today. A digest pin rather than a tag pin: tags

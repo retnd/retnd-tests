@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/backupdproject/backupd-tests/tools/statesnap"
+	"github.com/retnd/retnd-tests/tools/statesnap"
 )
 
 func main() {
