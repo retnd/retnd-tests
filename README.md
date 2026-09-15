@@ -89,16 +89,35 @@ and this repository has to keep them apart from the command:
 
 FR-43's org-wide grep for the retired brand has to come back to an
 enumerated allowlist rather than to nothing, and these are this
-repository's entries. Each is a REFERENCE to the old name rather than a
-use of it, or a compat window with an owner:
+repository's entries — every one of them, checked by running the grep and
+accounting for each line. Each is a REFERENCE to the old name rather than
+a use of it, or a compat window with an owner:
 
 | Where | What | Until |
 |---|---|---|
-| `suites/cli/cases/global/g6-…`, `g7-…` (`invoke_as: backupd`) | the retired filename the binary is reached THROUGH, proving nothing dispatches on `argv[0]` | permanent |
-| `tools/getbuild/handshake.go`'s version parser (`retnd`, `backupd`, `rbm`, `backup-manager`) | every spelling the product has ever printed, because the pin may name a build on either side of any rename | permanent |
-| `suites/web-ui/harness/session.ts`'s `backupd_*` and `bm_*` cookie names | read-compat, mirroring `apps/common/csrf`'s own `cookieNames` list | closes with the product's, same issue and release |
-| `suites/web-ui/harness/engine.ts` and the two Activity specs (`dial tcp: lookup rclone-manager …`) | a verbatim quotation of a log line from a reported incident; renaming it falsifies the record | permanent |
+| `suites/cli/cases/global/g6-…`, `g7-…` (`invoke_as: backupd`, and their docs) | the retired filename the binary is reached THROUGH, proving nothing dispatches on `argv[0]` | permanent |
+| `tools/getbuild/handshake.go`'s version parser and `handshake_test.go`'s table (`retnd`, `backupd`, `rbm`, `backup-manager`) | every spelling the product has ever printed, because the pin may name a build on either side of any rename | permanent |
+| `suites/web-ui/harness/session.ts`'s `backupd_*` and `bm_*` cookie names, and `session.test.ts`'s assertions about them | read-compat, mirroring `apps/common/csrf`'s own `cookieNames` list | closes with the product's, same issue and release |
+| `suites/web-ui/harness/engine.ts` and the two Activity specs (`dial tcp: lookup rclone-manager …`) | a verbatim quotation of a log line from a reported incident, whose CAUSE was a container rename; rewriting it falsifies the record | permanent |
+| `/backupd-web` in `docs/pinning.md`, `suites/cli/COVERAGE.md`, `tools/getbuild/getbuild.go` and g6's doc | a path that really is in the image: R1.5 (backupd#890) kept it for one release as a hardlink to `/retnd-web`, because published compose files name it in `command:` | closes with the hardlink |
+| `core/cmd/backupd` in `docs/pinning.md` and `tools/getbuild/getbuild.go` | the package directory the Go builder used to compile, named in the sentence explaining why source mode cannot build a pre-rename sha | permanent |
+| `BACKUP_MANAGER_API_URL` in `suites/equivalence/harness/fixtures.ts` | not a reference — the product's CURRENT variable name, unrenamed in `core/cmd/retnd/route.go`. Row 19 of the rename inventory, owned there, not here; spelling it any other way here would make a true comment false | until the product renames it |
 | `go.mod`'s module path, this repository's own name in the heading above and in clone/checkout paths, every `backupdproject/…` URL and every `backupd#N` reference | repository coordinates, which do not resolve under the new name until the organisation cutover | FR-41 |
+
+Reproduce with:
+
+```sh
+git grep -nE '(^|[^A-Za-z0-9_])(backupd|BACKUPD|Backupd|bm_[a-z]|RM_[A-Z]|rclone[-_ ]manager|backup[-_ ]manager|BACKUP_MANAGER)' \
+  -- $(git ls-files | grep -v node_modules) \
+  | grep -vE 'backupdproject|backupd#' | grep -v '^README.md:'
+```
+
+55 lines across 15 files as this was written, and every one of them is a
+row above. This file is excluded from its own grep because it IS the
+allowlist. `RM_[A-Z]` returns nothing at all: that contract is `RETND_*`
+outright, with no compat alias, because the product repository's
+`scripts/e2e` sets it and this repository reads it, and both halves move
+together.
 
 Every run, in every mode, starts by asking the binary `version` and
 refusing to continue unless the commit it reports matches what the pin
