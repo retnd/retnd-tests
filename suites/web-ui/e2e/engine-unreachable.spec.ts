@@ -14,7 +14,7 @@ import { expect, needs, test } from "./fixtures";
  * backupd#795, against the deployment rather than against the browser.
  *
  * An operator upgraded a UGREEN NAS, opened the Activity page, and was
- * shown nothing at all. Their `backupd-web serve-ui` container was logging
+ * shown nothing at all. Their `retnd-web serve-ui` container was logging
  * `dial tcp: lookup rclone-manager on 127.0.0.11:53: no such host`: the
  * engine container had been renamed underneath it, so the reverse proxy
  * had an upstream name that no longer resolved, and every `/api/v1` call

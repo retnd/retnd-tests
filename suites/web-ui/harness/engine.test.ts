@@ -194,7 +194,7 @@ describe("the request and acknowledgement pair", () => {
 
   it("rejects a stop the rig could not make, rather than reporting on a running engine", async () => {
     const dir = controlDir();
-    refuse(dir, STOP_REQUEST, STOP_FAILED_ACK, "docker stop backupd-engine: permission denied");
+    refuse(dir, STOP_REQUEST, STOP_FAILED_ACK, "docker stop retnd-engine: permission denied");
 
     const error = await stopEngine({ dir }, 5_000).catch((thrown: unknown) => thrown);
 
@@ -226,14 +226,14 @@ describe("the request and acknowledgement pair", () => {
 
   it("waits for a reason that is still being written, instead of quoting an empty one", async () => {
     const dir = controlDir();
-    refuseMidWrite(dir, START_REQUEST, START_FAILED_ACK, "no such container: backupd-engine");
+    refuseMidWrite(dir, START_REQUEST, START_FAILED_ACK, "no such container: retnd-engine");
 
     const error = await startEngine({ dir }, 5_000).catch((thrown: unknown) => thrown);
 
     // The refusal is the file's existence and the reason is its content,
     // so a reader that arrives between the two has the answer and not the
     // half of it anybody can act on.
-    expect((error as Error).message).toContain("no such container: backupd-engine");
+    expect((error as Error).message).toContain("no such container: retnd-engine");
   });
 
   it("still refuses when the reason never arrives, and says that is what happened", async () => {

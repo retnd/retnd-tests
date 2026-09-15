@@ -334,7 +334,7 @@ func TestReadOnlyMutationRemovesWritePermissionAndGivesItBack(t *testing.T) {
 // for `invoke_as`, and it is the whole reason that field is observable at
 // all.
 //
-// A case carrying `invoke_as: backupd` asserts that the build
+// A case carrying `invoke_as: retnd` asserts that the build
 // under test behaves the same however it was reached. The failure mode
 // that assertion has is not going red, it is going green while running
 // the binary under its ordinary name: the field silently ignored, the
@@ -345,13 +345,13 @@ func TestReadOnlyMutationRemovesWritePermissionAndGivesItBack(t *testing.T) {
 //
 // So this reaches past the four assertion dimensions and requires the two
 // things the case itself cannot say: the path that ran is called
-// `backupd` and is not the one the pin resolved, and it is the
+// `retnd` and is not the one the pin resolved, and it is the
 // same file underneath rather than a second copy that could drift.
 func TestInvokeAsRunsTheSameBinaryUnderAnotherName(t *testing.T) {
 	c := baseline()
 	c.Name = "selftest/invoke-as"
 	c.Scenario = "no-fixture"
-	c.InvokeAs = "backupd"
+	c.InvokeAs = "retnd"
 	c.Argv = []string{"version"}
 	c.Stdout = harness.Stream{Mode: "ignored"}
 
@@ -364,8 +364,8 @@ func TestInvokeAsRunsTheSameBinaryUnderAnotherName(t *testing.T) {
 		t.Fatalf("`version` through the old name should behave exactly as it does through the new one, got %d mismatch(es):\n%v", len(got), got)
 	}
 
-	if base := filepath.Base(res.Binary); base != "backupd" {
-		t.Fatalf("the argv under test ran as %q, want backupd: invoke_as did nothing and the case asserting it proves nothing", base)
+	if base := filepath.Base(res.Binary); base != "retnd" {
+		t.Fatalf("the argv under test ran as %q, want retnd: invoke_as did nothing and the case asserting it proves nothing", base)
 	}
 	if res.Binary == runner.CLI {
 		t.Fatalf("invoke_as handed back the pin's own path %s, so the case never left the name it was trying to get away from", res.Binary)
@@ -390,7 +390,7 @@ func TestInvokeAsRunsTheSameBinaryUnderAnotherName(t *testing.T) {
 // build under test is reached, not which build is under test, and the pin
 // is the only thing allowed to answer the second question.
 func TestInvokeAsRefusesAPath(t *testing.T) {
-	for _, name := range []string{"../backupd", "/bin/echo", "sub/dir"} {
+	for _, name := range []string{"../retnd", "/bin/echo", "sub/dir"} {
 		t.Run(name, func(t *testing.T) {
 			c := baseline()
 			c.Name = "selftest/invoke-as-path"

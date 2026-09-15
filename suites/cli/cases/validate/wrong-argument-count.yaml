@@ -1,14 +1,22 @@
 doc: >
   The usage line takes exactly one operand, so zero is a usage error and
-  the message says which operand is missing.
+  the message says which operands are accepted.
+
+  It names two now, because `validate` grew a second form. EPIC L
+  (backupd#816) added `validate workflow <source/backup-set>`, which
+  checks a backup set's hook scripts rather than an artifact, so the
+  refusal has to offer both or it sends an operator to the wrong one.
+  Pinned as the whole line rather than a prefix: a refusal that lists the
+  forms is only useful if it lists all of them, and a prefix match would
+  stay green if the second one were dropped again.
 scenario: seeded-local
 argv: [validate, --config, "${CONFIG}"]
 exit: 2
 stdout: empty
 stderr:
-  - line: "backupd: validate takes exactly one argument: <source/backup-set/artifact>"
+  - line: 'retnd: validate takes exactly one argument: <source/backup-set/artifact>, or "workflow <source/backup-set>"'
 state: unchanged
 contract:
-  - "usage text: validate <source/backup-set/artifact>"
+  - "usage text: validate <source/backup-set/artifact>, and validate workflow <source/backup-set> (backupd#816)"
   - "exit-code convention: 2 is a usage error"
 tags: [smoke]

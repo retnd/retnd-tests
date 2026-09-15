@@ -159,7 +159,7 @@ export interface DeploymentFacts {
    *  The one field here that does not come from the deployment, and it is
    *  the point of it: a name the suite did not choose and the bundle
    *  cannot invent is the only anchor that can tell a real catalogue from
-   *  a convincing fixture. Filled in by the fixture from RM_BACKUP_SET. */
+   *  a convincing fixture. Filled in by the fixture from RETND_BACKUP_SET. */
   seededBackupSet: string | null;
   /** What this deployment's workflow surface looks like (EPIC L,
    *  backupd#816). Read here rather than in each spec because every

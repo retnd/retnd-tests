@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Mirrors backupd's own arrangement: the gate is local, and a red
+# Mirrors retnd's own arrangement: the gate is local, and a red
 # gate refuses the commit. `git commit --no-verify` is the WIP escape
 # hatch, and a commit made that way is not evidence of anything.
 exec ./scripts/gate-local.sh

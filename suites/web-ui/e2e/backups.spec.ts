@@ -1,6 +1,6 @@
 import { retentionClasses } from "../harness/api";
 import { expect, mockOnly, needs, test } from "./fixtures";
-import type { Backupd } from "./fixtures";
+import type { Retnd } from "./fixtures";
 
 /**
  * The backups table and one backup's detail, against a real deployment.
@@ -261,7 +261,7 @@ test.describe("where a backup's copies are", () => {
   const copies = (page: import("@playwright/test").Page) =>
     page.getByRole("region", { name: "Copies" });
 
-  async function openBackup(bm: Backupd, page: import("@playwright/test").Page, filename: string) {
+  async function openBackup(bm: Retnd, page: import("@playwright/test").Page, filename: string) {
     await bm.goto("/backups");
     await page.getByRole("row").filter({ hasText: filename }).click();
     await expect(copies(page)).toBeVisible();
@@ -275,7 +275,7 @@ test.describe("where a backup's copies are", () => {
    *  drives the page to it. A deployment that has no such backup gets the
    *  reading printed instead of a green tick. */
   const withPlacement = (
-    bm: Backupd,
+    bm: Retnd,
     matches: (p: NonNullable<(typeof bm.facts.backups)[number]["placements"]>[number]) => boolean
   ) => bm.facts.backups.find((b) => (b.placements ?? []).some(matches));
 

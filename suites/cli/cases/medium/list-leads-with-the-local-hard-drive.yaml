@@ -33,7 +33,7 @@ stdout:
   - line: "offsite_s3"
   - line: "${SP}type: s3"
   - line: "${SP}bucket: nas-backups"
-  - absent: "RM_FIXTURE_S3_CREDENTIALS_NOT_SET"
+  - absent: "RETND_FIXTURE_S3_CREDENTIALS_NOT_SET"
   - absent: "credentials"
 stderr: empty
 state: unchanged

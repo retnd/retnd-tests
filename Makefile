@@ -1,6 +1,6 @@
 # Entry points for the three suites. Every target that runs Go tests
 # passes -count=1: the binary under test, the fixtures' replay output and
-# the backupd checkout all live outside this module, and Go's test
+# the retnd checkout all live outside this module, and Go's test
 # cache cannot see any of them change.
 
 GO ?= go
@@ -11,7 +11,7 @@ help:
 	@echo "                 scripts/gate-local.sh is the one the pre-commit hook runs,"
 	@echo "                 and it adds the two type checks and Suite B's unit tests"
 	@echo "make suite-a     the CLI contract suite (no browser, no Docker)"
-	@echo "make smoke       the fast slice of Suite A, for backupd's own per-commit gate"
+	@echo "make smoke       the fast slice of Suite A, for retnd's own per-commit gate"
 	@echo "make selftest    prove the harness can fail, per assertion dimension"
 	@echo "make tools       unit tests for the fixture layer and the state differ"
 	@echo "make typecheck   tsc --noEmit over the TypeScript in Suites B and C"
@@ -29,7 +29,7 @@ suite-a:
 
 .PHONY: smoke
 smoke:
-	RM_TAGS=smoke $(GO) test ./suites/cli -count=1
+	RETND_TAGS=smoke $(GO) test ./suites/cli -count=1
 
 .PHONY: selftest
 selftest:
@@ -57,13 +57,13 @@ typecheck:
 gate: vet tools selftest suite-a
 	@echo "gate: green"
 
-# Suite B drives a deployment it does not create. RM_BASE_URL names it, and
-# there is no default: the containers come up first (backupd's own
+# Suite B drives a deployment it does not create. RETND_BASE_URL names it, and
+# there is no default: the containers come up first (retnd's own
 # scripts/e2e/), and the run refuses to start rather than falling back to
 # localhost and reporting green against nothing.
 #
-#   RM_BASE_URL=http://backupd:8080 \
-#   RM_ADMIN_USERNAME=... RM_ADMIN_PASSWORD=... make suite-b
+#   RETND_BASE_URL=http://retnd:8080 \
+#   RETND_ADMIN_USERNAME=... RETND_ADMIN_PASSWORD=... make suite-b
 #
 # suites/web-ui/README.md has the whole variable list, required and optional.
 .PHONY: suite-b
@@ -85,7 +85,7 @@ suite-b-unit:
 	cd suites/web-ui && npm run unit
 
 # Boots the real engine and the real production UI bundle per spec, so
-# RM_UI_DIR (or the pin's own checkout) must have its dependencies
+# RETND_UI_DIR (or the pin's own checkout) must have its dependencies
 # installed: the bundle is built from it.
 .PHONY: suite-c
 suite-c:

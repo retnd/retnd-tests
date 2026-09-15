@@ -2,7 +2,7 @@
 
 - **Filed as**: [backupdproject/backupd#211](https://github.com/backupdproject/backupd/issues/211)
 - **Pinned by**: `suites/equivalence/specs/contract-gaps.spec.ts`
-- **Build**: originally observed on `backupd` at
+- **Build**: originally observed on `retnd` at
   `137f64699203a5ec6d2a6e399a654b99814a5a74`
 - **Kind**: divergence between two of the product's own artefacts, found by
   running them against each other for the first time.

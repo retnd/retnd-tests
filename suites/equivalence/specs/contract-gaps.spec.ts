@@ -330,7 +330,7 @@ test.describe("the matrix's gap rows", () => {
     // it is a routing bug rather than a missing feature, and the fix is a
     // different one. This reads api/v1/openapi.json from the checkout the
     // build under test came from, so it cannot drift from what ran.
-    const source = process.env.RM_UI_DIR ? resolve(process.env.RM_UI_DIR, "../..") : (pair.build.source_dir ?? "");
+    const source = process.env.RETND_UI_DIR ? resolve(process.env.RETND_UI_DIR, "../..") : (pair.build.source_dir ?? "");
     const declared = contractOperations(source);
 
     for (const call of UI_CALLS.filter((c) => !c.served)) {
@@ -366,7 +366,7 @@ test.describe("the matrix's gap rows", () => {
     // would let every assertion below pass by finding nothing.
     expect(
       usage.length,
-      "backupd printed no usage at all, so this case compared nothing"
+      "retnd printed no usage at all, so this case compared nothing"
     ).toBeGreaterThan(200);
     expect(
       usage,
@@ -453,7 +453,7 @@ test.describe("the matrix's gap rows", () => {
 });
 
 async function csrf(page: import("@playwright/test").Page): Promise<string> {
-  const cookie = (await page.context().cookies()).find((c) => c.name === "bm_csrf");
-  if (!cookie) throw new Error("no bm_csrf cookie, so a CSRF-gated request cannot be made");
+  const cookie = (await page.context().cookies()).find((c) => c.name === "retnd_csrf");
+  if (!cookie) throw new Error("no retnd_csrf cookie, so a CSRF-gated request cannot be made");
   return cookie.value;
 }

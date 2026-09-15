@@ -1,17 +1,17 @@
 <p align="center">
-  <img src="assets/logo-mark.svg" alt="backupd mark: a broken ring standing for a transfer cycle in progress" width="72">
+  <img src="assets/logo-mark.svg" alt="retnd mark: a broken ring standing for a transfer cycle in progress" width="72">
 </p>
 
 # backupd-tests
 
-End-to-end test suites for [`backupd`](https://github.com/backupdproject/backupd),
+End-to-end test suites for [`retnd`](https://github.com/backupdproject/backupd),
 run from outside it, against a build it has already released.
 
 Three suites live here:
 
 | Suite | What it is | Status |
 |---|---|---|
-| **A. CLI contract** | `backupd` driven black-box: argv in, exit code plus stdout plus stderr plus resulting on-disk state out | built, `make suite-a` |
+| **A. CLI contract** | `retnd` driven black-box: argv in, exit code plus stdout plus stderr plus resulting on-disk state out | built, `make suite-a` |
 | **B. Web UI** | the Playwright suite, driving a real deployment: browser to `serve-ui` to the proxy to `serve` to SQLite | built, `make suite-b` against a running rig, see [`suites/web-ui/README.md`](suites/web-ui/README.md) |
 | **C. UI to CLI equivalence** | every backend-affecting UI action proved equal to its CLI equivalent by comparing resulting backend state | built, `make suite-c`, with the matrix in [`suites/equivalence/MATRIX.md`](suites/equivalence/MATRIX.md) |
 
@@ -21,7 +21,7 @@ backend seeded with the same artifacts, states and config that the
 equivalent CLI test needs, and maintaining that twice would guarantee the
 two drift.
 
-## Why these live outside `backupd`
+## Why these live outside `retnd`
 
 Because a test that can call the product's exported Go functions is not
 testing what an operator has. From out here, a suite has exactly what a
@@ -38,13 +38,13 @@ itself.
 make build           # resolve the pinned build and make it prove its identity
 make suite-a         # the CLI contract suite
 make suite-b-install # once: Playwright and a Chromium
-make suite-b         # the Web UI suite, against the deployment RM_BASE_URL names
+make suite-b         # the Web UI suite, against the deployment RETND_BASE_URL names
 make suite-c         # UI-to-CLI equivalence, against the real engine
 make gate            # everything that has to be green before a commit here
 ```
 
 Suite A needs Go and nothing else. No browser, no Docker, no network
-beyond the one clone of `backupd` that the pin resolves, which is
+beyond the one clone of `retnd` that the pin resolves, which is
 cached per commit. Most fixtures use `remote.type: local` (FR-4), so a
 checked-in directory tree is a valid remote and there is no SSH endpoint
 to stand up.
@@ -55,17 +55,50 @@ to stand up.
 what a run certifies. See [`docs/pinning.md`](docs/pinning.md) for the
 three modes and how to point the suites at a newer build in one command.
 
-The command is `backupd` from 0.3.3
-((https://github.com/backupdproject/backupd/issues/648)),
-and was `backupd` before it. The old name still runs, because the
-image links it beside the new one, so this repository has to be able to
-tell the two apart: what the binary *prints* is asserted as `backupd` in
-every case, what an operator *types* is asserted under both names in
-`global/g6-…` and `global/g7-…`, and the three things merely named after
-the old command (the config directory `/etc/backupd`, the image
-`ghcr.io/backupdproject/backupd`, the Go package path
-`core/cmd/backupd`) did not move and are still spelled that way
-throughout.
+The command is `retnd`, from EPIC R
+([backupd#885](https://github.com/backupdproject/backupd/issues/885)). It
+was `backupd` before that
+([backupd#794](https://github.com/backupdproject/backupd/issues/794)) and
+`rbm` from 0.3.3
+([backupd#648](https://github.com/backupdproject/backupd/issues/648)).
+
+The old name does NOT still run: R1.3
+([backupd#888](https://github.com/backupdproject/backupd/issues/888))
+retired `backupd` rather than aliasing it, and the image ships no link
+under the old spelling, on the argument that printing two names is how a
+reference stops being one. So what the binary *prints* is asserted as
+`retnd` in every case, and what an operator *types* is asserted in
+`global/g6-…` and `global/g7-…`, which reach this build through a
+`backupd` filename the harness links itself and require the answer to
+still say `retnd`. That is the outside view of a property nothing else
+here checks: this binary does not dispatch on `argv[0]`, so the filename
+it was reached through never decides what it calls itself.
+
+Three things merely NAMED after the command are on their own schedules,
+and this repository has to keep them apart from the command:
+
+- the container's config directory, which **did** move, to `/etc/retnd`
+  (R1.5, [backupd#890](https://github.com/backupdproject/backupd/issues/890));
+- the Go package path, which **did** move, to `core/cmd/retnd`, in the
+  same commit that moved the constant (R1.3);
+- the published image, `ghcr.io/backupdproject/backupd`, which has **not**
+  moved and is not this epic's in-tree half to move: a registry path is
+  not redirected, and it changes with the organisation cutover (FR-41).
+
+### The old name, where it deliberately survives here
+
+FR-43's org-wide grep for the retired brand has to come back to an
+enumerated allowlist rather than to nothing, and these are this
+repository's entries. Each is a REFERENCE to the old name rather than a
+use of it, or a compat window with an owner:
+
+| Where | What | Until |
+|---|---|---|
+| `suites/cli/cases/global/g6-…`, `g7-…` (`invoke_as: backupd`) | the retired filename the binary is reached THROUGH, proving nothing dispatches on `argv[0]` | permanent |
+| `tools/getbuild/handshake.go`'s version parser (`retnd`, `backupd`, `rbm`, `backup-manager`) | every spelling the product has ever printed, because the pin may name a build on either side of any rename | permanent |
+| `suites/web-ui/harness/session.ts`'s `backupd_*` and `bm_*` cookie names | read-compat, mirroring `apps/common/csrf`'s own `cookieNames` list | closes with the product's, same issue and release |
+| `suites/web-ui/harness/engine.ts` and the two Activity specs (`dial tcp: lookup rclone-manager …`) | a verbatim quotation of a log line from a reported incident; renaming it falsifies the record | permanent |
+| `go.mod`'s module path, this repository's own name in the heading above and in clone/checkout paths, every `backupdproject/…` URL and every `backupd#N` reference | repository coordinates, which do not resolve under the new name until the organisation cutover | FR-41 |
 
 Every run, in every mode, starts by asking the binary `version` and
 refusing to continue unless the commit it reports matches what the pin
@@ -81,7 +114,7 @@ For the same reason, no suite here ever talks to a server it cannot name.
 Suites A and C still start their own, on a port they picked and proved
 free. Suite B no longer starts anything at all, because what it drives is
 a running deployment of four containers rather than a dev server, so it
-buys the same property a different way: `RM_BASE_URL` is required, has no
+buys the same property a different way: `RETND_BASE_URL` is required, has no
 default, and a run without it stops and says so. A fallback to localhost
 would be the stale dev server above wearing a different hat.
 
@@ -104,7 +137,7 @@ holds.
 
 When derivation and observation disagree, the expectation does not move.
 The disagreement is written up in [`findings/`](findings/README.md),
-filed against `backupd`, and the case is marked
+filed against `retnd`, and the case is marked
 `known_discrepancy`, which the runner treats as a strict expected
 failure: red while the issue is open, and red again the moment it starts
 passing, so a fix forces the marker's removal. Three entries are open
@@ -123,7 +156,7 @@ marker to relax them.
 ## Layout
 
 ```
-build-under-test.json      the pin: which backupd build a run certifies
+build-under-test.json      the pin: which retnd build a run certifies
 fixtures/
   scenarios/<name>/        declarative scenario definitions
   lib/                     materialisation, seeding by replay
@@ -148,7 +181,7 @@ git config core.hooksPath .husky
 That wires `.husky/pre-commit` to `scripts/gate-local.sh`, which is the
 gate: `gofmt`, `go vet`, the fixture and state-differ unit tests, the
 harness self-tests, Suite A in full, `tsc --noEmit` over both TypeScript
-suites, and Suite B's own unit tests. It mirrors how `backupd`
+suites, and Suite B's own unit tests. It mirrors how `retnd`
 gates itself, and for the same reason: the merge signal in this estate is
 local, so a red gate has to refuse the commit rather than annotate it
 afterwards.
@@ -162,7 +195,7 @@ Playwright transpiles types away without checking them, so before the
 type check went in, nothing in this repository ever read the types in
 Suites B and C at all. What the check does not turn on is
 `noUnusedLocals`/`noUnusedParameters`, and the reason has changed: while
-`suites/web-ui/e2e/` was byte-identical to `backupd`'s
+`suites/web-ui/e2e/` was byte-identical to `retnd`'s
 `ui/shared/e2e/` the one unused binding in there belonged upstream, but
  deleted that directory, so it is this repository's to fix and these
 options are this repository's to turn on, in a change of its own. Real
@@ -171,7 +204,7 @@ ESLint is absent for the same reason, spelled out in
 
 ## The CI signal
 
-Moving the Playwright suite out of `backupd` would take away the
+Moving the Playwright suite out of `retnd` would take away the
 e2e feedback that repository's pull requests currently rely on, so the
 replacement has to land in the same change. The design is in
 [`docs/ci-signal.md`](docs/ci-signal.md), including the part that has not

@@ -4,7 +4,7 @@
 - **Pinned by**: `suites/web-ui/e2e/storage-destinations.spec.ts`, "opens a
   destination wizard inside the tier, and tests the candidate from there",
   which drives everything up to the inverted step and stops there
-- **Build**: observed on `backupd` at
+- **Build**: observed on `retnd` at
   `87a9dc72dab2eb3161072b738bd29b0ccfb3b811`, which is the pin, and
   unchanged on `fix/622-storage-destinations`. It predates both.
 - **Kind**: a fixture defect that inverts a safety answer, found by driving

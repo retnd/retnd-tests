@@ -7,7 +7,7 @@ gaps stated rather than omitted.
 Re-derived at implementation time from the shipped pages
 (`ui/shared/src/App.tsx`'s twelve routes, `ui/shared/src/api/client.ts`'s
 request surface) and from the CLI's twelve registered commands
-(`core/cmd/backupd/main.go`), against `backupd` at
+(`core/cmd/retnd/main.go`), against `retnd` at
 `137f64699203a5ec6d2a6e399a654b99814a5a74`.
 
 **The pin has since moved to `6a93b96`, and the rows below have been
@@ -20,7 +20,7 @@ this document catch up. That is the mechanism working, not a failure.
 Each affected row below was re-derived from the source rather than from
 the failure message: `apps/common/webhost/router.go` for what the engine
 registers, `api/v1/openapi.json` for what the contract declares, and
-`core/cmd/backupd/main.go` for whether a CLI counterpart exists at
+`core/cmd/retnd/main.go` for whether a CLI counterpart exists at
 all. Rows that did not change were re-checked the same way rather than
 assumed, and the ones still blocked are still blocked for the reason
 already written against them.
@@ -92,7 +92,7 @@ ship unnoticed.
 | Enable or disable a backup set | `backup-set enabled <source/backup-set> <on\|off>` | the persisted `enabled` flag and a `sources` read-back, plus whether a run visits the set at all | **unproved**: this row used to read **gap (UI only)** and was wrong, in the same way the remove row was wrong before [#391](https://github.com/backupdproject/backupd/issues/391) was noticed: the verb had shipped as `backup-set enabled` and `contract-gaps.spec.ts` pinned the string `backup-set enable`, so nothing went red. Both surfaces exist — `POST /api/v1/backup-sets/{source}/{set}/enabled` and the verb — and no spec drives both and compares |
 | Quarantine: revalidate, retry ingestion | `validate <source/set/artifact>` for the revalidate half | the same resulting lifecycle state | **unproved**: `GET /api/v1/quarantine` answers 200 and the revalidate, retry and reinstate routes are registered and declared, all since [#214](https://github.com/backupdproject/backupd/pull/214). Proving the revalidate half means driving it in the browser and `validate` on the CLI over one fixture holding a quarantined artifact and comparing the resulting lifecycle state. Retry and reinstate have no CLI counterpart, so those stay UI-only whatever happens to the revalidate row |
 | Catalog rebuild (`/catalog-recovery`) | `catalog rebuild [--dry-run]` | a rebuilt catalog equal through the read surface | **unproved**: `POST /api/v1/catalog/rebuild` and `/catalog/scan` are registered and declared since [#214](https://github.com/backupdproject/backupd/pull/214). They answer 403 to `contract-gaps.spec.ts`, and that 403 is `requireCSRF` refusing a probe that sends no token, not a gate: both routes carry `requireCSRF` and, unlike `POST /operations`, not `requireDestructiveGate`. A browser driving the real page carries the token, so the route is reachable in the shape that matters. Proving it means rebuilding through the page and through `catalog rebuild` over one fixture and comparing the catalog through the read surface |
-| Local-auth enrolment | none | | **gap (UI only)**: there is no `backupd` command that enrols an administrator. This suite enrols over HTTP as setup, and names it as setup rather than comparing it |
+| Local-auth enrolment | none | | **gap (UI only)**: there is no `retnd` command that enrols an administrator. This suite enrols over HTTP as setup, and names it as setup rather than comparing it |
 | Password rotation | none | | **gap (UI only)**: `POST /api/v1/auth/password` has no CLI counterpart |
 | SSH key import, host-key trust, connection test | `backup-set create --ssh-key-file` and `--trust-host-key` for the first two, `backup-set test-connection <source/backup-set>` for the third | | **gap (UI only), narrowed twice**: the CLI imports a key and settles a host key only as inputs to a create ([#356](https://github.com/backupdproject/backupd/issues/356)), never as standalone verbs, so `POST /api/v1/ssh-keys` and `/ssh/host-key-probe` still have no CLI counterpart a caller can invoke on its own. The connection test is no longer in that list: `backup-set test-connection` exists, which this document recorded as having "none at all". Not proved here either: an import mints a fresh uuid by design, so two independent imports of one key are correctly unequal and the create row places the key under one id instead |
 

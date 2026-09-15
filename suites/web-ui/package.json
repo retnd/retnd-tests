@@ -1,11 +1,11 @@
 {
-  "name": "@backupd-tests/web-ui",
+  "name": "@retnd-tests/web-ui",
   "private": true,
   "type": "module",
-  "description": "Suite B: the Web UI Playwright suite, driven against a real backupd deployment.",
+  "description": "Suite B: the Web UI Playwright suite, driven against a real retnd deployment.",
   "scripts": {
     "e2e": "playwright test --project=generic --project=small-window --project=provider",
-    "e2e:list": "RM_BASE_URL=http://a-deployment.invalid RM_ADMIN_USERNAME=list RM_ADMIN_PASSWORD=list-only-no-deployment playwright test --list --project=generic --project=small-window --project=provider",
+    "e2e:list": "RETND_BASE_URL=http://a-deployment.invalid RETND_ADMIN_USERNAME=list RETND_ADMIN_PASSWORD=list-only-no-deployment playwright test --list --project=generic --project=small-window --project=provider",
     "e2e:ui": "playwright test --ui",
     "e2e:provider": "playwright test --project=provider",
     "unit": "vitest run",

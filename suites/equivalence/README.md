@@ -2,7 +2,7 @@
 
 ```sh
 cd suites/equivalence && npm ci && npx playwright install chromium   # once
-RM_UI_DIR=/path/to/backupd/ui/shared npm test
+RETND_UI_DIR=/path/to/retnd/ui/shared npm test
 ```
 
 Or from the repository root, `make suite-c`.
@@ -33,7 +33,7 @@ proved today, the row says why and names the issue.
    goes over HTTP; the credential is generated per run, held in memory, and
    never written to disk or passed through argv.
 4. Perform the action through the browser on the first directory, and
-   through `backupd` on the second. One row drives the API directly
+   through `retnd` on the second. One row drives the API directly
    instead of the browser, and says so in the spec: the wizard's own path
    to creating a backup set goes through a live host-key probe, which
    opens a real SSH connection to a machine no fixture here has. Driving

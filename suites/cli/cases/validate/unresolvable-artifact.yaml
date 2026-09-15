@@ -6,7 +6,7 @@ argv: [validate, --config, "${CONFIG}", "production/app-uploads/no-such-artifact
 exit: 1
 stdout: ignored
 stderr:
-  - contains: "backupd: "
+  - contains: "retnd: "
   - contains: "production/app-uploads/no-such-artifact"
 state: unchanged
 contract:

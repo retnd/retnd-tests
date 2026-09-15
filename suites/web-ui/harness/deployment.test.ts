@@ -29,68 +29,68 @@ import {
  *  breaks exactly one thing, so a failure names the thing it broke. */
 function env(overrides: Record<string, string | undefined> = {}): NodeJS.ProcessEnv {
   return {
-    RM_BASE_URL: "http://backupd:8080",
-    RM_ADMIN_USERNAME: "e2e-admin",
+    RETND_BASE_URL: "http://retnd:8080",
+    RETND_ADMIN_USERNAME: "e2e-admin",
     // Not a credential: this file never talks to anything, and the string
     // exists only so the resolver has a non-empty value to carry.
-    RM_ADMIN_PASSWORD: "unit-test-placeholder-value",
+    RETND_ADMIN_PASSWORD: "unit-test-placeholder-value",
     ...overrides
   } as NodeJS.ProcessEnv;
 }
 
 describe("the base URL", () => {
   it("is taken as given, so a container name resolves through Docker's DNS", () => {
-    expect(resolveBaseUrl(env())).toBe("http://backupd:8080");
+    expect(resolveBaseUrl(env())).toBe("http://retnd:8080");
   });
 
   it("refuses to default, and says why there is no default", () => {
-    expect(() => resolveBaseUrl(env({ RM_BASE_URL: undefined }))).toThrow(/RM_BASE_URL/);
+    expect(() => resolveBaseUrl(env({ RETND_BASE_URL: undefined }))).toThrow(/RETND_BASE_URL/);
     // The whole reason this variable is required rather than defaulted.
-    expect(() => resolveBaseUrl(env({ RM_BASE_URL: undefined }))).toThrow(/localhost/);
+    expect(() => resolveBaseUrl(env({ RETND_BASE_URL: undefined }))).toThrow(/localhost/);
   });
 
   it("treats an empty value as unset rather than as a URL", () => {
-    expect(() => resolveBaseUrl(env({ RM_BASE_URL: "   " }))).toThrow(/is not set/);
+    expect(() => resolveBaseUrl(env({ RETND_BASE_URL: "   " }))).toThrow(/is not set/);
   });
 
   it("refuses something that is not a URL at all", () => {
-    expect(() => resolveBaseUrl(env({ RM_BASE_URL: "http://" }))).toThrow(/not a URL/);
+    expect(() => resolveBaseUrl(env({ RETND_BASE_URL: "http://" }))).toThrow(/not a URL/);
   });
 
   // The commonest way to get this wrong, and the reason the refusal names
-  // the fix. `backupd:8080` is not rejected as unparseable: URL
-  // reads it as a scheme called `backupd`, so without this check it
+  // the fix. `retnd:8080` is not rejected as unparseable: URL
+  // reads it as a scheme called `retnd`, so without this check it
   // would sail through and reach page.goto as nonsense.
   it("refuses a host and port with no scheme in front of it", () => {
-    expect(() => resolveBaseUrl(env({ RM_BASE_URL: "backupd:8080" }))).toThrow(
+    expect(() => resolveBaseUrl(env({ RETND_BASE_URL: "retnd:8080" }))).toThrow(
       /write http:\/\/host:port/
     );
   });
 
   it("refuses a scheme a browser cannot be pointed at", () => {
-    expect(() => resolveBaseUrl(env({ RM_BASE_URL: "ftp://backupd" }))).toThrow(/http or https/);
+    expect(() => resolveBaseUrl(env({ RETND_BASE_URL: "ftp://retnd" }))).toThrow(/http or https/);
   });
 
   it("trims a trailing slash, so a path is appended once", () => {
-    expect(resolveBaseUrl(env({ RM_BASE_URL: "http://backupd:8080/" }))).toBe(
-      "http://backupd:8080"
+    expect(resolveBaseUrl(env({ RETND_BASE_URL: "http://retnd:8080/" }))).toBe(
+      "http://retnd:8080"
     );
   });
 });
 
 describe("the credentials", () => {
   it("are required, both of them", () => {
-    expect(() => resolveDeployment(env({ RM_ADMIN_USERNAME: undefined }))).toThrow(
+    expect(() => resolveDeployment(env({ RETND_ADMIN_USERNAME: undefined }))).toThrow(
       new RegExp(USERNAME_VAR)
     );
-    expect(() => resolveDeployment(env({ RM_ADMIN_PASSWORD: undefined }))).toThrow(
+    expect(() => resolveDeployment(env({ RETND_ADMIN_PASSWORD: undefined }))).toThrow(
       new RegExp(PASSWORD_VAR)
     );
   });
 
   it("carry no bootstrap token unless the run was handed one", () => {
     expect(resolveDeployment(env()).bootstrapToken).toBeNull();
-    expect(resolveDeployment(env({ RM_BOOTSTRAP_TOKEN: "tok" })).bootstrapToken).toBe("tok");
+    expect(resolveDeployment(env({ RETND_BOOTSTRAP_TOKEN: "tok" })).bootstrapToken).toBe("tok");
   });
 });
 
@@ -100,7 +100,7 @@ describe("the seeded backup set", () => {
   });
 
   it("comes through as the topology spells it", () => {
-    expect(resolveDeployment(env({ RM_BACKUP_SET: "e2e/vps" })).seededBackupSet).toBe("e2e/vps");
+    expect(resolveDeployment(env({ RETND_BACKUP_SET: "e2e/vps" })).seededBackupSet).toBe("e2e/vps");
   });
 
   // A set id is source and set, two segments. A one-segment value would
@@ -108,7 +108,7 @@ describe("the seeded backup set", () => {
   // failure would read as the page missing a set rather than as the run
   // being told the wrong thing.
   it("refuses a value that is not a backup set id", () => {
-    expect(() => resolveDeployment(env({ RM_BACKUP_SET: "vps" }))).toThrow(/RM_BACKUP_SET/);
+    expect(() => resolveDeployment(env({ RETND_BACKUP_SET: "vps" }))).toThrow(/RETND_BACKUP_SET/);
   });
 });
 
@@ -118,7 +118,7 @@ describe("the provider bundle", () => {
   });
 
   it("is taken from the environment when it is one this product ships", () => {
-    expect(resolvePlatform(env({ RM_PLATFORM: "synology" }))).toBe("synology");
+    expect(resolvePlatform(env({ RETND_PLATFORM: "synology" }))).toBe("synology");
   });
 
   // The sharp one. This variable DESCRIBES the image rather than
@@ -126,8 +126,8 @@ describe("the provider bundle", () => {
   // to work: it makes the provider spec assert one platform's treatment
   // against another's, which is a red nobody can read.
   it("refuses a name this product does not ship, and lists the ones it does", () => {
-    expect(() => resolvePlatform(env({ RM_PLATFORM: "qnap" }))).toThrow(new RegExp(PLATFORM_VAR));
-    expect(() => resolvePlatform(env({ RM_PLATFORM: "qnap" }))).toThrow(/openmediavault/);
+    expect(() => resolvePlatform(env({ RETND_PLATFORM: "qnap" }))).toThrow(new RegExp(PLATFORM_VAR));
+    expect(() => resolvePlatform(env({ RETND_PLATFORM: "qnap" }))).toThrow(/openmediavault/);
   });
 });
 
@@ -139,9 +139,9 @@ describe("the source machine", () => {
   it("comes back whole when it is named", () => {
     const source = resolveDeployment(
       env({
-        RM_VPS_HOST: "vps",
-        RM_VPS_USER: "backup",
-        RM_VPS_PATH: "/srv/outgoing"
+        RETND_VPS_HOST: "vps",
+        RETND_VPS_USER: "backup",
+        RETND_VPS_PATH: "/srv/outgoing"
       })
     ).source;
     expect(source).toEqual({ host: "vps", port: 22, user: "backup", path: "/srv/outgoing" });
@@ -150,7 +150,7 @@ describe("the source machine", () => {
   // A half-named source is worse than none: the wizard cases would type a
   // hostname, fail to list anything, and report a product defect.
   it("refuses a hostname with nothing to list on it", () => {
-    expect(() => resolveDeployment(env({ RM_VPS_HOST: "vps" }))).toThrow(/RM_VPS_USER/);
+    expect(() => resolveDeployment(env({ RETND_VPS_HOST: "vps" }))).toThrow(/RETND_VPS_USER/);
   });
 });
 
@@ -160,12 +160,12 @@ describe("how many browsers run at once", () => {
   });
 
   it("can be raised deliberately", () => {
-    expect(resolveWorkers(env({ RM_WORKERS: "4" }))).toBe(4);
+    expect(resolveWorkers(env({ RETND_WORKERS: "4" }))).toBe(4);
   });
 
   it("refuses a value that is not a count", () => {
-    expect(() => resolveWorkers(env({ RM_WORKERS: "lots" }))).toThrow(/RM_WORKERS/);
-    expect(() => resolveWorkers(env({ RM_WORKERS: "0" }))).toThrow(/RM_WORKERS/);
+    expect(() => resolveWorkers(env({ RETND_WORKERS: "lots" }))).toThrow(/RETND_WORKERS/);
+    expect(() => resolveWorkers(env({ RETND_WORKERS: "0" }))).toThrow(/RETND_WORKERS/);
   });
 });
 
@@ -181,18 +181,18 @@ describe("Chromium inside a container", () => {
   // that runs the browser as root needs it.
   it("only drops the sandbox when the image says it has to", () => {
     expect(resolveChromiumArgs(env())).not.toContain("--no-sandbox");
-    expect(resolveChromiumArgs(env({ RM_NO_SANDBOX: "1" }))).toContain("--no-sandbox");
+    expect(resolveChromiumArgs(env({ RETND_NO_SANDBOX: "1" }))).toContain("--no-sandbox");
   });
 });
 
 describe("where the evidence goes", () => {
   // The one that cost a run. Playwright removes its own outputDir on
-  // startup, and RM_ARTIFACTS_DIR is a bind mount, which cannot be
+  // startup, and RETND_ARTIFACTS_DIR is a bind mount, which cannot be
   // unlinked from inside the container: pointing outputDir straight at it
   // dies with EACCES rmdir before a browser ever starts. So both paths sit
   // a level below it.
   it("never puts the test output directory on the mount point itself", () => {
-    const paths = resolveArtifactPaths(env({ RM_ARTIFACTS_DIR: "/artifacts" }));
+    const paths = resolveArtifactPaths(env({ RETND_ARTIFACTS_DIR: "/artifacts" }));
     expect(paths.outputDir).not.toBe("/artifacts");
     expect(paths.outputDir.startsWith("/artifacts/")).toBe(true);
   });
@@ -200,13 +200,13 @@ describe("where the evidence goes", () => {
   // And Playwright refuses an HTML report folder nested inside the test
   // output folder, so the two are siblings.
   it("keeps the HTML report beside the test output rather than inside it", () => {
-    const paths = resolveArtifactPaths(env({ RM_ARTIFACTS_DIR: "/artifacts" }));
+    const paths = resolveArtifactPaths(env({ RETND_ARTIFACTS_DIR: "/artifacts" }));
     expect(paths.htmlReport.startsWith(paths.outputDir)).toBe(false);
     expect(paths.htmlReport.startsWith("/artifacts/")).toBe(true);
   });
 
   it("tolerates a trailing slash on the mount path", () => {
-    expect(resolveArtifactPaths(env({ RM_ARTIFACTS_DIR: "/artifacts/" })).outputDir).toBe(
+    expect(resolveArtifactPaths(env({ RETND_ARTIFACTS_DIR: "/artifacts/" })).outputDir).toBe(
       "/artifacts/test-results"
     );
   });
@@ -218,8 +218,8 @@ describe("where the evidence goes", () => {
 
 describe("the whole deployment", () => {
   it("resolves every field a run needs from one call", () => {
-    const deployment = resolveDeployment(env({ RM_ALLOW_DESTRUCTIVE: "1" }));
-    expect(deployment.baseURL).toBe("http://backupd:8080");
+    const deployment = resolveDeployment(env({ RETND_ALLOW_DESTRUCTIVE: "1" }));
+    expect(deployment.baseURL).toBe("http://retnd:8080");
     expect(deployment.credentials.username).toBe("e2e-admin");
     expect(deployment.platform).toBe("generic");
     expect(deployment.allowDestructive).toBe(true);
@@ -229,11 +229,11 @@ describe("the whole deployment", () => {
     expect(resolveDeployment(env()).allowDestructive).toBe(false);
     // Anything other than the exact opt-in is off, so a stray "true" or
     // "yes" cannot quietly arm a run that deletes retained backups.
-    expect(resolveDeployment(env({ RM_ALLOW_DESTRUCTIVE: "true" })).allowDestructive).toBe(false);
+    expect(resolveDeployment(env({ RETND_ALLOW_DESTRUCTIVE: "true" })).allowDestructive).toBe(false);
   });
 
   it("names the missing variable rather than the first thing that broke", () => {
-    expect(() => resolveDeployment(env({ RM_BASE_URL: undefined }))).toThrow(
+    expect(() => resolveDeployment(env({ RETND_BASE_URL: undefined }))).toThrow(
       new RegExp(BASE_URL_VAR)
     );
   });

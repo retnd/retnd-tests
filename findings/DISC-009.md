@@ -5,7 +5,7 @@
   it" below; `suites/web-ui/e2e/storage-destinations.spec.ts`'s "gives a
   newly added tier a destination of its own, named rather than left empty"
   carries the argument in its own comment.
-- **Build**: observed on `backupd` at `939da2f9`, the head of
+- **Build**: observed on `retnd` at `939da2f9`, the head of
   `fix/622-storage-destinations`. The feature is that branch's, so this
   cannot be older than it.
 - **Kind**: a divergence between what the issue says the default governs
