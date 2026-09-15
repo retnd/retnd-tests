@@ -17,8 +17,8 @@ import {
 // under `import.meta.env.DEV`. So every `?scenario=` state the specs drove
 // was a fixture inside the browser. The suite proved the UI renders
 // correctly given data, and structurally could not fail on anything in the
-// path an operator actually uses: browser -> `backupd-web serve-ui` ->
-// reverse proxy -> `backupd-web serve` -> SQLite.
+// path an operator actually uses: browser -> `retnd-web serve-ui` ->
+// reverse proxy -> `retnd-web serve` -> SQLite.
 //
 // That gap cost something real. backupd#598 was the Activity page
 // erroring in a browser while the server answered 200 with 64KB of valid
@@ -33,7 +33,7 @@ import {
 // host port.
 //
 // The topology is worth knowing about here, because one part of it is load
-// bearing for what this suite can claim. `backupd` is an alias on
+// bearing for what this suite can claim. `retnd` is an alias on
 // the EDGE network only, and the engine sits on an internal network the
 // client cannot resolve at all: a spec that tried to fetch the engine
 // directly gets ENOTFOUND. So every request this suite makes, from a page
@@ -44,7 +44,7 @@ import {
 // `reuseExistingServer` is gone with the block it belonged to. The
 // property it bought is not: a run here still never reports on a server it
 // cannot name. It just buys it a different way now, by refusing to start
-// without `RM_BASE_URL` rather than by refusing to adopt a listener.
+// without `RETND_BASE_URL` rather than by refusing to adopt a listener.
 // A default of `http://localhost:5173` would be the same defect the old
 // `reuseExistingServer: true` was, wearing a different hat: a run that
 // reports green against whatever happened to answer.
@@ -64,7 +64,7 @@ import {
 // A failure here happens inside a container, on a private network, against
 // a deployment that is gone by the time anybody reads the report. Nobody
 // can reproduce it by hand. So the trace, the video and the screenshot are
-// all kept on failure and written to `RM_ARTIFACTS_DIR`, which the client
+// all kept on failure and written to `RETND_ARTIFACTS_DIR`, which the client
 // container mounts out so the evidence survives teardown.
 // `on-first-retry` would never fire at all with retries at zero, so it
 // would have been a rule that quietly did nothing.
@@ -105,7 +105,7 @@ export default defineConfig({
   workers: resolveWorkers(),
   forbidOnly: !!process.env.CI,
   retries: 0,
-  // Both under RM_ARTIFACTS_DIR, and both a level below it. The client
+  // Both under RETND_ARTIFACTS_DIR, and both a level below it. The client
   // container mounts the tests checkout at /suite, so a report written
   // beside the specs would land in somebody's git status; and Playwright
   // removes its own outputDir on startup, which a bind mount cannot
@@ -153,7 +153,7 @@ export default defineConfig({
       // One provider, not seven. The bundle is chosen when the image is
       // built (VITE_PLATFORM, and `serve-ui --profile`), so a deployment
       // serves exactly one of them and no amount of configuration here
-      // reaches the others. `RM_PLATFORM` DESCRIBES which one this
+      // reaches the others. `RETND_PLATFORM` DESCRIBES which one this
       // deployment is; the seven-provider sweep the old
       // `scripts/e2e-all-providers.mjs` did by restarting Vite has no
       // equivalent against a real image and is not pretended at.

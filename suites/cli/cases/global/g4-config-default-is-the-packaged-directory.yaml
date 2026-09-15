@@ -15,11 +15,11 @@ no_arguments: true
 exit: 2
 stdout: empty
 stderr:
-  - line: "every command except version accepts --config (default /etc/backupd/config/config.yaml;"
+  - line: "every command except version accepts --config (default /etc/retnd/config/config.yaml;"
   - line: "a directory resolves to config.yaml inside it, which is what packaging mounts)"
 state: unchanged
 contract:
-  - "docs/runtime-contract.md: the configuration-mount row, /etc/backupd/config is a writable DIRECTORY holding config.yaml (issue #196)"
+  - "docs/runtime-contract.md: the configuration-mount row, /etc/retnd/config is a writable DIRECTORY holding config.yaml (issue #196)"
   - "docs/runtime-contract.md: a --config that resolves to a directory reads config.yaml inside it"
-  - "docs/deployment.md: /etc/backupd/config (writable) is the DIRECTORY holding the manager's YAML"
+  - "docs/deployment.md: /etc/retnd/config (writable) is the DIRECTORY holding the manager's YAML"
 tags: [smoke]

@@ -19,7 +19,7 @@ import (
 
 // Runner executes cases against one build under test.
 type Runner struct {
-	// CLI is the absolute path to the backupd binary, already
+	// CLI is the absolute path to the retnd binary, already
 	// through the identity handshake.
 	CLI string
 	// ScenarioDir is fixtures/scenarios.
@@ -215,9 +215,12 @@ func (r *Runner) invoke(bin string, n *Normalizer, argv []string, c Case, underT
 // who has not read the release notes still does.
 //
 // It is a link rather than a copy so the two names are the same binary by
-// construction, which is the arrangement the image makes and the only one
-// worth asserting against: two independently copied files could drift and
-// the case would not notice.
+// construction, which is the only arrangement worth asserting against:
+// two independently copied files could drift and the case would not
+// notice. It is the harness's own link, not the image's — R1.3
+// (backupd#888) ships no link under the retired name — so what a case
+// using this drives is a filename an operator's leftover automation
+// might still have, pointed at the build under test.
 //
 // The link is rebuilt on every use. A stale one pointing at the previous
 // pin's binary would be exactly the failure this repository refuses

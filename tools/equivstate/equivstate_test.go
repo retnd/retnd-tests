@@ -222,7 +222,7 @@ func write(t *testing.T, path, body string) {
 	}
 }
 
-// stubCLI writes a script that stands in for backupd. Each mode
+// stubCLI writes a script that stands in for retnd. Each mode
 // decides how the two sides' read surfaces relate, which is the one
 // variable each test above is changing.
 func stubCLI(t *testing.T, mode string) string {
@@ -241,7 +241,7 @@ func stubCLI(t *testing.T, mode string) string {
 	if body == "" {
 		t.Fatalf("unknown stub mode %q", mode)
 	}
-	path := filepath.Join(t.TempDir(), "backupd")
+	path := filepath.Join(t.TempDir(), "retnd")
 	write(t, path, "#!/bin/sh\n"+body+"\n")
 	if err := os.Chmod(path, 0o755); err != nil {
 		t.Fatal(err)

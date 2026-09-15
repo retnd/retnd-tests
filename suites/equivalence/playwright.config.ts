@@ -7,7 +7,7 @@ import { defineConfig, devices } from "@playwright/test";
 // this suite is measuring.
 //
 // No retries, anywhere. A retry is what turns a deterministic red into
-// something that reads as a flake, which is how backupd #172's real
+// something that reads as a flake, which is how retnd #172's real
 // failure got dismissed twice. An equivalence failure here is a claim about
 // the product, and it should be read rather than re-rolled.
 export default defineConfig({

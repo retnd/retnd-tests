@@ -13,7 +13,7 @@ argv: [activity, --config, "${CONFIG}", --severity, loud]
 exit: 2
 stdout: empty
 stderr:
-  - contains: "backupd: activity: --severity"
+  - contains: "retnd: activity: --severity"
   - contains: "warn or error"
   - absent: "DISCOVERED"
 state: unchanged

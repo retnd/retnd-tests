@@ -36,7 +36,7 @@ import { expect, test } from "./fixtures";
  *  the button, because that is the thing under test. */
 
 test.describe("signing out", () => {
-  test("sign-out lands on the Backupd login", async ({ page, bm }) => {
+  test("sign-out lands on the retnd login", async ({ page, bm }) => {
     await bm.goto("/");
     // The real control, reaching the real endpoint. On the mock,
     // api.logout() never made a network call at all and the stub had to be
@@ -45,7 +45,7 @@ test.describe("signing out", () => {
 
     await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
     await expect(page.getByText(/not.*your NAS operating-system login/i)).toBeVisible();
-    await expect(page.getByRole("img", { name: "Backupd" })).toBeVisible();
+    await expect(page.getByRole("img", { name: "retnd" })).toBeVisible();
   });
 
   test("the session it dropped is really gone from the service", async ({ page, bm, context }) => {
@@ -134,9 +134,9 @@ test.describe("the login form", () => {
     await page.goto("/");
     await page.getByRole("link", { name: /Create the administrator account/ }).click();
 
-    await expect(page.getByRole("heading", { name: /Create Backupd administrator/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Create retnd administrator/ })).toBeVisible();
     await expect(
-      page.getByText(/manages Backupd only.*separate from your NAS operating-system account/s)
+      page.getByText(/manages retnd only.*separate from your NAS operating-system account/s)
     ).toBeVisible();
   });
 
@@ -250,7 +250,7 @@ test.describe("what the service says about this session", () => {
  *
  *  Nor is it the outage page. Something DID answer, in one round trip,
  *  with a status and often with a sentence explaining the policy; telling
- *  the operator that Backupd is not answering sends them to restart a
+ *  the operator that retnd is not answering sends them to restart a
  *  service that is running.
  *
  *  `page.route` for the same reason `activity-failure.spec.ts` uses it: a
@@ -300,7 +300,7 @@ test.describe("a session the service refuses to discuss", () => {
     await expect(
       page.getByRole("heading", {
         level: 1,
-        name: "Backupd could not check your session",
+        name: "retnd could not check your session",
         exact: true
       })
     ).toBeVisible();
@@ -325,12 +325,12 @@ test.describe("a session the service refuses to discuss", () => {
     await expect(
       page.getByRole("heading", {
         level: 1,
-        name: "Backupd could not check your session",
+        name: "retnd could not check your session",
         exact: true
       })
     ).toBeVisible();
     await expect(page.getByRole("alert")).toContainText(
-      "Backupd could not answer whether this browser is signed in."
+      "retnd could not answer whether this browser is signed in."
     );
     await expect(page.getByRole("heading", { name: /^sign in$/i })).toHaveCount(0);
   });

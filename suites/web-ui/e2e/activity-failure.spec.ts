@@ -4,7 +4,7 @@ import { expect, needs, test } from "./fixtures";
 
 /**
  * backupd#598: the Activity page failing on a real 0.3.2 NAS with
- * "Backupd could not complete that request." and, under Advanced
+ * "retnd could not complete that request." and, under Advanced
  * details, the literal string "correlation id unavailable".
  *
  * # This file is the reason the suite moved, and it is the file that
@@ -57,7 +57,7 @@ const NOT_AN_ID = "correlation id unavailable";
  *
  *  A 200 with `application/json` and a body that is not JSON. The client
  *  (ui/shared/src/api/client.ts) calls `response.json()` on it and gets a
- *  plain `SyntaxError`, not a `BackupdError`, which is the whole
+ *  plain `SyntaxError`, not a `RetndError`, which is the whole
  *  root cause: nothing typed it, so every surface running that call said
  *  one fixed sentence and quoted a correlation id that appears in no log.
  *
@@ -235,7 +235,7 @@ test.describe("activity, when the feed reads fine", () => {
  *  answered unreadably".
  *
  *  On the reported UGREEN NAS the web-ui reverse proxy
- *  (`backupd-web serve-ui`) could not reach the engine at all
+ *  (`retnd-web serve-ui`) could not reach the engine at all
  *  (`dial tcp: lookup rclone-manager on 127.0.0.11:53: no such host`), and
  *  the Activity page showed the operator nothing. A read that never gets
  *  an answer is a different problem from one whose answer will not parse,

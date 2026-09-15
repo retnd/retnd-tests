@@ -81,7 +81,7 @@ test.describe("settings", () => {
     // Scoped to the card, so a label that turns up elsewhere on the page
     // does not count as provenance, and so the negatives below can be
     // about this card rather than about the whole app (the shell's own
-    // logo reads "backupd", which a page-wide /rclone/ would hit).
+    // logo reads "retnd", which a page-wide /rclone/ would hit).
     // The card is a plain <section> with an <h2>, not a landmark, so it is
     // located by its heading.
     const provenance = page
@@ -112,7 +112,7 @@ test.describe("settings", () => {
     // because the public contract does not name the implementation, and
     // it is asserted above.
     for (const gone of [
-      "Backupd version", "Core version", "Database schema", "Architecture"
+      "retnd version", "Core version", "Database schema", "Architecture"
     ]) {
       await expect(provenance.getByText(gone, { exact: true })).toHaveCount(0);
     }
@@ -136,7 +136,7 @@ test.describe("version mismatch", () => {
     // Scoped to the banner: the dashboard also raises a host-key alert in
     // this scenario, and "keeps information visible" is only worth
     // anything if the refusal it asserts is the version one.
-    const banner = page.getByRole("alert").filter({ hasText: "Backupd update required" });
+    const banner = page.getByRole("alert").filter({ hasText: "retnd update required" });
     await expect(banner).toBeVisible();
     await expect(banner).toContainText(/management actions have been disabled/);
 

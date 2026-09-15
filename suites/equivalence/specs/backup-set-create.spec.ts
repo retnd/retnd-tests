@@ -12,7 +12,7 @@ import { compareState, runCli } from "../harness/tools";
 // one, written as though it were a feature. The Web UI and the API could
 // both create a backup set and the CLI could not, so the row recorded a
 // capability that existed on two surfaces and not on the third.
-// backupd#356 added `backupd backup-set create`, and this is
+// backupd#356 added `retnd backup-set create`, and this is
 // what turns that into a proved row rather than a claim.
 //
 // # Why this drives the API rather than the wizard
@@ -87,8 +87,8 @@ function placeKey(work: string, pem: string): void {
 }
 
 async function csrf(page: import("@playwright/test").Page): Promise<string> {
-  const cookie = (await page.context().cookies()).find((c) => c.name === "bm_csrf");
-  if (!cookie) throw new Error("no bm_csrf cookie, so a CSRF-gated request cannot be made");
+  const cookie = (await page.context().cookies()).find((c) => c.name === "retnd_csrf");
+  if (!cookie) throw new Error("no retnd_csrf cookie, so a CSRF-gated request cannot be made");
   return cookie.value;
 }
 

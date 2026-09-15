@@ -111,4 +111,4 @@ export const GLOBAL_BEFORE_LINE = "e2e-hook global before ok";
 
 /** The variable naming the directory above, relative to the workflow
  *  root, as `settings workflow patch --before-dir` spells it. */
-export const GLOBAL_BEFORE_DIR_VAR = "RM_WF_GLOBAL_BEFORE_DIR";
+export const GLOBAL_BEFORE_DIR_VAR = "RETND_WF_GLOBAL_BEFORE_DIR";

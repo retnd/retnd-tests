@@ -41,8 +41,8 @@ export function resolveBuild(): Build {
   const build = JSON.parse(raw) as Build;
   if (!build.web) {
     throw new Error(
-      "the resolved build has no backupd-web binary, so there is no engine to drive the Web UI against. " +
-        "source mode's go builder produces one; local mode needs RM_WEB_BINARY."
+      "the resolved build has no retnd-web binary, so there is no engine to drive the Web UI against. " +
+        "source mode's go builder produces one; local mode needs RETND_WEB_BINARY."
     );
   }
   cachedBuild = build;

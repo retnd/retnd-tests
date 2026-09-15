@@ -34,7 +34,7 @@ raw_config: |
       region: us-east-1
       storage_class: STANDARD_IA
       credentials:
-        env: RM_FIXTURE_S3_CREDENTIALS_NOT_SET
+        env: RETND_FIXTURE_S3_CREDENTIALS_NOT_SET
   sources:
     - id: production
       backup_sets:

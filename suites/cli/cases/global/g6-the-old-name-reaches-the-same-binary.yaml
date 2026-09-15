@@ -1,28 +1,39 @@
 doc: >
-  The command was renamed to `backupd` in 0.3.3 and `backupd` still
-  runs, because the image links the old name beside the new one. This
-  case drives the build under test through that old filename and requires
-  the same four version lines it prints under its own name.
+  The build under test, reached through a filename it is not called. The
+  command is `retnd` from EPIC R (backupd#885) on, was `backupd` before
+  it, and this case drives the binary through `backupd` and requires the
+  same four version lines it prints under its own name — the first of
+  which says `retnd`.
 
-  Nothing an operator runs proves that promise, which is how it rots: the
-  Go side of it is one constant nobody reads argv[0] against, so the day
-  somebody "fixes" the printed name by taking it from the filename
-  instead, every test in the product still passes and the two spellings
-  quietly start reporting themselves differently on the same host. This
-  case is the outside view of that. `version` is the invocation it makes
-  because the binary naming itself is the assertion, and the first line
-  below says `backupd` while the file that produced it is called
-  `backupd`.
+  What changed in EPIC R, and why this case matters more than it did: the
+  old name is not aliased any more. R1.3 (backupd#888) retired `backupd`
+  rather than shipping a link under it, on the argument that printing two
+  names is how a reference stops being one. So the second filename this
+  case invokes through is not something the image provides; the harness
+  makes the link itself (Case.InvokeAs), which is what makes the claim
+  here about the BINARY rather than about packaging.
 
-  What this does not prove is that the shipped image contains both names.
-  The harness makes the link, so the claim is about the binary, not about
-  packaging; container/Dockerfile owns that half.
+  The property is that nothing dispatches on argv[0]. The Go side of it is
+  one constant nobody reads argv[0] against, and nothing an operator runs
+  proves that, which is how it rots: the day somebody "fixes" the printed
+  name by taking it from the filename instead, every test in the product
+  still passes, and a wrapper script, a busybox-style multi-call link or a
+  `docker run --entrypoint` under any other filename makes this build
+  print a command nobody can type. This case is the outside view of that.
+  `version` is the invocation it makes because the binary naming itself is
+  the assertion, and the first line below says `retnd` while the file that
+  produced it is called `backupd`.
+
+  What this does not prove is anything about the shipped image's contents.
+  The harness makes the link, so the claim is about the binary; the image
+  ships `/retnd`, `/retnd-web` and — for one release, as a hardlink —
+  `/backupd-web`, and container/Dockerfile owns that half.
 scenario: no-fixture
 invoke_as: backupd
 argv: [version]
 exit: 0
 stdout:
-  - re: "backupd \\S+"
+  - re: "retnd \\S+"
   - re: "rclone v\\d+\\.\\d+\\.\\d+\\S*"
   - re: "go go\\d+\\.\\d+(\\.\\d+)?"
   - re: "commit [0-9a-f]{7,40}(-dirty)?"
@@ -30,6 +41,6 @@ stdout:
 stderr: empty
 state: unchanged
 contract:
-  - "core/cliecho/cliname.go: Binary is `backupd`, and `backupd` still runs because the image symlinks it beside this one, so nothing an operator already automated has to change"
+  - "core/cliecho/cliname.go: Binary is `retnd`, and what this binary calls itself is a fact about the build rather than about how somebody reached it — reading argv[0] would make it print a command nobody can type"
   - "usage text: version - report version information"
 tags: [smoke]

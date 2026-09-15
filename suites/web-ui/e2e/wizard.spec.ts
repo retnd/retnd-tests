@@ -24,7 +24,7 @@ import { CONTENT_COLUMN, expect, needs, test } from "./fixtures";
  *    always succeeded, which is why the six named outcomes could be
  *    asserted in one go. Against a deployment they need a machine that
  *    actually answers, which is the source container the topology stands
- *    up, named through RM_VPS_HOST.
+ *    up, named through RETND_VPS_HOST.
  *
  *  - the case that SAVES creates a backup set on the deployment every
  *    later spec is reading, and there is no undo in this suite. It needs
@@ -268,8 +268,8 @@ test.describe("add backup set wizard", () => {
   test("step 3 requires an explicit trust decision", async ({ deployment, page }) => {
     needs(
       deployment.source !== null,
-      "a source machine this deployment can really reach, named through RM_VPS_HOST / " +
-        "RM_VPS_USER / RM_VPS_PATH. The mock answered every probe and every " +
+      "a source machine this deployment can really reach, named through RETND_VPS_HOST / " +
+        "RETND_VPS_USER / RETND_VPS_PATH. The mock answered every probe and every " +
         "connection test with a fixture; a real probe opens a real outbound connection, so the " +
         "wizard's built-in example hostname resolves to nothing and the step correctly fails"
     );
@@ -422,7 +422,7 @@ test.describe("add backup set wizard", () => {
   test("saving is blocked until the acknowledgement is checked", async ({ deployment, page }) => {
     needs(
       deployment.source !== null,
-      "a source machine this deployment can really reach (RM_VPS_HOST and friends) AND a key " +
+      "a source machine this deployment can really reach (RETND_VPS_HOST and friends) AND a key " +
         "in its store that authenticates against it. See satisfySavePreconditions: a synthetic key " +
         "is refused by a real sshd, so the topology has to import the source's own key"
     );
@@ -486,8 +486,8 @@ test.describe("add backup set wizard", () => {
   test("saving is blocked until the connection has been proven", async ({ deployment, page }) => {
     needs(
       deployment.source !== null,
-      "a source machine this deployment can really reach, named through RM_VPS_HOST / " +
-        "RM_VPS_USER / RM_VPS_PATH. The mock answered every probe and every " +
+      "a source machine this deployment can really reach, named through RETND_VPS_HOST / " +
+        "RETND_VPS_USER / RETND_VPS_PATH. The mock answered every probe and every " +
         "connection test with a fixture; a real probe opens a real outbound connection, so the " +
         "wizard's built-in example hostname resolves to nothing and the step correctly fails"
     );
@@ -612,8 +612,8 @@ test.describe("add backup set wizard", () => {
   test("completing the wizard and clicking Save & enable persists a new backup set, visible on the sets list", async ({ deployment, page, bm }) => {
     needs(
       deployment.source !== null,
-      "a source machine this deployment can really reach, named through RM_VPS_HOST / " +
-        "RM_VPS_USER / RM_VPS_PATH. The mock answered every probe and every " +
+      "a source machine this deployment can really reach, named through RETND_VPS_HOST / " +
+        "RETND_VPS_USER / RETND_VPS_PATH. The mock answered every probe and every " +
         "connection test with a fixture; a real probe opens a real outbound connection, so the " +
         "wizard's built-in example hostname resolves to nothing and the step correctly fails"
     );

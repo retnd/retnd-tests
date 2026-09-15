@@ -2,7 +2,7 @@
 
 ## The problem this has to solve
 
-Today a `backupd` change gets Web UI e2e feedback in the same
+Today a `retnd` change gets Web UI e2e feedback in the same
 working tree, and pull requests in that repository have been using e2e
 pass counts as merge evidence. Moving the Playwright suite out here takes
 that away unless something replaces it, so **the migration and its
@@ -11,7 +11,7 @@ in which a UI regression can arrive unseen.
 
 ## Where the gate actually is
 
-Not in GitHub Actions. Every workflow in `backupd` is
+Not in GitHub Actions. Every workflow in `retnd` is
 `workflow_dispatch`-only, `nightly-e2e.yml` has its schedule commented
 out, and merges rely on `.husky/pre-commit` running `scripts/ci-local.sh`
 having been green. A GitHub-side required check would gate nothing,
@@ -19,7 +19,7 @@ because nothing triggers it.
 
 So the replacement signal goes where the gate is: into `ci-local.sh`.
 
-## What goes into `backupd`
+## What goes into `retnd`
 
 Implemented. This section was the specification; it now describes what
 landed, and the two places it differs from the original design are called
@@ -38,7 +38,7 @@ out where they occur.
    lines. The step:
 
    - clones `backupd-tests` into
-     `${XDG_CACHE_HOME:-$HOME/.cache}/backupd-tests-gate/<sha>` and
+     `${XDG_CACHE_HOME:-$HOME/.cache}/retnd-tests-gate/<sha>` and
      checks out the pinned sha detached. Keyed by sha rather than one
      shared directory, which is a change from the original design: this
      machine carries around fifty worktrees of the product, and one shared
@@ -51,8 +51,8 @@ out where they occur.
 
      ```sh
      go build -ldflags "-X main.version=$(git rev-parse --short HEAD) -X main.commit=$(git rev-parse HEAD)" \
-       -o "$tmp/backupd" ./core/cmd/backupd
-     RM_MODE=local RM_BINARY="$tmp/backupd" RM_SOURCE_DIR="$PWD" \
+       -o "$tmp/retnd" ./core/cmd/retnd
+     RETND_MODE=local RETND_BINARY="$tmp/retnd" RETND_SOURCE_DIR="$PWD" \
        make -C "$gate_checkout" smoke
      ```
 
@@ -61,12 +61,12 @@ out where they occur.
      the handshake doing its job rather than a problem to work around.
 
    - runs Suite B too. This step is the one that changed shape when the
-     browser suite stopped driving a Vite dev server: `RM_UI_DIR` named a
+     browser suite stopped driving a Vite dev server: `RETND_UI_DIR` named a
      `ui/shared` checkout to serve, and there is nothing to serve any
      more. Suite B drives a deployment it did not create, so the step has
-     to stand the containers up first and hand the suite `RM_BASE_URL`,
-     `RM_ADMIN_USERNAME` and `RM_ADMIN_PASSWORD`. The rig lives in
-     `backupd`'s own `scripts/e2e/`, and wiring the gate step to
+     to stand the containers up first and hand the suite `RETND_BASE_URL`,
+     `RETND_ADMIN_USERNAME` and `RETND_ADMIN_PASSWORD`. The rig lives in
+     `retnd`'s own `scripts/e2e/`, and wiring the gate step to
      it is that repository's half of the change: this one only pins the
      specs.
 
@@ -109,7 +109,7 @@ predates a behaviour the pinned build has, or because it is ahead of one.
 That is the suite doing its job, and the fix is to read which case failed
 rather than to loosen it. A case is written to pin one claim, and its
 `contract:` list names where that claim came from, so a red case names
-the behaviour that differs. If a change in `backupd` deliberately
+the behaviour that differs. If a change in `retnd` deliberately
 changes a documented behaviour, the accompanying tests-repo change updates
 the case and its `contract:` list, and the pin bump lands with it.
 
@@ -123,7 +123,7 @@ reason.
 ### The smoke slice is a new signal
 
 The Suite A smoke slice is worth calling out separately: it is a signal
-`backupd` has never had. Today nothing exercises the CLI
+`retnd` has never had. Today nothing exercises the CLI
 black-box on a per-commit basis at all. The smoke slice runs the real
 binary against real fixtures on local remotes, needs no Docker and no
 browser, and takes a couple of seconds.
@@ -151,8 +151,8 @@ owner's call.
 
 ## Why the pins point opposite ways
 
-`backupd` pins this repository, and this repository pins a
-`backupd` build. That asymmetry is deliberate:
+`retnd` pins this repository, and this repository pins a
+`retnd` build. That asymmetry is deliberate:
 
 - pinning the tests repository means a new or changed test cannot break
   unrelated in-flight work in the product until someone bumps the pin,

@@ -20,7 +20,7 @@ import { expect, needs, test } from "./fixtures";
  *
  * The topology creates a backup set on the source machine and lets the
  * engine ingest from it before this suite starts, then names it in
- * `RM_BACKUP_SET`. That name is the anchor: the suite did not choose it,
+ * `RETND_BACKUP_SET`. That name is the anchor: the suite did not choose it,
  * the page cannot invent it, and a build that rendered a plausible fixture
  * instead of the catalogue would fail here and pass everywhere else.
  *
@@ -32,7 +32,7 @@ test.describe("the browser is looking at a real deployment", () => {
   test("the backup set the topology created is the one on the page", async ({ bm, page }) => {
     needs(
       bm.facts.seededBackupSet !== null,
-      "the topology to name the set it seeded, through RM_BACKUP_SET (e.g. e2e/vps)"
+      "the topology to name the set it seeded, through RETND_BACKUP_SET (e.g. e2e/vps)"
     );
     const [source, set] = bm.facts.seededBackupSet!.split("/");
 

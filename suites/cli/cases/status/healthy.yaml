@@ -8,7 +8,7 @@ scenario: seeded-local
 argv: [status, --config, "${CONFIG}"]
 exit: 0
 stdout:
-  - line: "process: backupd ${ANY}, go ${ANY}, rclone ${ANY}"
+  - line: "process: retnd ${ANY}, go ${ANY}, rclone ${ANY}"
   - line: "production/postgres-primary: HEALTHY"
   - line: "production/app-uploads: HEALTHY"
   - line: "  newest known-good backup: ${DUR}"

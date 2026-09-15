@@ -3,9 +3,9 @@
 // fixtures/scenarios.
 //
 // Two rules shape everything here, and both are about staying an outside
-// consumer of backupd rather than an insider:
+// consumer of retnd rather than an insider:
 //
-// First, nothing in this package imports anything from backupd.
+// First, nothing in this package imports anything from retnd.
 // The tests repository has exactly what an operator has: a binary, a YAML
 // config file, a state directory, and directory trees. The moment it
 // imports the product's own packages it stops being able to catch the

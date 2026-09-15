@@ -1,5 +1,5 @@
 import { destructive, expect, needs, test } from "./fixtures";
-import type { Backupd } from "./fixtures";
+import type { Retnd } from "./fixtures";
 import type { Locator, Page } from "@playwright/test";
 
 /**
@@ -89,13 +89,13 @@ const card = (page: Page) => page.getByRole("region", { name: "Storage destinati
  *  cases are about is the difference between a class that can take
  *  delivery and one that cannot, never those two names, and a deployment
  *  is free to call them anything. */
-const contentMedium = (bm: Backupd) => bm.facts.mediums.find((m) => m.archive !== true)!;
-const archiveMedium = (bm: Backupd) => bm.facts.mediums.find((m) => m.archive === true)!;
+const contentMedium = (bm: Retnd) => bm.facts.mediums.find((m) => m.archive !== true)!;
+const archiveMedium = (bm: Retnd) => bm.facts.mediums.find((m) => m.archive === true)!;
 
 /** The precondition every block in this file shares. Stated once, and in
  *  terms of what the topology would have to declare rather than in terms
  *  of what the mock happened to. */
-function needsTwoKindsOfDestination(bm: Backupd) {
+function needsTwoKindsOfDestination(bm: Retnd) {
   needs(
     bm.facts.mediums.some((m) => m.archive !== true) && bm.facts.mediums.some((m) => m.archive === true),
     "a deployment declaring both a content-class storage medium and an archive-class one. Every " +
@@ -336,15 +336,15 @@ test.describe("the storage destinations list", () => {
     // remove local`, because a row that taught a command the engine
     // refuses would be worse than a row that taught none.
     const local = row(page, "local");
-    await expect(local).toContainText("backupd medium test-connection local");
-    await expect(local).not.toContainText("backupd medium remove local");
+    await expect(local).toContainText("retnd medium test-connection local");
+    await expect(local).not.toContainText("retnd medium remove local");
 
     await expect(row(page, contentMedium(bm).id)).toContainText(
-      "backupd medium default " + contentMedium(bm).id
+      "retnd medium default " + contentMedium(bm).id
     );
     // And the destination that already carries the mark does not print a
     // line that would change nothing.
-    await expect(local).not.toContainText("backupd medium default local");
+    await expect(local).not.toContainText("retnd medium default local");
   });
 });
 
@@ -471,11 +471,11 @@ test.describe("picking a destination under a retention tier", () => {
 
     await picker(page, 1).selectOption(away);
     await expect(tier(page, 1)).toContainText(
-      "backupd settings patch --tier-medium " + tierName + "=" + away + " --acknowledge-medium-disclosure"
+      "retnd settings patch --tier-medium " + tierName + "=" + away + " --acknowledge-medium-disclosure"
     );
 
     await picker(page, 1).selectOption("local");
-    await expect(tier(page, 1)).toContainText("backupd settings patch --tier-medium " + tierName + "=local");
+    await expect(tier(page, 1)).toContainText("retnd settings patch --tier-medium " + tierName + "=local");
     await expect(tier(page, 1)).not.toContainText(
       "--tier-medium " + tierName + "=local --acknowledge-medium-disclosure"
     );
@@ -532,7 +532,7 @@ test.describe("picking a destination under a retention tier", () => {
       await expect(wizard.getByText(step, { exact: true })).toBeVisible();
     }
     await expect(wizard).toContainText(
-      "backupd medium test-connection --candidate nearline_eu"
+      "retnd medium test-connection --candidate nearline_eu"
     );
     await expect(wizard.getByRole("button", { name: "Test connection again" })).toBeVisible();
     await expect(wizard.getByRole("button", { name: "Verify" })).toHaveCount(0);

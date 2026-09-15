@@ -1,4 +1,4 @@
-// Package harness runs one backupd invocation against one fixture
+// Package harness runs one retnd invocation against one fixture
 // and decides whether the result matched a checked-in expectation.
 //
 // # Why there is no golden mode
@@ -17,7 +17,7 @@
 // specific lines, each of which someone had to derive from a document,
 // and every case names its source in its own `contract:` list. When
 // derivation and observation disagree, that is a finding to file against
-// backupd (see findings/), recorded as a known_discrepancy which
+// retnd (see findings/), recorded as a known_discrepancy which
 // this runner treats as a strict expected-failure: the case stays red
 // while the issue is open, and goes red again the moment it starts
 // passing, so a fix forces the marker's removal.
@@ -69,10 +69,13 @@ type Case struct {
 	Argv []string `yaml:"argv"`
 	// InvokeAs runs the argv under test through a second filename for the
 	// same binary, rather than through the name the pin resolved. It is
-	// how the old command name gets asserted from outside: `backupd` was
-	// `backupd` until 0.3.3 and the old spelling still has to
-	// work, and a promise like that is exactly the kind that rots
-	// silently because nothing an operator runs ever proves it.
+	// how the RETIRED command names get driven from outside: `retnd` was
+	// `backupd` until EPIC R (backupd#885) and `rbm` before that, and
+	// R1.3 (backupd#888) retired each one rather than aliasing it, so a
+	// host can only still reach this build under an old name through a
+	// link somebody made. What such a host has to be told is the name
+	// that exists, and nothing an operator runs ever proves that, which
+	// is exactly the kind of promise that rots silently.
 	//
 	// It is a bare filename, and the harness makes the link itself, so
 	// what a case using this asserts is that the binary does not care
@@ -109,7 +112,7 @@ type Case struct {
 	Contract []string `yaml:"contract"`
 
 	// Tags select subsets. "smoke" is the slice cheap enough to run on
-	// every backupd commit; "docker" marks cases needing a
+	// every retnd commit; "docker" marks cases needing a
 	// container.
 	Tags []string `yaml:"tags"`
 

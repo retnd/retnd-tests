@@ -327,7 +327,7 @@ test.describe("a backup set's workflow configuration, in a browser", () => {
     // panel and a panel nobody filled in look identical; this sentence
     // is the product saying which one it is.
     await expect(wf.card()).toContainText(
-      "This script parses, and backupd's own shell rules reported nothing about it."
+      "This script parses, and retnd's own shell rules reported nothing about it."
     );
   });
 

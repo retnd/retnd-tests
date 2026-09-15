@@ -84,7 +84,7 @@ const PAGES = ["/", "/sets", "/backups", "/activity", "/quarantine", "/settings"
 /** Opens the wizard the issue is named for, on the first backup set, and
  *  leaves a key selected so its primary button is live rather than
  *  disabled. */
-async function openSSHWizard(bm: import("./fixtures").Backupd) {
+async function openSSHWizard(bm: import("./fixtures").Retnd) {
   const page = bm.page;
   await page.getByRole("article").first().getByRole("button", { name: "Open" }).click();
   await page.getByRole("button", { name: "Change SSH authentication" }).click();
@@ -100,7 +100,7 @@ async function openSSHWizard(bm: import("./fixtures").Backupd) {
 /** The reading for the wizard's primary button, with the wizard opened
  *  from scratch. Its own function because two cases need it and one of
  *  them needs it twice, once per theme. */
-async function primaryButtonReading(bm: import("./fixtures").Backupd) {
+async function primaryButtonReading(bm: import("./fixtures").Retnd) {
   await bm.goto("/sets");
   await openSSHWizard(bm);
   const readings = await contrastReadings(bm.page, "[role='dialog']");

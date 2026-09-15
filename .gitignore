@@ -6,7 +6,7 @@
 # Node lives only inside the suites that need a browser.
 node_modules/
 /suites/web-ui/test-results/
-# resolveArtifactPaths defaults RM_ARTIFACTS_DIR to ".", so a local
+# resolveArtifactPaths defaults RETND_ARTIFACTS_DIR to ".", so a local
 # `npm run e2e:list` writes the HTML reporter's folder here rather than
 # into the client container's mount.
 /suites/web-ui/html-report/

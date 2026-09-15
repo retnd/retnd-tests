@@ -21,8 +21,8 @@ import { type SessionCookies, sessionIsLive, signIn } from "../harness/session";
  * would take the one path this move exists to cover and stub it out again.
  *
  * So the fixture signs in the way the client does: GET a page for the
- * `backupd_csrf` cookie, POST /api/v1/auth/login echoing it back in
- * `X-CSRF-Token`, and carry the `backupd_session` cookie the 204 sets. The
+ * `retnd_csrf` cookie, POST /api/v1/auth/login echoing it back in
+ * `X-CSRF-Token`, and carry the `retnd_session` cookie the 204 sets. The
  * details are in harness/session.ts, including why no credential in this
  * suite ever reaches a file.
  *
@@ -49,7 +49,7 @@ import { type SessionCookies, sessionIsLive, signIn } from "../harness/session";
  * it into a stated skip rather than a silent pass.
  */
 
-/** The same two elements as `Backupd.terminal()` and the content
+/** The same two elements as `Retnd.terminal()` and the content
  *  column, as selectors, for the geometry a locator cannot express: a
  *  measurement that compares two boxes has to read both inside ONE page
  *  evaluation, or it is comparing a layout to itself one paint later. */
@@ -82,7 +82,7 @@ class SessionStore {
 
 /** Page-object surface. Keeps the specs readable and stops selector drift
  *  from spreading across the suite. */
-export class Backupd {
+export class Retnd {
   constructor(
     readonly page: Page,
     private readonly session: SessionStore,
@@ -180,7 +180,7 @@ export class Backupd {
 }
 
 export const test = base.extend<
-  { signedIn: boolean; bm: Backupd },
+  { signedIn: boolean; bm: Retnd },
   { deployment: Deployment; sessionStore: SessionStore; facts: DeploymentFacts }
 >({
   /** Whether this test's browser carries a session.
@@ -263,7 +263,7 @@ export const test = base.extend<
           await context.addCookies([...(await sessionStore.cookiesForContext())]);
         }
       }
-      await use(new Backupd(page, sessionStore, context.request, facts));
+      await use(new Retnd(page, sessionStore, context.request, facts));
     },
     { auto: true }
   ]
