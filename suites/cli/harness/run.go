@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	fixtures "github.com/backupdproject/backupd-tests/fixtures/lib"
-	"github.com/backupdproject/backupd-tests/tools/getbuild"
-	"github.com/backupdproject/backupd-tests/tools/statesnap"
+	fixtures "github.com/retnd/retnd-tests/fixtures/lib"
+	"github.com/retnd/retnd-tests/tools/getbuild"
+	"github.com/retnd/retnd-tests/tools/statesnap"
 )
 
 // Runner executes cases against one build under test.

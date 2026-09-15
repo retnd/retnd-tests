@@ -40,7 +40,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/backupdproject/backupd-tests/tools/statesnap"
+	"github.com/retnd/retnd-tests/tools/statesnap"
 )
 
 // ReadCommands are the read-only invocations the comparison runs against
