@@ -1,0 +1,418 @@
+import { request } from "@playwright/test";
+
+import { signIn } from "../harness/session";
+import {
+  HOST_RUNNER,
+  INHERITING_ONLY,
+  NO_HOOKS_SENTENCE,
+  WorkflowScreens
+} from "./workflow-page";
+import {
+  FINDINGS_INFO_CODE,
+  FINDINGS_SCRIPT,
+  FINDINGS_WARNING_CODE,
+  HAPPY_BEFORE,
+  REJECTED_ERROR_CODE,
+  REJECTED_POSITION,
+  REJECTED_SCRIPT,
+  REMOTE_BEFORE,
+  SECRET_ENV_NAME,
+  SFTP_ONLY_SCRIPT
+} from "./workflow-scripts";
+import { expect, needs, test } from "./fixtures";
+import {
+  EXEC_SET_VAR,
+  FINDINGS_SET_VAR,
+  NEEDS_WORKFLOW_CONTROL,
+  NO_HOOKS_SET_VAR,
+  REJECTED_DIR_VAR,
+  SECRET_SET_VAR,
+  SECRET_VALUE_VAR,
+  SFTP_ONLY_SET_VAR,
+  WORKFLOW_SET_VAR,
+  acknowledgeHolds,
+  needsFixture,
+  readBackupSetWorkflow,
+  readWorkflowSettings,
+  resolveWorkflowControl,
+  withRunnerStopped
+} from "../harness/workflow";
+
+/**
+ * What a backup set says about its hooks BEFORE anything runs
+ * (backupd#816, the configuration half of EPIC L in a browser).
+ *
+ * # Why these cases are not unit tests of the same component
+ *
+ * Because every sentence on this card is a claim about a filesystem and
+ * an sshd that the browser cannot see. "This script runs on the Host
+ * Workflow Runner" is a claim about a Unix socket on the manager;
+ * "this connection cannot run a command" is a claim about what a real
+ * sshd did when a real exec channel was opened on it. ui/shared's own
+ * tests render the card over a fixture, which proves the card draws what
+ * it is handed and cannot prove that what it is handed is true.
+ *
+ * The card only reaches the state these cases read by asking the engine
+ * for a validation report, which opens a connection to the source host
+ * AND to the Host Workflow Runner. So a red here is one of two real
+ * things: the product drew the wrong answer, or the deployment could not
+ * produce one.
+ *
+ * # The SFTP-only case is the sharpest one in the file
+ *
+ * A source account confined to `internal-sftp` authenticates perfectly,
+ * transfers bytes perfectly, and cannot run a hook. That is the
+ * RECOMMENDED posture for a backup source, so it is not a fault, and a
+ * product that reported it as a connection failure would send an operator
+ * to fix a thing that is not broken. The rig provides it as a genuinely
+ * confined account on a real sshd - not as a refusal simulated in the
+ * app - and this file asserts the product tells the two apart.
+ */
+
+test.describe("a backup set's workflow configuration, in a browser", () => {
+  test.beforeEach(async ({ bm }) => {
+    needs(
+      bm.facts.workflow.served,
+      "a build that serves /api/v1/settings/workflow: every case here is about EPIC L, and a " +
+        "build predating it has no workflow surface to assert on"
+    );
+  });
+
+  test("a set with no hooks says so in one sentence and draws nothing else", async ({ bm, deployment, page }) => {
+    const set = deployment.workflow.noHooksSet;
+    needs(set !== null, needsFixture(NO_HOOKS_SET_VAR));
+
+    const wf = new WorkflowScreens(page);
+    await wf.gotoSet(set!);
+    const card = wf.card();
+    await expect(card).toBeVisible();
+
+    // Which empty state is the honest one depends on the DEPLOYMENT, not
+    // on this set: a global stage runs for every set, so a deployment
+    // that configures one has no set that runs nothing. Both are real
+    // states and the product words them differently, so the fact decides
+    // which sentence is asserted rather than the spec hoping for one.
+    const globals =
+      bm.facts.workflow.globalBeforeDir !== "" || bm.facts.workflow.globalAfterDir !== "";
+    if (globals) {
+      await expect(card).toContainText(INHERITING_ONLY);
+    } else {
+      await expect(card).toContainText(NO_HOOKS_SENTENCE);
+      // The whole point of the quiet path: no table, no findings, no
+      // history. New noise on every existing set is the failure mode
+      // this wave was one edit away from.
+      await expect(card.getByRole("table")).toHaveCount(0);
+      await expect(card).not.toContainText("Recent workflow runs");
+    }
+  });
+
+  test("a configured set names the directories its hooks come from", async ({ bm, deployment, page }) => {
+    const set = deployment.workflow.happySet;
+    needs(set !== null, needsFixture(WORKFLOW_SET_VAR));
+
+    // The anchor comes from the service, not from the page: a card that
+    // rendered a plausible directory would pass a case that only looked
+    // at the card.
+    const configured = await readBackupSetWorkflow(bm.api, set!);
+    needs(
+      configured !== null && configured.configured,
+      "the rig to configure hook directories on " + set + ": the service reports it as " +
+        "unconfigured, so there is nothing for the card to name"
+    );
+
+    const wf = new WorkflowScreens(page);
+    await wf.gotoSet(set!);
+    const card = wf.card();
+    await expect(card).toContainText(configured!.before_dir ?? "");
+    await expect(card).toContainText(configured!.after_dir ?? "");
+    await expect(card).toContainText("Script timeout");
+  });
+
+  test("checking a set's hooks lists every script and where each one runs", async ({ bm, deployment, page }) => {
+    const set = deployment.workflow.happySet;
+    needs(set !== null, needsFixture(WORKFLOW_SET_VAR));
+
+    const wf = new WorkflowScreens(page);
+    await wf.gotoSet(set!);
+    await wf.checkControl().click();
+
+    // The table only exists once the engine has answered, and answering
+    // means it reached the Host Workflow Runner. There is no fixture
+    // path to this table.
+    const table = wf.scriptTable();
+    await expect(table).toBeVisible({ timeout: 30_000 });
+    const row = wf.scriptRow(HAPPY_BEFORE);
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText("Local Host");
+    // The column this whole L7 surface exists for: a hook that runs on
+    // the manager and one that runs on the source machine are different
+    // things to an operator deciding what a script may touch.
+    await expect(row).toContainText(HOST_RUNNER);
+
+    // Two verdicts, kept apart. A set whose hooks are sound says so
+    // without claiming anything about the backup set itself.
+    await expect(wf.card()).toContainText("Hooks valid");
+  });
+
+  test("a remote hook names the connection it runs over, and not the host runner", async ({ bm, deployment, page }) => {
+    const set = deployment.workflow.execSet;
+    needs(set !== null, needsFixture(EXEC_SET_VAR));
+
+    const wf = new WorkflowScreens(page);
+    await wf.gotoSet(set!);
+    await wf.checkControl().click();
+    await expect(wf.scriptTable()).toBeVisible({ timeout: 30_000 });
+
+    const row = wf.scriptRow(REMOTE_BEFORE);
+    await expect(row).toHaveCount(1);
+    await expect(row).toContainText("Remote");
+    // The negative is the assertion. A remote script whose "Runs on"
+    // said Host Workflow Runner would be telling an operator their hook
+    // executes on the manager, which is the opposite of true and the
+    // exact mistake that makes somebody quiesce the wrong machine.
+    await expect(row).not.toContainText(HOST_RUNNER);
+  });
+
+  test("an SFTP-only source is refused a remote hook, in words, and is not called broken", async ({ bm, deployment, page }) => {
+    const set = deployment.workflow.sftpOnlySet;
+    needs(set !== null, needsFixture(SFTP_ONLY_SET_VAR));
+
+    // Half of this case is that the SAME source transfers bytes
+    // perfectly. Read from the catalogue rather than asserted by running
+    // one: the engine's own preflight refuses a run of a set whose hooks
+    // cannot execute, so the artifacts the rig ingested before it
+    // attached the hook are what prove the transfer path works.
+    const [source, name] = set!.split("/");
+    const ingested = bm.facts.backups.filter(
+      (artifact) => artifact.source_name === source && artifact.set_name === name
+    );
+    needs(
+      ingested.length > 0,
+      "the topology to have ingested at least one backup from " + set + " before attaching its " +
+        "remote hook: without it, 'SFTP works and exec does not' is only half asserted"
+    );
+
+    const wf = new WorkflowScreens(page);
+    await wf.gotoSet(set!);
+    await wf.checkControl().click();
+    const card = wf.card();
+
+    // The engine's own check id, which is a closed vocabulary and not a
+    // sentence: `exec_capability` is the one that means "this account
+    // authenticates and cannot run a command".
+    const finding = card.getByText("exec_capability", { exact: true });
+    await expect(finding).toBeVisible({ timeout: 60_000 });
+    // Scoped to the finding's own row rather than swept over the card:
+    // "error" appears in plenty of prose, and a case that matched it
+    // anywhere would pass against an exec_capability finding reported
+    // as a warning - which is the difference between "your hooks will
+    // not run" and "you might want to look at this".
+    await expect(finding.locator("..")).toContainText("error");
+    await expect(card).toContainText("Hooks not valid");
+
+    // And the half that keeps this from reading as a fault: the set
+    // itself is fine, and the product says a confined source is a
+    // supported setup with a named way out of it.
+    await expect(card).toContainText("Valid for backup");
+    await expect(card).toContainText("An SFTP-only source can move bytes and cannot run a hook");
+    await expect(wf.scriptRow(SFTP_ONLY_SCRIPT)).toHaveCount(1);
+  });
+
+  test("with the Host Workflow Runner stopped, the check says the runner is why", async ({ bm, deployment, page }) => {
+    const control = resolveWorkflowControl();
+    needs(control !== null, NEEDS_WORKFLOW_CONTROL);
+    const set = deployment.workflow.happySet;
+    needs(set !== null, needsFixture(WORKFLOW_SET_VAR));
+
+    await withRunnerStopped(control!, async () => {
+      const wf = new WorkflowScreens(page);
+      await wf.gotoSet(set!);
+      await wf.checkControl().click();
+      const card = wf.card();
+
+      // `runner_health` is the engine's own id for "the Host Workflow
+      // Runner did not answer". A deployment whose runner is gone and
+      // whose card still said "Hooks valid" would be promising an
+      // operator that a local hook will run tonight.
+      await expect(card.getByText("runner_health", { exact: true })).toBeVisible({ timeout: 60_000 });
+      await expect(card).toContainText("Hooks not valid");
+    });
+
+    // Taking the runner away interrupts whatever local hook the
+    // scheduler happened to be executing, and that is not confined to
+    // the set this case names: every hooked set in the deployment runs
+    // on a one-minute cadence, so the outage lands on whichever one was
+    // mid-hook. A run left with an obligation nobody settled becomes a
+    // hold, and a held set is never scheduled again - which starves any
+    // later case that can only OBSERVE runs, and reports as a scheduler
+    // that stopped working.
+    //
+    // The settle happens in this file's afterAll and not on this line,
+    // and the timing is the whole point: an interrupted run does not
+    // become a hold until it FINALISES, seconds to minutes after the
+    // outage. A settle taken here is structurally guaranteed to look
+    // before the hold exists, find nothing, and leave the set blocked
+    // for everything after it - which is exactly what a run ending
+    // with two unsettled holds on a set nobody named showed.
+  });
+
+  test("a secret-backed variable shows where it comes from and never what it is", async ({ bm, deployment, page }) => {
+    const set = deployment.workflow.secretSet;
+    needs(set !== null, needsFixture(SECRET_SET_VAR));
+    const secret = deployment.workflow.secretValue;
+    needs(
+      secret !== null,
+      "the rig to hand over the plaintext in " + SECRET_VALUE_VAR + ": without it this case can " +
+        "only check that a row exists, which is not the assertion"
+    );
+
+    const wf = new WorkflowScreens(page);
+    await wf.gotoSet(set!);
+    const preview = wf.environmentPreview();
+    await expect(preview).toBeVisible();
+    const row = preview.getByRole("row").filter({ hasText: SECRET_ENV_NAME });
+    await expect(row).toHaveCount(1);
+    // A secret is a LOCATION and never a value: the contract has no
+    // field a resolved secret could arrive in, and the cell says so out
+    // loud rather than leaving a blank that reads as "not set".
+    await expect(row).toContainText("never shown");
+
+    // The invariant, swept over the whole document rather than over the
+    // cell: a reveal control, a title attribute or a debug panel
+    // anywhere on this page would be the same defect.
+    expect(await page.content()).not.toContain(secret!);
+  });
+
+  test("a finding carries its code, its position and the line it fired at", async ({ bm, deployment, page }) => {
+    const set = deployment.workflow.findingsSet;
+    needs(set !== null, needsFixture(FINDINGS_SET_VAR));
+
+    const wf = new WorkflowScreens(page);
+    await wf.gotoSet(set!);
+    await wf.checkControl().click();
+    await expect(wf.scriptTable()).toBeVisible({ timeout: 30_000 });
+
+    // The badge is the way in, and opening it is the assertion that the
+    // cell is an affordance rather than a decoration.
+    const badge = wf.findingsControl(FINDINGS_SCRIPT);
+    await expect(badge).toHaveAttribute("aria-expanded", "false");
+    await badge.click();
+    await expect(badge).toHaveAttribute("aria-expanded", "true");
+
+    const card = wf.card();
+    await expect(card.getByText(FINDINGS_WARNING_CODE, { exact: true }).first()).toBeVisible();
+    await expect(card.getByText(FINDINGS_INFO_CODE, { exact: true }).first()).toBeVisible();
+    // A position is `line:col`, and the column is the half nobody can
+    // use without counting - which is why the panel draws the source
+    // line under it. Both halves are asserted, because a panel with a
+    // code and no position sends an operator to read the whole file.
+    await expect(card.getByText(/^\d+:\d+$/).first()).toBeVisible();
+    // The excerpt itself: the bytes the verification read and hashed,
+    // carried with the finding. Asserted through the line the rule fired
+    // on rather than through a class name.
+    await expect(card).toContainText("cd ");
+  });
+
+  test("a clean script says so rather than showing an empty panel", async ({ bm, deployment, page }) => {
+    const set = deployment.workflow.happySet;
+    needs(set !== null, needsFixture(WORKFLOW_SET_VAR));
+
+    const wf = new WorkflowScreens(page);
+    await wf.gotoSet(set!);
+    await wf.checkControl().click();
+    await expect(wf.scriptTable()).toBeVisible({ timeout: 30_000 });
+
+    await wf.findingsControl(HAPPY_BEFORE).click();
+    // The contrast that makes the case above mean something. An empty
+    // panel and a panel nobody filled in look identical; this sentence
+    // is the product saying which one it is.
+    await expect(wf.card()).toContainText(
+      "This script parses, and backupd's own shell rules reported nothing about it."
+    );
+  });
+
+  test("a stage directory holding an error-severity hook is refused, and nothing is saved", async ({
+    bm,
+    deployment,
+    page
+  }) => {
+    const dir = deployment.workflow.rejectedDir;
+    needs(dir !== null, needsFixture(REJECTED_DIR_VAR));
+
+    // Deliberately NOT a set with the directory already configured:
+    // there is no such state. The engine verifies every script a write
+    // points at BEFORE persisting, and refuses the write, so the only
+    // way to observe an error-severity finding is to attempt the save
+    // and be told no. That is also the better assertion - it is the
+    // gate, and the gate is what stands between an operator and a hook
+    // that runs `rm -rf` on a path an empty variable left behind.
+    const before = await readWorkflowSettings(bm.api);
+    await page.goto("/settings");
+    const field = page.locator("#workflow-setting-beforeDir");
+    await expect(field).toBeVisible();
+    await field.fill(dir!);
+    await field.locator("..").getByRole("button", { name: "Save", exact: true }).click();
+
+    // The refusal, wherever the card draws it. Scoped to the Workflow
+    // card rather than to `role="alert"`: the banner this renders in
+    // does not claim that role, and a case that required it would be
+    // asserting a markup choice instead of the refusal. Matched
+    // case-insensitively on the one clause both wordings share, because
+    // the service says "the configuration was not saved" and the card's
+    // own lead-in says "This configuration was NOT saved".
+    const card = page
+      .locator("section.card")
+      .filter({ has: page.getByRole("heading", { level: 2, name: "Workflow", exact: true }) });
+    await expect(card).toContainText(/configuration was not saved/i, { timeout: 60_000 });
+    // Which script, where it lives, which rule fired and at what
+    // position. A refusal that said only "refused" would send an
+    // operator to read every file in a directory.
+    await expect(card).toContainText(REJECTED_SCRIPT);
+    await expect(card).toContainText(dir!);
+    await expect(card).toContainText(REJECTED_ERROR_CODE + " at " + REJECTED_POSITION);
+
+    // And the refusal was a refusal: the deployment still configures
+    // whatever it configured before this case touched it. A gate that
+    // reported a refusal and wrote anyway is the failure worth catching,
+    // and it is invisible from the banner alone.
+    const after = await readWorkflowSettings(bm.api);
+    expect(after?.before_dir ?? "").toBe(before?.before_dir ?? "");
+  });
+
+  // Settle what the runner outage above left behind, once it can exist.
+  //
+  // Here rather than in the case, because a hold is created when the
+  // interrupted run FINALISES and not when it is interrupted: by the
+  // time this file's remaining cases have run, that has happened. A
+  // held set is never scheduled again, and the file after this one
+  // waits for the scheduler to run one - so a hold left here does not
+  // fail this file, it starves that one and reports as a scheduler
+  // that stopped working.
+  //
+  // Deployment-wide rather than per set: the runner is shared, so the
+  // outage lands on whichever set was mid-hook and this file cannot
+  // know which.
+  test.afterAll(async ({ deployment }) => {
+    const jar = (await signIn(deployment)).map((c) => c.name + "=" + c.value).join("; ");
+    const api = await request.newContext({
+      baseURL: deployment.baseURL,
+      extraHTTPHeaders: { cookie: jar }
+    });
+    try {
+      const settled = await acknowledgeHolds(
+        api,
+        null,
+        "e2e: the Host Workflow Runner was stopped by a test, which interrupted this run's " +
+          "hooks; settled so the scheduler will run the set again"
+      );
+      if (settled.length > 0) {
+        console.log(
+          "e2e: the runner outage left " + settled.length + " hold(s) on " +
+            [...new Set(settled)].join(", ") + "; acknowledged so later files are not starved"
+        );
+      }
+    } finally {
+      await api.dispose();
+    }
+  });
+});

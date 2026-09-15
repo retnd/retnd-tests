@@ -52,22 +52,23 @@ test.describe("dashboard", () => {
     // repeats "Service running" with a different suffix (uptime, not
     // version), so an unscoped match is ambiguous.
     await expect(page.getByRole("banner").getByText(/Service running/)).toBeVisible();
-    // The sentence under the verdict, whichever verdict this deployment
-    // is on. The three alternatives here were the mock's, and its fixture
-    // was never healthy, so the healthy sentence had never been seen by
-    // this suite at all: the first real run found it saying "a known-good
-    // backup exists within the stale threshold and nothing needs
-    // attention" and read that as a missing subhead.
+    // The sentence under the verdict is the SERVICE's own
+    // (`backupHealthReason`, rendered straight through by
+    // HealthSummary), so it is read from the service and compared
+    // rather than matched against a regex of remembered wordings. That
+    // regex was really asserting which verdict this deployment happens
+    // to be on, and it went red the day the deployment grew a set whose
+    // hooks fail on purpose.
     //
-    // What §8 is about survives whichever one renders: the line under
-    // BACKUPS talks about BACKUPS, not about the process being up.
-    await expect(
-      page
-        .getByText(
-          /a healthy daemon is not a healthy backup|not produced a verified backup|halted|known-good backup exists/i
-        )
-        .first()
-    ).toBeVisible();
+    // What §8 is about survives whichever verdict renders: the line
+    // under BACKUPS talks about BACKUPS, and it is the service's answer
+    // rather than the page's invention.
+    needs(
+      bm.facts.backupHealthReason !== "",
+      "the service to publish a backup health reason: without one there is no sentence to " +
+        "compare the page against, and asserting the page against itself proves nothing"
+    );
+    await expect(page.getByText(bm.facts.backupHealthReason, { exact: true })).toBeVisible();
   });
 
   test("every status chip pairs a glyph with a text label", async ({ bm, page }) => {
@@ -191,8 +192,14 @@ test.describe("dashboard", () => {
     // literally "Backup sets10 stale · 0 failing": one set, then a
     // detail line starting with a zero. A `\s` after the count matches
     // nothing, and worse, a bare `1` would have matched the wrong digit.
+    // The tile renders `setsHealthy`, not the total: its own detail line
+    // carries the stale and failing counts beside it. Asserting the
+    // total passed only while every set in the deployment was healthy,
+    // which stopped being true the moment the fixture fleet grew a set
+    // whose before hook fails on purpose.
+    const healthy = bm.facts.sets.filter((set) => set.state === "HEALTHY").length;
     await expect(metrics).toContainText(
-      new RegExp("Backup sets\\s*" + bm.facts.sets.length + "\\s*\\d+ stale")
+      new RegExp("Backup sets\\s*" + healthy + "\\s*\\d+ stale")
     );
   });
 

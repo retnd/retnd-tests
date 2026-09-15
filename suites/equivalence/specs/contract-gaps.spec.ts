@@ -46,7 +46,7 @@ import { expect, signIn, test } from "../harness/fixtures";
  *  readable route regressing behind a gate, both fail here. */
 const UI_CALLS: {
   path: string;
-  method: "GET" | "POST";
+  method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   served: boolean;
   status: number;
   note: string;
@@ -75,7 +75,41 @@ const UI_CALLS: {
   { path: "/catalog/rebuild", method: "POST", served: true, status: 403, note: "closed by #214; 403 here is CSRF, not a gate" },
 
   { path: "/version", method: "GET", served: false, status: 404, note: "the contract calls it /system/version" },
-  { path: "/health", method: "GET", served: false, status: 404, note: "the engine serves /health/live outside /api/v1" }
+  { path: "/health", method: "GET", served: false, status: 404, note: "the engine serves /health/live outside /api/v1" },
+
+  // EPIC L's workflow surface (backupd#813/#814/#816). Every mutating
+  // one carries `requireCSRF` and, deliberately, NOT
+  // `requireDestructiveGate` (apps/common/webhost/router.go): resuming a
+  // cleanup is how an operator un-quiesces a machine, and putting it
+  // behind the gate that refuses `POST /operations` would leave a source
+  // stuck on a deployment that has not turned destructive operations on.
+  // So 403 here is this probe sending no token, exactly as the catalog
+  // rows above, and a browser driving the real banner carries one. A row
+  // flipping to 200 means the CSRF requirement came off something that
+  // unwinds hooks on a live machine.
+  { path: "/settings/workflow", method: "GET", served: true, status: 200, note: "the deployment-wide hook configuration" },
+  { path: "/settings/workflow", method: "PATCH", served: true, status: 403, note: "configure hooks deployment-wide; 403 is CSRF, not a gate" },
+  { path: "/settings/workflow/environment", method: "GET", served: true, status: 200, note: "the deployment-wide hook environment" },
+  { path: "/settings/workflow/environment/E2E_PROBE", method: "PUT", served: true, status: 403, note: "set a hook variable; 403 is CSRF, not a gate" },
+  { path: "/settings/workflow/environment/E2E_PROBE", method: "DELETE", served: true, status: 403, note: "unset a hook variable; 403 is CSRF, not a gate" },
+  { path: "/workflow-runs", method: "GET", served: true, status: 200, note: "the workflow run journal" },
+  { path: "/workflow-recovery", method: "GET", served: true, status: 200, note: "the hold set the Run control is gated on" },
+  // A run id that cannot exist, deliberately: `requireCSRF` refuses
+  // before the handler looks one up, so this probe cannot resume or
+  // acknowledge anything. A 404 here would mean the CSRF middleware came
+  // off and the handler answered instead.
+  { path: "/workflow-recovery/e2e-no-such-run/resume-cleanup", method: "POST", served: true, status: 403, note: "resume an interrupted run's cleanup; 403 is CSRF, not a gate" },
+  { path: "/workflow-recovery/e2e-no-such-run/acknowledge", method: "POST", served: true, status: 403, note: "acknowledge a held run; 403 is CSRF, not a gate" },
+
+  // The per-set half, against a set this deployment really has: the
+  // source and set segments below are substituted at run time, because a
+  // GET on a set nobody configured answers 404 and would be recorded
+  // here as an absent route.
+  { path: "/backup-sets/{source}/{set}/workflow", method: "GET", served: true, status: 200, note: "one set's hook configuration" },
+  { path: "/backup-sets/{source}/{set}/workflow", method: "PATCH", served: true, status: 403, note: "configure one set's hooks; 403 is CSRF, not a gate" },
+  { path: "/backup-sets/{source}/{set}/workflow/environment", method: "GET", served: true, status: 200, note: "one set's hook environment" },
+  { path: "/backup-sets/{source}/{set}/workflow/environment/E2E_PROBE", method: "PUT", served: true, status: 403, note: "set one set's hook variable; 403 is CSRF, not a gate" },
+  { path: "/backup-sets/{source}/{set}/workflow/environment/E2E_PROBE", method: "DELETE", served: true, status: 403, note: "unset one set's hook variable; 403 is CSRF, not a gate" },
 ];
 
 /** The CLI verbs this matrix's rows depend on, and whether the product has
@@ -120,9 +154,54 @@ const CLI_VERBS: { verb: string; present: boolean; note: string }[] = [
     note: "the remove row's CLI half, landed by backupd#391. This entry used to read `backup-set delete` and `present: false`, which is the mistake the exhaustiveness case below exists to stop repeating"
   },
   {
-    verb: "backup-set enable",
-    present: false,
-    note: "the enable/disable row stays a gap on this side; POST .../enabled is served"
+    verb: "backup-set enabled",
+    present: true,
+    note: "the enable/disable row's CLI half. This entry used to read `backup-set enable` and `present: false`, which is the same mistake the remove row made: the verb had shipped under a name nobody pinned, and the matrix went on calling it a gap"
+  },
+  {
+    verb: "backup-set read-only",
+    present: true,
+    note: "a set's read-only posture, pinned so the exhaustiveness case below has an entry for every subverb `backup-set` offers"
+  },
+  {
+    verb: "backup-set edit-hold",
+    present: true,
+    note: "the edit hold, same reason as the row above"
+  },
+  {
+    verb: "backup-set test-connection",
+    present: true,
+    note: "the standalone connection test the SSH row records as having no CLI counterpart at all. It has one now, under `backup-set`, which is what the exhaustiveness case is for"
+  },
+
+  // EPIC L (backupd#813/#814/#816). Every mutating workflow action the
+  // Web UI offers has a CLI counterpart, and the two that do NOT are
+  // the interesting rows: there is no cancel verb anywhere, and the CLI
+  // refuses `fetch --skip-workflow-scripts` by design.
+  {
+    verb: "backup-set workflow",
+    present: true,
+    note: "one set's hook configuration and environment: `workflow <set>`, `workflow patch <set>`, `workflow env <set> list|set|unset`"
+  },
+  {
+    verb: "settings workflow",
+    present: true,
+    note: "the deployment-wide hook configuration and environment, the CLI half of Settings > Workflow"
+  },
+  {
+    verb: "validate workflow",
+    present: true,
+    note: "the CLI half of the card's `Check this set's hooks`: the same validation report, findings and two verdicts"
+  },
+  {
+    verb: "workflow run",
+    present: true,
+    note: "`run list|show|steps|log`, the CLI half of the run history, the run page and the step terminal"
+  },
+  {
+    verb: "workflow recovery",
+    present: true,
+    note: "`recovery show|resume-cleanup|acknowledge`, the CLI half of the recovery banner and both of its buttons"
   },
   {
     verb: "activity",
@@ -194,10 +273,32 @@ test.describe("the matrix's gap rows", () => {
   test("every path the UI client calls is served, or is a gap this matrix names", async ({ page, pair }) => {
     await signIn(page, pair.ui);
 
+    // The set every per-set row is probed against. Read from the
+    // deployment rather than written down, because a set id this suite
+    // invented would answer 404 and be recorded as an absent route.
+    const sets = (await (await page.request.get(pair.ui.uiUrl + "/api/v1/backup-sets")).json()) as {
+      backup_sets?: { id?: string }[];
+    };
+    const anySet = (sets.backup_sets ?? []).map((s) => s.id ?? "").find((id) => id.includes("/"));
+    expect(
+      anySet,
+      "this fixture configures no backup set, so every per-set row below would be probed against " +
+        "a path nobody serves and recorded as an absent route"
+    ).toBeTruthy();
+
     const surprises: string[] = [];
     for (const call of UI_CALLS) {
-      const url = pair.ui.uiUrl + "/api/v1" + call.path;
-      const res = call.method === "GET" ? await page.request.get(url) : await page.request.post(url);
+      const [source, set] = (anySet ?? "/").split("/");
+      const path = call.path.replace("{source}", encodeURIComponent(source)).replace(
+        "{set}",
+        encodeURIComponent(set)
+      );
+      const url = pair.ui.uiUrl + "/api/v1" + path;
+      // `fetch` rather than the per-verb helpers: EPIC L's configuration
+      // surface writes with PATCH, PUT and DELETE, and a table that
+      // could only express GET and POST would have to leave the
+      // mutating half of a whole feature unpinned.
+      const res = await page.request.fetch(url, { method: call.method });
       const reachable = res.status() !== 404 && res.status() !== 405;
       if (reachable !== call.served) {
         surprises.push(
@@ -301,7 +402,13 @@ test.describe("the matrix's gap rows", () => {
     // and that is the one that notices a verb shipping under a name the
     // matrix never considered.
     const raw = rawCliUsage(pair.build.cli);
-    const covered = ["backup-set"];
+    // `workflow` joins `backup-set` here because EPIC L put a whole
+    // feature's inspection surface under one noun with two levels below
+    // it, which is exactly the shape a verb hides in: `workflow run log`
+    // shipped under a name this matrix would never have guessed, and a
+    // spot-check of the two nouns somebody thought of is how the remove
+    // row stayed wrong for weeks.
+    const covered = ["backup-set", "workflow"];
 
     for (const family of covered) {
       const offered = cliSubverbs(raw, family);
