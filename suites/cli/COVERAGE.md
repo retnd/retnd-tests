@@ -117,12 +117,12 @@ other command that opens a config, so a command that stops honouring
 
 | Case | Fixture | Expectation |
 |---|---|---|
-| `check/f1-config-missing` | none | exit 1, `retnd: ` naming the path |
+| `check/f1-config-missing` | none | exit 0 and a first-run notice naming the path, the writable-directory answer and the next step (retnd#1049) |
 | `check/f2-malformed-yaml` | `malformed-yaml` | exit 1, stderr naming a parse problem |
 | `check/f3-duplicate-backup-set-id` | `invalid-duplicate-set` | exit 1, stderr naming the offending field path (FR-7) |
 | `check/f3-unsupported-remote-type` | `invalid-remote-type` | exit 1, stderr naming the type and the field (FR-4) |
 | `check/f3-missing-local-path` | `invalid-missing-local-path` | exit 1, stderr naming `local_path` |
-| `check/f3-zero-sources` | `zero-sources` | exit 1: a config that configures nothing to back up is a mistake to report, not an empty deployment to accept |
+| `check/f3-zero-sources` | `zero-sources` | exit 0: a config with no sources is what a fresh install runs on, valid and idle (retnd#1049) |
 | `check/f4-state-database-absent` | `absent-state` | derived: FR-9 makes migrations version-controlled, which only makes sense if opening a missing database creates it, and nothing documents a missing file as an error. So exit 0, and the database exists afterwards |
 | `check/f5-state-database-corrupt` | `corrupt-state` | exit 1, stderr naming the state database |
 | `global/f6-unknown-flag` | any | exit 2 |

@@ -1,12 +1,18 @@
-doc: status honours --config, and refuses when the file is not there.
+doc: >
+  status on a fresh install (retnd#1049). A --config path with no
+  configuration behind it is a deployment nobody has configured yet, not a
+  broken one: there is no backup set to be unhealthy, so status says it is
+  a fresh install, names the next step, and exits 0.
 scenario: no-fixture
 argv: [status, --config, "${WORK}/no-such-config.yaml"]
-exit: 1
-stdout: empty
-stderr:
-  - contains: "retnd: "
+exit: 0
+stdout:
+  - contains: "not configured yet"
+  - contains: "Next step:"
   - contains: "${WORK}/no-such-config.yaml"
+stderr: empty
 state: unchanged
 contract:
   - "usage text: every command except version accepts --config"
+  - "retnd#1049: a user must never meet an error on first install just because something has not been configured yet"
 tags: [smoke]

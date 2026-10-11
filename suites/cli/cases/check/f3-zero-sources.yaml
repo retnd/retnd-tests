@@ -1,16 +1,20 @@
 doc: >
-  A config with no sources configures nothing to back up. FR-5's whole
-  point is that the file describes the deployment, so an empty sources
-  list is a mistake to report rather than an empty deployment to accept
-  silently.
+  A config with no sources is valid (retnd#1049). It is what a fresh
+  install runs on until its first backup set exists: the scheduler walks
+  nothing and the UI shows its empty state. This case used to expect exit 1
+  with a refusal naming "sources"; it now pins the opposite, so the
+  relaxation is deliberate and cannot come back unnoticed.
 scenario: zero-sources
 argv: [check, --config, "${CONFIG}"]
-exit: 1
-stdout: empty
-stderr:
-  - contains: "retnd: "
-  - contains: "sources"
-state: unchanged
+exit: 0
+stdout:
+  - line: "config OK: 0 source(s), 0 backup set(s)"
+  - line: "state database OK: ${STATE_DB}"
+  - count: 2
+stderr: empty
+state:
+  mode: changed
+  files_present: ["${STATE_DB}"]
 contract:
-  - "docs/EPIC.md FR-5 (configuration SHALL be validated before destructive processing begins)"
+  - "retnd#1049: a user must never meet an error on first install just because something has not been configured yet"
 tags: [smoke]

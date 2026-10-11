@@ -1,16 +1,18 @@
 doc: >
-  A --config path that does not exist is an operational failure, named
-  with the path so an operator can see which file was looked for.
+  check on a fresh install (retnd#1049). The engine writes a default
+  configuration on its first start, so the question check answers here is
+  whether it can: a writable configuration directory is a pass, and the
+  notice says there is no configuration yet and what to do next.
 scenario: no-fixture
 argv: [check, --config, "${WORK}/no-such-config.yaml"]
-exit: 1
-stdout: empty
-stderr:
-  - contains: "retnd: "
-  - contains: "${WORK}/no-such-config.yaml"
-  - contains: "no such file or directory"
+exit: 0
+stdout:
+  - contains: "config: none yet at ${WORK}/no-such-config.yaml"
+  - contains: "config directory writable: yes"
+  - contains: "Next step:"
+stderr: empty
 state: unchanged
 contract:
   - "usage text: every command except version accepts --config"
-  - "exit-code convention: 1 is an operational failure, prefixed retnd: "
+  - "retnd#1049: a user must never meet an error on first install just because something has not been configured yet"
 tags: [smoke]
