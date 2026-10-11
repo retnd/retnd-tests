@@ -69,8 +69,13 @@ test.describe("backups table", () => {
     // a number the deployment decides would make this red on every
     // deployment that declares no storage medium, which is FR-35's
     // supported case and the state a fresh install is in.
-    const expected = bm.facts.mediums.length > 0 ? 8 : 7;
+    //
+    // One more since EPIC Q (retnd#985): the Assurance column carries the
+    // three claims, Stored, Content verified and Recovery tested, as three
+    // elements, so the count is one past what it was.
+    const expected = (bm.facts.mediums.length > 0 ? 8 : 7) + 1;
     await expect(page.getByRole("columnheader")).toHaveCount(expected);
+    await expect(page.getByRole("columnheader", { name: "Assurance" })).toHaveCount(1);
     const rows = await page.getByRole("row").count();
     expect(rows).toBeGreaterThan(1);
   });
@@ -469,13 +474,14 @@ test.describe("a deployment that never heard of storage mediums", () => {
     );
   });
 
-  test("has no Medium column, and exactly the seven columns it always had", async ({ bm, page }) => {
+  test("has no Medium column, and exactly the seven columns it always had plus Assurance", async ({ bm, page }) => {
     needs(bm.facts.backups.length > 0, "at least one ingested backup, so there is a table to count columns on");
     await bm.goto("/backups");
 
     const table = page.getByRole("table");
     await expect(table).toBeVisible();
-    await expect(page.getByRole("columnheader")).toHaveCount(7);
+    await expect(page.getByRole("columnheader")).toHaveCount(8);
+    await expect(table.getByRole("columnheader", { name: "Assurance" })).toHaveCount(1);
     await expect(table.getByRole("columnheader", { name: "Medium" })).toHaveCount(0);
     // The positive control: the table really rendered rows, so the
     // absence above is the absence of a column and not of the page.
