@@ -1,0 +1,15 @@
+doc: >
+  The staging root, its TTL, the concurrency ceilings and the web download
+  budget are properties of the host and the process, and the per-set answer is
+  no, written down. Asking for one on a set is a usage error that says so and
+  names the command that does take it (FR-73).
+scenario: seeded-local
+argv: ["backup-set", "assurance", "production/postgres-primary", "--staging-root", "/x", "--config", "${CONFIG}"]
+exit: 2
+stdout: ignored
+stderr:
+  - contains: "--staging-root is global only, and the per-set answer is no"
+  - contains: "settings assurance patch"
+state: unchanged
+contract:
+  - "FR-73 (global only, per-set is no, in writing)"

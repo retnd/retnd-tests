@@ -1,0 +1,14 @@
+doc: >
+  --content downloads the copy, which most providers bill for, so it is
+  refused as a usage error unless --allow-egress says the cost is
+  acknowledged. Nothing is read and nothing is written (FR-68, FR-74).
+scenario: seeded-local
+argv: ["scrub", "production/postgres-primary", "--content", "--config", "${CONFIG}"]
+exit: 2
+stdout: empty
+stderr:
+  - contains: "--content downloads the copy, which is billed by most providers; add --allow-egress"
+state: unchanged
+contract:
+  - "FR-68 (money is a refusal, not a warning)"
+  - "FR-74"

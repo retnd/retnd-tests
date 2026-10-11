@@ -1,0 +1,15 @@
+doc: >
+  --json prints the body the API serves: the artifact id, the byte count, the
+  copy and the digest, so a script can compare a recovery against what it
+  recorded without parsing prose (FR-67).
+scenario: seeded-local
+argv: ["recover", "production/postgres-primary/pg-2026-06-01.dump", "--to", "recovered-2", "--json", "--config", "${CONFIG}"]
+exit: 0
+stdout:
+  - contains: "\"artifact_id\":\"production/postgres-primary/pg-2026-06-01.dump\""
+  - contains: "\"bytes\":4096"
+  - contains: "\"sha256\":\"55611b10e46648a984c74726d94237a8d37d9ec1c366240fa82c50cd676cdd8c\""
+stderr: ignored
+state: changed
+contract:
+  - "FR-67"

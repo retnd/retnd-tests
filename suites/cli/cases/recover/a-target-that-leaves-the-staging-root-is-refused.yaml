@@ -1,0 +1,14 @@
+doc: >
+  A target name that climbs out of the staging root is refused with exit
+  status 20, before anything is opened or written. The name is operator input
+  and the root is the one place a recovery may write (FR-67).
+scenario: seeded-local
+argv: ["recover", "production/postgres-primary/pg-2026-06-01.dump", "--to", "../x", "--config", "${CONFIG}"]
+exit: 20
+stdout: ignored
+stderr:
+  - contains: "that target name does not stay inside the recovery staging root"
+state: unchanged
+contract:
+  - "FR-67"
+  - "usage text: recover exit codes 10-36"

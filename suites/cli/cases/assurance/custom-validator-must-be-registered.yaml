@@ -1,0 +1,14 @@
+doc: >
+  A custom recovery test names a validator, and a name nothing registered is
+  refused: the validator is a reference to something the operator already
+  declared, never free text that becomes a command (FR-71).
+scenario: seeded-local
+argv: ["backup-set", "assurance", "production/postgres-primary", "--recovery-test-mode", "custom", "--recovery-test-validator", "nope", "--config", "${CONFIG}"]
+exit: 1
+stdout: ignored
+stderr:
+  - contains: "\"nope\" is not a registered validator"
+state: unchanged
+contract:
+  - "FR-71"
+  - "FR-73"

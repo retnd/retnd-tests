@@ -1,0 +1,18 @@
+doc: >
+  A local copy whose bytes changed is refused before a byte is delivered, with
+  exit status 14 (its own code, not the generic 1), a sentence that says none
+  of it was delivered and that other copies are unaffected. The staging area
+  holds nothing afterwards (FR-67).
+scenario: seeded-local
+mutate:
+  - "corrupt ${LOCAL}/production/postgres-primary/pg-2026-06-01.dump"
+argv: ["recover", "production/postgres-primary/pg-2026-06-01.dump", "--to", "out", "--config", "${CONFIG}"]
+exit: 14
+stdout: ignored
+stderr:
+  - contains: "does not match the checksum recorded when this backup was ingested"
+  - contains: "none of it was delivered"
+state: unchanged
+contract:
+  - "FR-67 (re-verifies the bytes)"
+  - "usage text: recover exit codes 10-36"

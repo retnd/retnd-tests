@@ -1,0 +1,17 @@
+doc: >
+  Recovering a local copy to a name under the staging root places the verified
+  bytes and reports the digest the host placed. The digest is the one the
+  fixture's seeded bytes hash to, pinned here, so a recovery that delivered
+  the right size of the wrong content would print a different one (FR-67).
+scenario: seeded-local
+argv: ["recover", "production/postgres-primary/pg-2026-06-01.dump", "--to", "recovered-1", "--config", "${CONFIG}"]
+exit: 0
+stdout:
+  - contains: "recovered:           production/postgres-primary/pg-2026-06-01.dump"
+  - contains: "copy:                local"
+  - contains: "bytes:               4096"
+  - contains: "sha256:              55611b10e46648a984c74726d94237a8d37d9ec1c366240fa82c50cd676cdd8c"
+stderr: ignored
+state: changed
+contract:
+  - "FR-67 (streams one chosen copy to one declared target, re-verifying the bytes)"

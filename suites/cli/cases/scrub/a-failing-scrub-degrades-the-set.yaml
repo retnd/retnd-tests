@@ -1,0 +1,21 @@
+doc: >
+  After a failing scrub the set reads DEGRADED in status, the exit status of
+  status is 1, and the artifact is QUARANTINED in the product's own read
+  surface. The exit code of the scrub alone would not prove the journal
+  learned anything, so the second command asks the journal (FR-69, FR-70).
+scenario: seeded-local
+setup_after_mutate:
+  - ["scrub", "production/postgres-primary", "--config", "${CONFIG}"]
+mutate:
+  - "corrupt ${LOCAL}/production/postgres-primary/pg-2026-06-01.dump"
+allow_setup_failure: true
+argv: ["status", "--config", "${CONFIG}"]
+exit: 1
+stdout:
+  - contains: "production/postgres-primary: DEGRADED"
+  - contains: "quarantined: 1"
+stderr: ignored
+state: unchanged
+contract:
+  - "FR-69 (a failure degrades health)"
+  - "docs/EPIC.md FR-10 (QUARANTINED)"

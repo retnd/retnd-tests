@@ -1,0 +1,18 @@
+doc: >
+  The same default through --json, which is the shape the API serves:
+  configured is false, and the four host-scoped knobs are listed with per_set
+  false. A script can tell a deployment that chose its policy from one that
+  inherited it, and the zero value is never mistaken for a choice (FR-73).
+scenario: seeded-local
+argv: ["settings", "assurance", "--json", "--config", "${CONFIG}"]
+exit: 0
+stdout:
+  - contains: "\"configured\": false"
+  - contains: "\"per_set\": false"
+  - contains: "\"name\": \"staging_root\""
+  - contains: "\"name\": \"web_download_memory_bytes\""
+stderr: empty
+state: unchanged
+contract:
+  - "FR-73"
+  - "usage text: settings assurance --json prints the body the API serves"

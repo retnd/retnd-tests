@@ -1,0 +1,14 @@
+doc: >
+  --to is required: standard output, a name under the staging root or a
+  medium. There is no default target, because a default is where the bytes go
+  when nobody was asked (FR-67).
+scenario: seeded-local
+argv: ["recover", "production/postgres-primary/pg-2026-06-01.dump", "--config", "${CONFIG}"]
+exit: 2
+stdout: empty
+stderr:
+  - contains: "recover: --to is required"
+state: unchanged
+contract:
+  - "FR-67"
+  - "usage text: recover"

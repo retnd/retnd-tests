@@ -1,0 +1,18 @@
+doc: >
+  Changing the deployment-wide cadence moves a set that inherits. The patch is
+  made first and the set is read afterwards, so the answer is the one the
+  resolver gives after the write and not a value cached before it. This is the
+  retention-override silent no-op, asserted through the command a person types
+  (FR-73).
+scenario: seeded-local
+setup:
+  - ["settings", "assurance", "patch", "--scrub-cadence", "24h", "--config", "${CONFIG}"]
+argv: ["backup-set", "assurance", "production/postgres-primary", "--config", "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "production/postgres-primary inherits the deployment's policy:"
+  - contains: "scrub: every 24h0m0s, strategy auto"
+stderr: ignored
+state: unchanged
+contract:
+  - "FR-73 (a global change moves a set that inherits)"

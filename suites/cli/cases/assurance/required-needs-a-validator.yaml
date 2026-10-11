@@ -1,0 +1,15 @@
+doc: >
+  A set that requires a recovery test with no validator anywhere is refused at
+  the write, with the field path and the reason, and nothing is written.
+  Required without a validator would be a policy no recovery test could ever
+  satisfy, and the refusal is the only place that is said (FR-71, FR-73).
+scenario: seeded-local
+argv: ["backup-set", "assurance", "production/postgres-primary", "--recovery-test-mode", "required", "--config", "${CONFIG}"]
+exit: 1
+stdout: ignored
+stderr:
+  - contains: "assurance.recovery_test.validator_id: mode required needs a validator"
+state: unchanged
+contract:
+  - "FR-73 (resolved by Validate)"
+  - "FR-71 (the operator's validator)"
