@@ -148,6 +148,45 @@ Two asymmetries shape this section and neither is a defect:
 | Bypass a set's hooks for one run | none — `fetch --skip-workflow-scripts` is refused rather than ignored | | **gap (neither surface)**: the only way to ask for this is `POST /api/v1/operations` with `skip_workflow_scripts`, which sits behind the destructive gate, and no control in the shipped bundle submits it. The UI renders the result — a "Scripts bypassed" badge beside the run state, and a workflow verdict that says so rather than reporting the hooks skipped — so an operator can read a state neither surface lets them cause. `fetch`'s own refusal names the reason: bypassing is an administrator action performed by the process that serves the deployment, recorded on the run row and in a warn-level event |
 | Cancel a workflow run | none | | **gap (neither surface)**: there is no cancel verb under `workflow` and no cancel control in the bundle. `canceled` is a real run state the journal records and the run page draws, and what matters about a canceled run is what happened to the cleanup it still owed, which is the Cleanup verdict. The exhaustiveness case in `specs/contract-gaps.spec.ts` now covers the `workflow` family, so a cancel verb appearing goes red here |
 
+## Recovery and assurance (EPIC Q)
+
+EPIC Q (retnd#953) put recovery, scrubbing and the three assurance claims on both
+surfaces. The rows below were derived from the shipped pages
+(`ui/shared/src/assurance/`, `SettingsPage.tsx`, the Backup detail page), from
+`api/v1/openapi.json`, and from the binary's own usage text (`settings assurance`,
+`backup-set assurance`, `scrub`, `recover`), not from the epic's description of them.
+
+Two things the epic describes are **not** on both surfaces, and the rows say so rather
+than imply a pair:
+
+- There is **no route that starts a scrub or a recovery test**, and no CLI verb that
+  starts a recovery test (it runs from the daemon's schedule). The Web UI's production
+  client reports `offers: { operations: false }`, so a real deployment shows the
+  equivalent `retnd scrub` command and no button. The mock API offers both, which is why
+  the documentation pictures show them and no spec here can drive them.
+- **Recovery is outside the destructive gate**, by design (Q1.1). That is the one
+  direction this suite cannot compare, because the CLI has no gate: the browser half is
+  asserted (the same engine that completed a browser recovery still answers `403
+  DESTRUCTIVE_OPERATIONS_DISABLED` to `POST /api/v1/operations`) and the CLI half is
+  simply absent.
+
+| UI function | CLI equivalent | Equivalent state means | Status |
+|---|---|---|---|
+| Settings > Assurance: scrub cadence | `settings assurance patch --scrub-cadence D` | the resolved policy (`settings assurance --json`), and the same value on a set that inherits | **proved** (`specs/assurance-recovery.986.spec.ts`) |
+| Settings > Assurance: a cadence under the one-hour floor | the same verb | refused on both, nothing written | **proved** (same spec). The browser refuses before it asks and the CLI refuses with exit status 1, so the exit codes are the CLI's alone |
+| Backup set > Assurance: Custom with a cadence | `backup-set assurance <set> --scrub-cadence D` | the set's own policy (`backup-set assurance --json`, `is_override`), and a sibling set still inheriting | **proved** (same spec) |
+| Backup set > Assurance: Off, Required, Inherit | `backup-set assurance <set> --recovery-test-mode off\|required`, `--reset` | the set's resolved policy | **unproved**: both exist and Suite A pins the CLI half (`assurance/off-and-reset-round-trip`, `assurance/required-needs-a-validator`); no spec drives the browser half. Required needs a registered validator, which no fixture here has |
+| Recover artifact > Download in this browser | `recover <id> --to -` | the delivered bytes, byte for byte, and equal to the digest the fixture's seeded bytes hash to | **proved** (same spec) |
+| Recover artifact > Staging path | `recover <id> --to NAME` | the staged bytes, equal to that digest, and an identical `artifacts` read-back afterwards | **proved** (same spec) |
+| Recover artifact, a corrupted local copy | the same, exit status 14 | the same refusal sentence, the engine's code `RECOVERY_LOCAL_COPY_CORRUPT` against the CLI's 14 (named in the usage text), and no staged file on either side | **proved** (same spec) |
+| Recover artifact > Configured destination | `recover <id> --to medium:ID[/KEY]` | the object at the destination | **unproved**: needs an S3-compatible medium this suite cannot stand up |
+| Recover artifact, an archived copy (the cost decision) | `recover <id> --acknowledge-cost` | no provider job started without the acknowledgement, exactly one with it | **unproved**: needs an archive-class medium and a provider that records its jobs |
+| Scrub now | `scrub [<set> \| <artifact>]` | the per-copy record | **gap (CLI only)**: no route starts a scrub, so the production client offers no button |
+| Run recovery test | none | | **gap (neither surface)**: it runs only from the daemon's schedule, and the browser's button exists in the mock only |
+| Validator output and log | none | | **gap (UI only, mock only)**: no route reports it |
+| The three claims on Backups and Backup detail | `artifacts`, `settings assurance due` | | **unproved**: the Stored and Content claims are built from the placements and the schedule; the Recovery claim has no route and renders Unknown |
+| Dashboard assurance summary | `settings assurance due [--due\|--overdue]` | | **unproved**: counts derived client-side from the same schedule |
+
 ## CLI functions with no UI equivalent
 
 | CLI command | Why there is no UI row |
