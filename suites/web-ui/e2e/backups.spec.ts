@@ -47,15 +47,30 @@ test.describe("backups table", () => {
   });
 
   test("states plainly that it does not perform restore", async ({ page }) => {
-    await expect(
-      page.getByText(/does not perform application restore .* retained, verified copies/)
-    ).toBeVisible();
+    // The footer used to say "retained, verified copies", and "verified" was
+    // the one word EPIC Q (retnd#985, #987) took away: a copy is Stored,
+    // Content verified or Recovery tested now, each as its own claim, so a
+    // footer calling every row verified would contradict the chips above it.
+    // The sentence that replaces it is the boundary sentence (retnd#987,
+    // docs/adr/0029): the product recovers and exports, and putting the bytes
+    // back into an application stays with the operator. Which exact words the
+    // footer settles on is retnd#1057's to decide, so this holds the part both
+    // wordings share: the card footer, below the "Showing N artifacts" count,
+    // speaks about restoring into an application.
+    const footer = page.locator(".card__footer").filter({ hasText: /Showing \d+ artifacts?/ });
+    await expect(footer).toBeVisible();
+    await expect(footer).toContainText(/restor(e|ing)/i);
+    await expect(footer).toContainText(/application/i);
+    await expect(footer).not.toContainText(/verified copies/i);
   });
 
   test("renders a real table with all seven documented columns", async ({ page }) => {
     const table = page.getByRole("table");
     await expect(table).toBeVisible();
-    for (const col of ["Time", "Backup set", "Artifact", "Size", "Validation", "Retention", "Status"]) {
+    // Assurance sits where Validation used to: retnd#1057 retired the
+    // Validation column (the green "Verified" badge) and put the three claims,
+    // Stored, Content verified and Recovery tested, in its place.
+    for (const col of ["Time", "Backup set", "Artifact", "Size", "Assurance", "Retention", "Status"]) {
       await expect(table.getByRole("columnheader", { name: col })).toBeVisible();
     }
   });
@@ -70,12 +85,14 @@ test.describe("backups table", () => {
     // deployment that declares no storage medium, which is FR-35's
     // supported case and the state a fresh install is in.
     //
-    // One more since EPIC Q (retnd#985): the Assurance column carries the
-    // three claims, Stored, Content verified and Recovery tested, as three
-    // elements, so the count is one past what it was.
-    const expected = (bm.facts.mediums.length > 0 ? 8 : 7) + 1;
+    // The count is back to what it was before EPIC Q (retnd#985): the
+    // Assurance column took the place of Validation rather than joining it,
+    // and carries the three claims, Stored, Content verified and Recovery
+    // tested, inside its cells.
+    const expected = bm.facts.mediums.length > 0 ? 8 : 7;
     await expect(page.getByRole("columnheader")).toHaveCount(expected);
     await expect(page.getByRole("columnheader", { name: "Assurance" })).toHaveCount(1);
+    await expect(page.getByRole("columnheader", { name: "Validation" })).toHaveCount(0);
     const rows = await page.getByRole("row").count();
     expect(rows).toBeGreaterThan(1);
   });
@@ -116,11 +133,6 @@ test.describe("backups table", () => {
         "ingested-but-never-retained deployment really looks like, and nothing in it is protected yet"
     );
     await expect(page.getByText("Protected").first()).toBeVisible();
-  });
-
-  test("validation shows a glyph and a word, not just colour", async ({ page }) => {
-    const cell = page.getByRole("row").nth(1);
-    await expect(cell).toContainText(/Verified|Failed|Pending/);
   });
 
   test("status distinguishes removed from retained remote sources", async ({ page }) => {
@@ -474,14 +486,15 @@ test.describe("a deployment that never heard of storage mediums", () => {
     );
   });
 
-  test("has no Medium column, and exactly the seven columns it always had plus Assurance", async ({ bm, page }) => {
+  test("has no Medium column, and exactly seven columns, Assurance in the place Validation held", async ({ bm, page }) => {
     needs(bm.facts.backups.length > 0, "at least one ingested backup, so there is a table to count columns on");
     await bm.goto("/backups");
 
     const table = page.getByRole("table");
     await expect(table).toBeVisible();
-    await expect(page.getByRole("columnheader")).toHaveCount(8);
+    await expect(page.getByRole("columnheader")).toHaveCount(7);
     await expect(table.getByRole("columnheader", { name: "Assurance" })).toHaveCount(1);
+    await expect(table.getByRole("columnheader", { name: "Validation" })).toHaveCount(0);
     await expect(table.getByRole("columnheader", { name: "Medium" })).toHaveCount(0);
     // The positive control: the table really rendered rows, so the
     // absence above is the absence of a column and not of the page.
