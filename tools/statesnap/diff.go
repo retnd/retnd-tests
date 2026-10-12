@@ -25,8 +25,38 @@ func (d Diff) Empty() bool {
 	return len(d.Added) == 0 && len(d.Removed) == 0 && len(d.Changed) == 0 && len(d.DBEvents) == 0
 }
 
-// Compare diffs two snapshots.
+// Compare diffs two snapshots. Every table counts.
 func Compare(a, b Snapshot) Diff {
+	return CompareAllowingAdditive(a, b, nil)
+}
+
+// AdditiveTables are the tables whose APPENDED rows do not count as a state
+// change, keyed by table name and carrying the reason as a sentence. The key
+// is a name and nothing wider: no prefix, no pattern, no column.
+//
+// activity_events is the durable activity feed (retnd#1071, migration 0018).
+// Every log line a process files goes into it, so a command that opens the
+// write door leaves rows behind even when it refused and did no work. Three
+// kinds turn up in Suite A: the "startup" and "rclone_version" lifecycle
+// lines of a mutating verb (fetch of a set nobody configured), the error
+// line a failed medium check files (medium test-connection on a missing
+// path or a full disk), and the audit lines of a recovery that was asked for
+// and refused or failed (recover). Each is a true record that the attempt
+// happened, which is what the feed is for, and none is backup state: no
+// artifact, copy, policy or file moved.
+//
+// Only growth is forgiven. A feed row that is rewritten or deleted is
+// history changing, and still shows up.
+var AdditiveTables = map[string]string{
+	"activity_events": "the durable activity feed (retnd#1071) is an append-only log of what a process did, " +
+		"and a refused or read-only command still files its own startup, error and audit lines; " +
+		"they record the attempt and change no backup state",
+}
+
+// CompareAllowingAdditive diffs two snapshots, forgiving rows appended to
+// the tables named in additive. A table in additive that lost a row or had
+// one rewritten is reported like any other, and so is every table not named.
+func CompareAllowingAdditive(a, b Snapshot, additive map[string]string) Diff {
 	var d Diff
 	for path, before := range a.Files {
 		after, ok := b.Files[path]
@@ -47,11 +77,11 @@ func Compare(a, b Snapshot) Diff {
 	sort.Strings(d.Added)
 	sort.Strings(d.Removed)
 	sort.Strings(d.Changed)
-	d.DBEvents = compareDB(a.DB, b.DB)
+	d.DBEvents = compareDB(a.DB, b.DB, additive)
 	return d
 }
 
-func compareDB(a, b DB) []string {
+func compareDB(a, b DB, additive map[string]string) []string {
 	var out []string
 	switch {
 	case !a.Present && !b.Present:
@@ -91,6 +121,9 @@ func compareDB(a, b DB) []string {
 		default:
 			added, removed := rowDelta(before, after)
 			if len(added) == 0 && len(removed) == 0 {
+				continue
+			}
+			if _, forgiven := additive[t]; forgiven && len(removed) == 0 {
 				continue
 			}
 			out = append(out, fmt.Sprintf("table %s: +%d row(s), -%d row(s)", t, len(added), len(removed)))
