@@ -1,0 +1,18 @@
+doc: >
+  A backup set with no assurance block of its own says that it inherits the
+  deployment's policy, and spells that policy out. This is the existing-
+  deployment case at the per-set scope: nothing was written, nothing was
+  chosen, and the answer is still complete (FR-73).
+scenario: seeded-local
+argv: ["backup-set", "assurance", "production/postgres-primary", "--config", "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "production/postgres-primary inherits the deployment's policy:"
+  - contains: "scrub: every 168h0m0s, strategy auto"
+  - contains: "recovery test: off"
+stderr: empty
+state: unchanged
+contract:
+  - "FR-73 (per-backup-set inherit)"
+  - "usage text: backup-set assurance <source/backup-set>"
+tags: [smoke]

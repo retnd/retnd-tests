@@ -1,0 +1,14 @@
+doc: >
+  Naming one artifact scrubs just that copy whether or not it is due, which is
+  an operator saying now. The summary scope names the artifact, so a scrub of
+  one is never mistaken for a pass over everything (FR-69).
+scenario: seeded-local
+argv: ["scrub", "production/postgres-primary/pg-2026-06-01.dump", "--config", "${CONFIG}"]
+exit: 0
+stdout:
+  - contains: "scrub (artifact production/postgres-primary/pg-2026-06-01.dump)"
+  - contains: "1 passed"
+stderr: ignored
+state: changed
+contract:
+  - "FR-69"

@@ -1,0 +1,18 @@
+doc: >
+  A per-set override turns the recovery test off, and --reset hands the set
+  back to the deployment: the block is removed and the set reads as inheriting
+  again, with the resolved values restored. The round trip is the proof that
+  reset removes the override rather than writing the defaults into it (FR-73).
+scenario: seeded-local
+setup:
+  - ["backup-set", "assurance", "production/postgres-primary", "--scrub-cadence", "12h", "--recovery-test-mode", "off", "--config", "${CONFIG}"]
+  - ["backup-set", "assurance", "production/postgres-primary", "--reset", "--config", "${CONFIG}"]
+argv: ["backup-set", "assurance", "production/postgres-primary", "--config", "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "production/postgres-primary inherits the deployment's policy:"
+  - contains: "scrub: every 168h0m0s, strategy auto"
+stderr: empty
+state: unchanged
+contract:
+  - "FR-73 (inherit / off / required / custom; reset)"

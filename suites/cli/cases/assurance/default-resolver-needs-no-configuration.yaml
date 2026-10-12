@@ -1,0 +1,20 @@
+doc: >
+  A deployment that configures nothing about assurance still has a policy, and
+  the command says so rather than printing nothing: scrub every seven days at
+  the automatic strategy, recovery test off. This is the default nobody has to
+  set, and the first line says it is the default and that config.yaml sets
+  none (FR-73). Reading it writes nothing.
+scenario: seeded-local
+argv: ["settings", "assurance", "--config", "${CONFIG}"]
+exit: 0
+stdout:
+  - contains: "assurance policy (the defaults; config.yaml sets none):"
+  - contains: "scrub: every 168h0m0s, strategy auto"
+  - contains: "recovery test: off, every 720h0m0s, validator -"
+  - contains: "no per-set override: the staging root"
+stderr: empty
+state: unchanged
+contract:
+  - "FR-73 (a deployment-wide default good enough to leave alone)"
+  - "usage text: settings assurance"
+tags: [smoke]

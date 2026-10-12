@@ -1,0 +1,13 @@
+doc: >
+  Standard output carries the bytes when the target is -, so --json cannot
+  share it, and the refusal says why. Mixing them would put a JSON document in
+  the middle of somebody's backup (FR-67).
+scenario: seeded-local
+argv: ["recover", "production/postgres-primary/pg-2026-06-01.dump", "--to", "-", "--json", "--config", "${CONFIG}"]
+exit: 2
+stdout: empty
+stderr:
+  - contains: "--json cannot be combined with --to -, because standard output carries the bytes"
+state: unchanged
+contract:
+  - "FR-67"

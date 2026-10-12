@@ -1,0 +1,30 @@
+doc: >
+  A custom recovery test names the script it runs, and a name that could never
+  be one is refused at the write: the validator_id is a bare script name (NAME
+  for NAME.local.sh under the set's recovery-test directory), never free text
+  that becomes a command (FR-71). This case used to expect "is not a registered
+  validator", and the product no longer says that for a recovery test: a
+  recovery-test validator_id is a file name in the workflow tree, not an entry
+  in the ingest validators' catalog, so the catalog check covers only a set's
+  validation.validator_id. What the write refuses is a name that cannot be a
+  script, here a whole file name that carries the .local.sh-style suffix. A
+  well-formed name whose script is missing is accepted here and refused when
+  the test runs, which a CLI case with no daemon cycle cannot see.
+  Source: core/internal/config/assurance.go RecoveryTestScriptName (the ".sh"
+  refusal) and the set-scope check in the same file that calls it for
+  a set's recovery_test.validator_id; core/service/validator.go
+  checkValidatorCatalogMembership, which says in a comment that a recovery-test
+  validator_id is deliberately not checked against the catalog. Mode custom also
+  needs the set's own cadence (config/assurance.go, "mode custom needs the set's
+  own cadence"), so the case supplies one and the validator is the only thing
+  wrong.
+scenario: seeded-local
+argv: ["backup-set", "assurance", "production/postgres-primary", "--recovery-test-mode", "custom", "--recovery-test-cadence", "24h", "--recovery-test-validator", "nope.sh", "--config", "${CONFIG}"]
+exit: 1
+stdout: ignored
+stderr:
+  - contains: "recovery_test.validator_id: \"nope.sh\" is a file name; name the script without its .local.sh suffix"
+state: unchanged
+contract:
+  - "FR-71"
+  - "FR-73"

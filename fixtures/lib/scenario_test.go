@@ -3,6 +3,7 @@ package fixtures
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -110,4 +111,68 @@ func read(t *testing.T, path string) []byte {
 		t.Fatalf("reading %s: %v", path, err)
 	}
 	return b
+}
+
+// A recovery test names an operator's validator script, and that script has
+// to exist on disk before the command runs. A scenario can say so with
+// `files`, and add config the rendered shape has no field for with
+// `extra_config`.
+func TestScenarioFilesAreWrittenWithTheirModeAndTokens(t *testing.T) {
+	scn := Scenario{
+		Name: "files",
+		Sources: []Source{{ID: "production", BackupSets: []BackupSet{{
+			ID: "postgres-primary", Remote: Remote{Type: "local"}, Include: []string{"*.dump"},
+			Completion: Completion{Strategy: "rename"}, StaleAfter: "30h",
+			Artifacts: []Artifact{{Name: "a.dump", Size: 64, Seed: "s"}},
+		}}}},
+		State:       "none",
+		ExtraConfig: "workflows:\n  root: ${WORK}/workflows\n",
+		Files: []File{{
+			Path: "workflows/recovery-test/production/postgres-primary/reads-nothing.local.sh", Mode: "0755",
+			Content: "#!/bin/sh\ntouch ${WORK}/validator-ran\nexit 0\n",
+		}},
+	}
+	m := materialize(t, scn)
+
+	script := filepath.Join(m.Work, "workflows/recovery-test/production/postgres-primary/reads-nothing.local.sh")
+	info, err := os.Stat(script)
+	if err != nil {
+		t.Fatalf("the scenario file was not written: %v", err)
+	}
+	if info.Mode().Perm() != 0o755 {
+		t.Errorf("mode = %v, want 0755", info.Mode().Perm())
+	}
+	if got := string(read(t, script)); !strings.Contains(got, "touch "+m.Work+"/validator-ran") {
+		t.Errorf("${WORK} was not expanded in the file content:\n%s", got)
+	}
+	cfg := string(read(t, m.Config))
+	if !strings.Contains(cfg, "workflows:\n  root: "+m.Work+"/workflows\n") {
+		t.Errorf("extra_config did not reach config.yaml with its tokens expanded:\n%s", cfg)
+	}
+	// The directories on the way to a script are what the product's custody
+	// check reads, and a group- or world-writable one is refused.
+	for dir := filepath.Dir(script); dir != m.Work; dir = filepath.Dir(dir) {
+		di, err := os.Stat(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if di.Mode().Perm()&0o022 != 0 {
+			t.Errorf("%s is %v, which the product's custody check refuses", dir, di.Mode().Perm())
+		}
+	}
+}
+
+func TestScenarioFilesCannotEscapeTheWorkDirectory(t *testing.T) {
+	for _, path := range []string{"../escape", "/etc/escape", "a/../../escape", ""} {
+		scn := Scenario{Name: "escape", State: "none", RawConfig: "# placeholder\n",
+			Files: []File{{Path: path, Mode: "0644", Content: "x"}}}
+		if _, err := Materialize(scn, Options{Work: t.TempDir()}); err == nil {
+			t.Errorf("a scenario file at %q should have been refused, and was not", path)
+		}
+	}
+	scn := Scenario{Name: "badmode", State: "none", RawConfig: "# placeholder\n",
+		Files: []File{{Path: "x", Mode: "rwx", Content: "x"}}}
+	if _, err := Materialize(scn, Options{Work: t.TempDir()}); err == nil {
+		t.Error("an unparsable mode should have been refused")
+	}
 }

@@ -1,0 +1,30 @@
+doc: >
+  A recovery test is a pass only when the recovered bytes hash to the digest
+  recorded for the artifact, whatever the operator's validator says. The
+  validator here exits 0 without ever opening the file, and the copy's bytes
+  were changed underneath it (same size, so a size check and a reachability
+  check both see a healthy copy). The test must come back failed, with the
+  digest reported as not matching, and the validator must never be consulted:
+  the marker it leaves when run is absent. An implementation that counts "the
+  copy is reachable and the script exited 0" as a pass is the one this case
+  exists to catch (#986, the validator-that-reads-nothing criterion).
+scenario: seeded-local-validator
+setup:
+  - ["backup-set", "assurance", "production/postgres-primary", "--recovery-test-mode", "custom", "--recovery-test-cadence", "24h", "--recovery-test-validator", "reads-nothing", "--config", "${CONFIG}"]
+mutate:
+  - "corrupt ${LOCAL}/production/postgres-primary/pg-2026-06-01.dump"
+argv: ["recovery-test", "production/postgres-primary", "--json", "--config", "${CONFIG}"]
+exit: 1
+stdout:
+  - contains: '"state":"failed"'
+  - contains: '"digest_matched":false'
+  - absent: '"state":"passed"'
+stderr: ignored
+state:
+  mode: changed
+  files_absent:
+    - "${WORK}/validator-ran"
+contract:
+  - "FR-71 (a validator is one input to the verdict, not the verdict)"
+  - "FR-72 (a pass is distinct from reachability)"
+  - "retnd/retnd#986 acceptance: the validator-that-reads-nothing case asserts the absence of a recovery-test pass"

@@ -162,7 +162,7 @@ func (r *Runner) Run(work string, c Case) (Result, error) {
 	if err != nil {
 		return res, fmt.Errorf("snapshotting after the run: %w", err)
 	}
-	res.Diff = statesnap.Compare(res.Before, res.After)
+	res.Diff = statesnap.CompareAllowingAdditive(res.Before, res.After, statesnap.AdditiveTables)
 	return res, nil
 }
 

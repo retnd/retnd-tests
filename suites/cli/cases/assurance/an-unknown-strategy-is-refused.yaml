@@ -1,0 +1,13 @@
+doc: >
+  The scrub strategy is a closed list (auto, existence, content). A value
+  outside it is refused with the list, so a typo cannot silently mean the
+  default (FR-69).
+scenario: seeded-local
+argv: ["settings", "assurance", "patch", "--scrub-strategy", "bogus", "--config", "${CONFIG}"]
+exit: 1
+stdout: ignored
+stderr:
+  - contains: "\"bogus\" is not one of [auto existence content]"
+state: unchanged
+contract:
+  - "FR-69"

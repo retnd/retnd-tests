@@ -72,6 +72,9 @@ why they are skipped:
 | `RETND_VPS_HOST`, `RETND_VPS_PORT`, `RETND_VPS_USER`, `RETND_VPS_PATH` | the source machine, for the wizard cases that probe a real host and prove a real connection |
 | `RETND_PLATFORM` | which provider bundle the image serves. It DESCRIBES the image; it does not choose one |
 | `RETND_ALLOW_DESTRUCTIVE=1` | the cases that destroy data nothing puts back: applying a retention plan, and removing a declared storage destination |
+| `RETND_COPY_CONTROL` | a control directory that lets a case change one backup's local copy in place (same size) and put it back, for `failing-scrub-replaces-chip.985.spec.ts`. The protocol is in `harness/assurance.ts`; the rig half does not exist yet |
+| `RETND_RECOVERY_SLOW_SET` | `source/set` of a backup set whose recovery-test validator holds for tens of seconds, for `recovery-test-restart.986.spec.ts` and `stage-progress-reload.985.spec.ts` |
+| `RETND_BIG_ARTIFACT`, `RETND_BIG_ARTIFACT_BYTES` | the id and size of a backup of at least 32 MiB, for `download-interrupted.985.spec.ts`: a small one finishes streaming before a browser can leave |
 | `RETND_WORKERS` | more than one browser at a time. Read the note in `harness/deployment.ts` before setting it |
 | `RETND_NO_SANDBOX=1` | `--no-sandbox`, for an image that runs Chromium as root |
 

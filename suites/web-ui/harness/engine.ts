@@ -224,12 +224,13 @@ async function refusalReason(path: string): Promise<string> {
  *  read by everything downstream as "the deployment is now in that state",
  *  and an engine that is actually still running would then be asserted
  *  against by cases written for an engine that is gone. */
-async function ask(
+export async function ask(
   control: EngineControl,
   request: string,
   ack: string,
   failedAck: string,
-  timeoutMs: number
+  timeoutMs: number,
+  body: string = ""
 ): Promise<void> {
   mkdirSync(control.dir, { recursive: true });
   const ackPath = join(control.dir, ack);
@@ -239,7 +240,7 @@ async function ask(
   // as this cycle's refusal, and the run would stop on a stale reason.
   rmSync(ackPath, { force: true });
   rmSync(failedPath, { force: true });
-  writeFileSync(join(control.dir, request), "", "utf8");
+  writeFileSync(join(control.dir, request), body, "utf8");
 
   const deadline = Date.now() + timeoutMs;
   for (;;) {

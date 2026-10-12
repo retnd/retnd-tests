@@ -1,0 +1,14 @@
+doc: >
+  The same floor, reached through the deployment-wide command, with its own
+  field path. Two doors, one rule, and a refusal that names the one that was
+  used (FR-74).
+scenario: seeded-local
+argv: ["settings", "assurance", "patch", "--scrub-cadence", "30s", "--config", "${CONFIG}"]
+exit: 1
+stdout: ignored
+stderr:
+  - contains: "assurance.scrub.cadence: 30s is below the floor of 1h0m0s"
+state: unchanged
+contract:
+  - "FR-74"
+  - "FR-73"

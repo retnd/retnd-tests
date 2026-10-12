@@ -1,0 +1,18 @@
+doc: >
+  The other half of the claim above: a set that carries its own cadence keeps
+  it when the deployment's changes, and says it has its own assurance block. A
+  resolver that rewrote every set on a global change would pass the case above
+  and fail this one (FR-73).
+scenario: seeded-local
+setup:
+  - ["backup-set", "assurance", "production/app-uploads", "--scrub-cadence", "6h", "--config", "${CONFIG}"]
+  - ["settings", "assurance", "patch", "--scrub-cadence", "24h", "--config", "${CONFIG}"]
+argv: ["backup-set", "assurance", "production/app-uploads", "--config", "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "production/app-uploads has its own assurance block:"
+  - contains: "scrub: every 6h0m0s, strategy auto"
+stderr: empty
+state: unchanged
+contract:
+  - "FR-73 (a pinned set is not moved by a global change)"

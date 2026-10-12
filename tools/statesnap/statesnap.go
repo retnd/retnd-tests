@@ -13,6 +13,12 @@
 //     read-only commands, and the first person to hit that would delete
 //     the assertion rather than the false positive.
 //
+// One table is the exception to "every table counts": AdditiveTables names
+// activity_events, the durable activity feed, whose appended rows
+// CompareAllowingAdditive does not report (Suite A's runner uses it). The
+// allowlist is by table name only, growth only, and carries its reason; see
+// diff.go.
+//
 // The logical dump is schema-blind: it reads sqlite_master to find out
 // what tables exist and dumps whatever columns it finds. That is the one
 // place this repository touches FR-9's internals at all, and it touches

@@ -120,20 +120,23 @@ func TestStdoutAbsentMatcherCanFail(t *testing.T) {
 }
 
 func TestStderrDimensionCanFail(t *testing.T) {
-	// `check` against a config that is not there writes to stderr and
-	// nothing to stdout, which is what makes it the right probe for this
-	// dimension: the expectation being broken is about stderr alone.
+	// `fetch` without its two required flags writes a usage error to stderr
+	// and nothing to stdout, which is what makes it the right probe for this
+	// dimension: the expectation being broken is about stderr alone. It used
+	// to be `check` against a config that is not there, until retnd#1049 made
+	// that a pass with a notice on stdout (a fresh install has no config yet).
 	c := baseline()
-	c.Argv = []string{"check", "--config", "${WORK}/no-such-config.yaml"}
-	c.Exit = 1
+	c.Scenario = "seeded-local"
+	c.Argv = []string{"fetch", "--config", "${CONFIG}"}
+	c.Exit = 2
 	c.Stdout = harness.Stream{Mode: "empty"}
 	c.Stderr = harness.Stream{Mode: "empty"}
 
 	got := run(t, c)
 	assertOnly(t, got, "stderr")
-	assertReadable(t, got[0], "expected nothing on stderr", "no-such-config.yaml")
+	assertReadable(t, got[0], "expected nothing on stderr", "fetch requires --source and --backup-set")
 
-	c.Stderr = harness.Stream{Mode: "matchers", Matchers: []harness.Matcher{{Contains: "no such file or directory"}}}
+	c.Stderr = harness.Stream{Mode: "matchers", Matchers: []harness.Matcher{{Contains: "fetch requires --source and --backup-set"}}}
 	if got := run(t, c); len(got) != 0 {
 		t.Fatalf("correcting the stderr expectation should clear it, got %v", got)
 	}

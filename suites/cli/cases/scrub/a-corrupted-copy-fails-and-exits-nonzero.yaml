@@ -1,0 +1,18 @@
+doc: >
+  A local copy whose bytes were changed underneath it fails its scrub: the
+  line says FAILED and names the class, the summary counts it, and the exit
+  status is 1 so a script that branches on it learns. The size did not change,
+  which is the fixture a size-only check would pass (FR-69, FR-70).
+scenario: seeded-local
+mutate:
+  - "corrupt ${LOCAL}/production/postgres-primary/pg-2026-06-01.dump"
+argv: ["scrub", "production/postgres-primary", "--config", "${CONFIG}"]
+exit: 1
+stdout:
+  - contains: "production/postgres-primary/pg-2026-06-01.dump on local: FAILED (content):"
+  - contains: "1 selected, 0 passed, 1 failed"
+stderr: ignored
+state: changed
+contract:
+  - "FR-69"
+  - "FR-70 (a failure clears the claim it contradicts)"

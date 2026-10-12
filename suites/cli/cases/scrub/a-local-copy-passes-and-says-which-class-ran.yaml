@@ -1,0 +1,17 @@
+doc: >
+  Scrubbing a set re-reads its local copy, and a copy whose bytes still hash
+  to the recorded digest passes. The line names the class that ran (content
+  here, because it is a local file) and the summary counts every copy
+  including the ones that did not pass, so a green line can never hide a hole
+  (FR-69, FR-70).
+scenario: seeded-local
+argv: ["scrub", "production/postgres-primary", "--config", "${CONFIG}"]
+exit: 0
+stdout:
+  - contains: "production/postgres-primary/pg-2026-06-01.dump on local: passed (content:"
+  - contains: "scrub (set production/postgres-primary): 1 selected, 1 passed, 0 failed, 0 could not be checked, 0 need a restore, 0 skipped, 0 refused; 4096 bytes read"
+stderr: ignored
+state: changed
+contract:
+  - "FR-69 (a real production driver)"
+  - "FR-70 (the class achieved is recorded)"

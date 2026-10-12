@@ -1,0 +1,15 @@
+doc: >
+  The scrub cadence has a floor of one hour, and a cadence below it is refused
+  naming the field and the floor, per set and globally alike. A cadence that
+  short would re-read the same bytes continuously, which is the cost this
+  floor exists to prevent (FR-74).
+scenario: seeded-local
+argv: ["backup-set", "assurance", "production/postgres-primary", "--scrub-cadence", "10m", "--config", "${CONFIG}"]
+exit: 1
+stdout: ignored
+stderr:
+  - contains: "assurance.scrub.cadence: 10m0s is below the floor of 1h0m0s"
+state: unchanged
+contract:
+  - "FR-74 (budgets are refusals)"
+  - "FR-73"
