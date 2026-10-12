@@ -70,10 +70,35 @@ type Scenario struct {
 	// every valid scenario shares.
 	RawConfig string `yaml:"raw_config"`
 
+	// ExtraConfig is appended to the rendered config.yaml, after ${WORK},
+	// ${STATE_DB}, ${REMOTE} and ${LOCAL} substitution. It is for the keys
+	// the rendered shape has no field for (a workflows root, say) on a
+	// scenario that otherwise wants the rendered sources. A scenario using
+	// RawConfig writes its own keys and does not need it.
+	ExtraConfig string `yaml:"extra_config"`
+
+	// Files are written under the work directory before the state is
+	// seeded. They are how an operator's own script (a recovery-test
+	// validator under the workflows root) exists on disk before a command
+	// names it. A path must stay inside the work directory.
+	Files []File `yaml:"files"`
+
 	// Doc is a one-line note about what this scenario is for. It exists so
 	// scenarios read as documentation of the situations the CLI is
 	// contractually expected to handle.
 	Doc string `yaml:"doc"`
+}
+
+// File is one file a scenario places in the work directory.
+type File struct {
+	// Path is relative to the work directory, with no ".." and no leading
+	// slash. The directories on the way are created 0755, which is what the
+	// product's custody check asks of a path to a script.
+	Path string `yaml:"path"`
+	// Mode is an octal permission such as "0755".
+	Mode string `yaml:"mode"`
+	// Content has ${WORK}, ${STATE_DB}, ${REMOTE} and ${LOCAL} expanded.
+	Content string `yaml:"content"`
 }
 
 type Retention struct {

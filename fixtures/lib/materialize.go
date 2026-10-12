@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -135,11 +136,18 @@ func Materialize(s Scenario, opt Options) (Manifest, error) {
 		}
 	}
 
+	if err := writeScenarioFiles(s, m); err != nil {
+		return m, err
+	}
+
 	config := s.RawConfig
 	if config == "" {
 		config = renderConfig(s, m)
 	} else {
 		config = expand(config, m)
+	}
+	if s.ExtraConfig != "" {
+		config += expand(s.ExtraConfig, m)
 	}
 	if err := os.WriteFile(m.Config, []byte(config), 0o644); err != nil {
 		return m, err
@@ -165,6 +173,33 @@ func Materialize(s Scenario, opt Options) (Manifest, error) {
 		m.Replay = runs
 	}
 	return m, nil
+}
+
+// writeScenarioFiles places a scenario's own files. It refuses a path that
+// could leave the work directory, because a fixture that writes outside the
+// directory it was given is a fixture that damages the machine running it.
+func writeScenarioFiles(s Scenario, m Manifest) error {
+	for _, f := range s.Files {
+		clean := filepath.Clean(f.Path)
+		if f.Path == "" || filepath.IsAbs(f.Path) || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("scenario file %q: a path must be relative and stay inside the work directory", f.Path)
+		}
+		mode, err := strconv.ParseUint(f.Mode, 8, 32)
+		if err != nil {
+			return fmt.Errorf("scenario file %q: mode %q is not an octal permission: %w", f.Path, f.Mode, err)
+		}
+		full := filepath.Join(m.Work, clean)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(full, []byte(expand(f.Content, m)), os.FileMode(mode)); err != nil {
+			return err
+		}
+		if err := os.Chmod(full, os.FileMode(mode)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // replay seeds the catalog by running documented operator commands
