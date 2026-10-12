@@ -1,0 +1,26 @@
+doc: >
+  The positive control for the case beside it. The same reads-nothing
+  validator against an intact copy: the recovered bytes hash to the recorded
+  digest, so the digest gate is crossed and the report says so, which a
+  corrupted copy cannot do. Without this, "digest_matched is false" proves
+  nothing about the digest comparison, only that the verb prints the field.
+  This suite stands up no Host Workflow Runner, so the validator itself cannot
+  run here and the test cannot reach a pass; what the case asserts is the
+  gate, and that it is not a failure.
+scenario: seeded-local-validator
+setup:
+  - ["backup-set", "assurance", "production/postgres-primary", "--recovery-test-mode", "custom", "--recovery-test-cadence", "24h", "--recovery-test-validator", "reads-nothing", "--config", "${CONFIG}"]
+argv: ["recovery-test", "production/postgres-primary", "--json", "--config", "${CONFIG}"]
+exit: 1
+stdout:
+  - contains: '"digest_matched":true'
+  - absent: '"state":"failed"'
+  - absent: '"state":"passed"'
+stderr: ignored
+state:
+  mode: changed
+  files_absent:
+    - "${WORK}/validator-ran"
+contract:
+  - "FR-71"
+  - "FR-72 (the digest is compared before a validator is consulted)"

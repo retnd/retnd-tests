@@ -1,0 +1,47 @@
+doc: >
+  The seeded-local deployment plus an operator's recovery-test validator
+  that reads nothing: a script that exits 0 without opening the file it is
+  given, and leaves a marker beside the fixture if it is ever run at all.
+  The marker is what lets a case say the validator was never consulted.
+
+  The config names a workflows root inside the work directory (the product
+  refuses a script under a world-writable directory such as /tmp, so this
+  lives under the suite's own work tree) and the script sits where a
+  recovery test looks for it: recovery-test/<source>/<set>/NAME.local.sh.
+  The set is not switched onto the validator here; a case does that with
+  `backup-set assurance`, the way an operator would.
+poll_interval: 15m
+sources:
+  - id: production
+    backup_sets:
+      - id: postgres-primary
+        remote: {type: local}
+        include: ["*.dump"]
+        completion: {strategy: stable, stable_for: 10m}
+        stale_after: 30h
+        validation: {hash: sha256}
+        artifacts:
+          - {name: pg-2026-06-01.dump, size: 4096, seed: a1, mtime: now-2h}
+          - {name: pg-in-progress.dump, size: 2048, seed: a2, mtime: now}
+      - id: app-uploads
+        remote: {type: local}
+        include: ["*.tar"]
+        completion: {strategy: rename}
+        stale_after: 30h
+        validation: {hash: sha256}
+        artifacts:
+          - {name: uploads-2026-06-01.tar, size: 8192, seed: b1, mtime: now-3h}
+state: replay
+replay: fetch
+extra_config: |
+  workflows:
+    root: ${WORK}/workflows
+files:
+  - path: workflows/recovery-test/production/postgres-primary/reads-nothing.local.sh
+    mode: "0755"
+    content: |
+      #!/bin/sh
+      # A validator that reads nothing: it never opens "$1". If it is run at
+      # all it leaves a marker, and it always says the copy is fine.
+      touch ${WORK}/validator-ran
+      exit 0

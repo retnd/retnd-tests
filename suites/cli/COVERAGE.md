@@ -154,8 +154,9 @@ place that catches it per command is a case per command.
 | `catalog rebuild` | `catalog/rebuild-after-database-loss`, `catalog/rebuild-dry-run-writes-nothing` | `catalog/no-subcommand` (exit 2), `catalog/unknown-subcommand` (exit 2), `catalog/f1-config-missing` |
 | `medium` | `medium/list-leads-with-the-local-hard-drive`: the drive this deployment's backups land on is the FIRST entry, names the drive, and says it is not declared, with the S3 medium after it as the control that the local entry was added to the list rather than replacing it ([#622](https://github.com/backupdproject/backupd/issues/622)); `medium/test-connection-local-passes`: all nine steps of the local report in the engine's own order, including `space`, which no bucket has, and the two that are SKIPPED rather than passed; `medium/preflight-is-still-the-same-check-under-the-old-name`: the alias, driven against the id the new verb made checkable, which is where two implementations would part; `medium/default-moves-the-mark-and-nothing-else` and `medium/default-writes-the-mark-and-local-clears-it`: the mark moves, no tier is rewritten, and moving it back to the drive REMOVES the key rather than writing `local` into it, which is FR-35's round trip | the three local failures, told apart by which step failed: `medium/test-connection-local-reports-a-missing-path` (`reach`, `not_found`, everything after it skipped), `medium/test-connection-local-reports-a-permission-problem` (`reach` and `space` pass, `write` fails `permission_denied`, from a real probe write into a directory the mutation made read-only), `medium/test-connection-local-reports-no-room` (everything an S3-shaped check looks at passes and `space` still fails, weighed against the operator's own FR-21 margin); plus the two removal refusals, `medium/remove-refuses-the-destination-that-carries-the-mark` and `medium/remove-refuses-the-local-hard-drive`, `medium/default-refuses-a-destination-nothing-declares`, and `medium/f1-config-missing` |
 | `settings` | `settings/patch-tier-medium-moves-one-tier`: one tier moves and the other two are asserted unchanged, because the write REPLACES the whole chain and a flag that built it from the wrong chain would move somebody's other tiers by the act of editing this one; `settings/patch-tier-medium-local-brings-a-tier-back`: `local` is a legal name here and what it writes is absence, so the round trip leaves the file it started with | `settings/patch-tier-medium-refuses-without-the-disclosure` (FR-27's gate, and the refusal IS the disclosure, naming the mapping and no price), `settings/patch-tier-medium-refuses-a-tier-nobody-declared` (exit 2, the tiers there are listed, nothing written), `settings/f1-config-missing` |
-| `settings assurance`, `backup-set assurance` (EPIC Q, #982) | `assurance/a-global-change-leaves-a-pinned-set-alone`, `assurance/a-global-change-moves-an-inheriting-set`, `assurance/default-resolver-json-says-it-is-not-configured`, `assurance/default-resolver-needs-no-configuration`, `assurance/off-and-reset-round-trip`, `assurance/set-inherits-the-deployment-by-default` | `assurance/a-host-knob-has-no-per-set-control`, `assurance/an-unknown-strategy-is-refused`, `assurance/cadence-below-the-floor-is-refused`, `assurance/custom-validator-must-be-registered`, `assurance/global-cadence-below-the-floor-is-refused`, `assurance/required-needs-a-validator` |
+| `settings assurance`, `backup-set assurance` (EPIC Q, #982) | `assurance/a-global-change-leaves-a-pinned-set-alone`, `assurance/a-global-change-moves-an-inheriting-set`, `assurance/default-resolver-json-says-it-is-not-configured`, `assurance/default-resolver-needs-no-configuration`, `assurance/off-and-reset-round-trip`, `assurance/set-inherits-the-deployment-by-default`, `assurance/a-copy-nobody-has-checked-is-overdue-never-fine`, `assurance/a-scrubbed-copy-leaves-the-overdue-list` (`settings assurance due --overdue`: a never-scrubbed copy is OVERDUE with basis never, and leaves the list once scrubbed) | `assurance/a-host-knob-has-no-per-set-control`, `assurance/an-unknown-strategy-is-refused`, `assurance/cadence-below-the-floor-is-refused`, `assurance/custom-validator-must-be-registered`, `assurance/global-cadence-below-the-floor-is-refused`, `assurance/required-needs-a-validator` |
 | `scrub` (EPIC Q, #978) | `scrub/a-local-copy-passes-and-says-which-class-ran`, `scrub/naming-an-artifact-checks-it-now` | `scrub/a-corrupted-copy-fails-and-exits-nonzero`, `scrub/a-failing-scrub-degrades-the-set`, `scrub/content-on-a-medium-needs-the-egress-acknowledgement` |
+| `recovery-test` (EPIC Q, #980) | `recovery-test/an-intact-copy-clears-the-digest-gate` | `recovery-test/a-validator-that-reads-nothing-is-not-a-pass`: a validator that exits 0 without opening the file, over a copy whose bytes changed at the same size, comes back `failed` with the digest not matching and the validator never consulted (#986's reads-nothing criterion) |
 | `recover` (EPIC Q, #976) | `recover/a-local-copy-to-the-staging-root-reports-the-recorded-digest`, `recover/json-carries-the-same-digest` | `recover/a-corrupted-local-copy-is-refused-with-its-own-code`, `recover/a-recover-with-no-target-is-a-usage-error`, `recover/a-target-that-leaves-the-staging-root-is-refused`, `recover/an-artifact-nobody-recorded-is-not-found`, `recover/json-and-standard-output-do-not-mix` |
 | `version` | `version/happy`: all four fields, shapes asserted, and this case doubles as the identity handshake | `version/no-config-flag` (exit 2 from the flag package), `version/rejects-an-operand` (exit 2 through usageError) |
 
@@ -183,17 +184,24 @@ Stated rather than implied.
   stale-container sweep. Standing one up needs a throwaway SSH key, and
   the rule against writing any credential to disk means that needs to be
   designed rather than improvised.
-- **EPIC Q's S3, archive and recovery-test cases are not here, and the
-  reason is the fixture, not the product.** Recovery from an S3 medium, an
-  archive-class copy refused for cost and then recovered after an explicit
-  acknowledgement (asserting that no provider job was started in between),
-  and a recovery test with a validator that passes, fails, hangs or reads
-  nothing, all need a provider this suite cannot stand up (it has no
-  Docker and no S3-compatible endpoint, and every fixture is `remote.type:
-  local`), or a validator registry entry and a daemon cycle. The cases that
-  can be driven with a local copy are above; the rest are written down in
-  `suites/equivalence/MATRIX.md` under EPIC Q with the specific thing each
-  one is waiting for.
+- **EPIC Q's S3 and archive cases, and a recovery test that passes, hangs or
+  is lapsed, are not here, and the reason is the fixture, not the product.**
+  Recovery from an S3 medium, and an archive-class copy refused for cost and
+  then recovered after an explicit acknowledgement (asserting that no provider
+  job was started in between), need a provider this suite cannot stand up (it
+  has no Docker and no S3-compatible endpoint, and every fixture is
+  `remote.type: local`); retnd#1063 drives those against MinIO. A recovery
+  test whose validator passes, hangs or times out needs the Host Workflow
+  Runner, which this suite does not start. What is here: the validator that
+  reads nothing over a changed copy (`recovery-test/a-validator-that-reads-nothing-is-not-a-pass`)
+  and its positive control. Overdue is covered for a copy nobody has checked
+  (`assurance/a-copy-nobody-has-checked-is-overdue-never-fine` and its
+  control). Overdue for a scrub that passed and then lapsed by a whole
+  cadence, and the SCRUB_OVERDUE and RECOVERY_TEST_OVERDUE notifications that
+  follow it, need a clock a caller can set: the binary reads its own
+  (`assuranceNow` in core/service/assurance.go), the cadence floor is an hour,
+  and the notification sink belongs to the platform app. They are written down
+  in `suites/equivalence/MATRIX.md` under EPIC Q.
 - **`daemon` is exercised for one cycle and one signal.** Its
   single-instance journal lock, its behaviour when a second daemon
   attaches to the same state database, and multi-cycle scheduling are not

@@ -1,0 +1,19 @@
+doc: >
+  The control for the case beside it: after one set is scrubbed, that set's
+  copy leaves the overdue list and the other, still never scrubbed, stays. The
+  list is not simply "everything"; the harness can see the string when it is
+  there (the case beside it) and it is absent here because the scrub moved the
+  copy to a dated, in-cadence state (FR-72).
+scenario: seeded-local
+setup:
+  - ["scrub", "production/postgres-primary", "--config", "${CONFIG}"]
+argv: ["settings", "assurance", "due", "--overdue", "--config", "${CONFIG}"]
+exit: 0
+stdout:
+  - re: 'OVERDUE  production/app-uploads/uploads-2026-06-01\.tar  next \S+  last never \(never\)  every 168h0m0s'
+  - absent: "production/postgres-primary/pg-2026-06-01.dump"
+stderr: ignored
+state: unchanged
+contract:
+  - "FR-72"
+  - "usage text: settings assurance due --overdue"

@@ -1,0 +1,20 @@
+doc: >
+  A copy nobody has ever scrubbed is listed OVERDUE, never fine and never
+  absent: the schedule says "last never" and the basis is never, not a date
+  invented to look recent (FR-72, not-looked-at is its own state). This is the
+  clock-free half of the overdue surface: it needs no time to pass, so it is
+  reproducible on any machine. The half that needs a passed scrub to lapse by
+  a whole cadence cannot be driven from outside, because the binary reads its
+  own clock and nothing lets a caller set it (core/service/assurance.go
+  assuranceNow). COVERAGE.md says so.
+scenario: seeded-local
+argv: ["settings", "assurance", "due", "--overdue", "--config", "${CONFIG}"]
+exit: 0
+stdout:
+  - re: 'OVERDUE  production/app-uploads/uploads-2026-06-01\.tar  next \S+  last never \(never\)  every 168h0m0s'
+  - re: 'OVERDUE  production/postgres-primary/pg-2026-06-01\.dump  next \S+  last never \(never\)  every 168h0m0s'
+stderr: ignored
+state: unchanged
+contract:
+  - "FR-72 (a copy nobody has looked at is overdue, never fine)"
+  - "usage text: settings assurance due --overdue"
