@@ -75,7 +75,7 @@ ship unnoticed.
 | Dashboard health (`/`) | `status` | the same per-set verdicts, and the same overall health the exit code implies | **blocked**: the page cannot load, `GET /api/v1/health` and `GET /api/v1/version` are 404 ([#211](https://github.com/backupdproject/backupd/issues/211)) |
 | Backups list (`/backups`) | `artifacts [--source S] [--backup-set B]` | the same artifact ids and lifecycle states | **unproved**: `GET /api/v1/backups` answers 200 since [#214](https://github.com/backupdproject/backupd/pull/214), registered and declared, so the block is gone. No spec drives it yet. Proving it means listing artifacts in the browser and through `artifacts` over one fixture and comparing ids and lifecycle states, which is a spec this repository does not have |
 | Backup detail (`/backups/:id`) | `artifacts` filtered | the same artifact record | **unproved**: rides the same now-served route ([#214](https://github.com/backupdproject/backupd/pull/214)). Proving it means the row above plus a per-artifact comparison, and it should not be attempted before the list row is proved, since a detail view that agrees while the list does not is the less useful half |
-| Activity feed (`/activity`) | none | | **gap (UI only)**: no CLI command exposes an event log, checked against `main.go`'s registered commands at this pin and still true. `GET /api/v1/activity` answers 200 since [#214](https://github.com/backupdproject/backupd/pull/214), so the page loads now, but a UI-only surface has nothing to be equivalent to and this stays a gap rather than becoming unproved |
+| Activity feed (`/activity`) | `activity [--follow] [--json]` | the durable rows an operator can read | **unproved**: the CLI verb exists since EPIC Q (`retnd activity`, Suite A `activity/*`), so this is no longer a UI-only gap. No spec drives the page and the verb and compares |
 | Live operation status | none | | **gap (UI only)**: `GET /api/v1/operations` answers 200 since [#214](https://github.com/backupdproject/backupd/pull/214), which also declared the GET the contract previously had only as POST. The CLI still has no equivalent read, so this stays a gap for the same reason as the row above |
 
 ## Writes
@@ -156,14 +156,22 @@ surfaces. The rows below were derived from the shipped pages
 `api/v1/openapi.json`, and from the binary's own usage text (`settings assurance`,
 `backup-set assurance`, `scrub`, `recover`), not from the epic's description of them.
 
-Two things the epic describes are **not** on both surfaces, and the rows say so rather
-than imply a pair:
+Three things the epic describes are **not** on both surfaces yet, and the rows say so
+rather than imply a pair:
 
-- There is **no route that starts a scrub or a recovery test**, and no CLI verb that
-  starts a recovery test (it runs from the daemon's schedule). The Web UI's production
-  client reports `offers: { operations: false }`, so a real deployment shows the
-  equivalent `retnd scrub` command and no button. The mock API offers both, which is why
-  the documentation pictures show them and no spec here can drive them.
+- There is **no route that starts a scrub, cancels a scrub or a recovery test, or reads
+  a validator's output**. The Web UI's production client reports `offers: { operations:
+  false }`, so a real deployment shows the equivalent `retnd scrub` command and no button.
+  retnd#1059 adds all three (`POST /backup-sets/{source}/{set}/scrub`, `POST
+  /assurance/operations/{op}/cancel`, `GET /backup-sets/{source}/{set}/recovery-test/output`)
+  and the matching CLI verbs (`retnd assurance cancel <op>`, `retnd recovery-test <set>
+  --show-output`). Until it lands the rows below are marked **planned**, and
+  `specs/contract-gaps.spec.ts` records each route and verb as absent, so that spec goes
+  red the day one ships and this section has to move with it.
+- A recovery test **can** be started from both surfaces now (`POST
+  /backup-sets/{source}/{set}/recovery-test` behind Run recovery test, `retnd
+  recovery-test <set>` in a terminal). What neither can do from outside is pass one: the
+  validator runs on the Host Workflow Runner, which Suite A does not start.
 - **Recovery is outside the destructive gate**, by design (Q1.1). That is the one
   direction this suite cannot compare, because the CLI has no gate: the browser half is
   asserted (the same engine that completed a browser recovery still answers `403
@@ -181,9 +189,11 @@ than imply a pair:
 | Recover artifact, a corrupted local copy | the same, exit status 14 | the same refusal sentence, the engine's code `RECOVERY_LOCAL_COPY_CORRUPT` against the CLI's 14 (named in the usage text), and no staged file on either side | **proved** (same spec) |
 | Recover artifact > Configured destination | `recover <id> --to medium:ID[/KEY]` | the object at the destination | **unproved**: needs an S3-compatible medium this suite cannot stand up |
 | Recover artifact, an archived copy (the cost decision) | `recover <id> --acknowledge-cost` | no provider job started without the acknowledgement, exactly one with it | **unproved**: needs an archive-class medium and a provider that records its jobs |
-| Scrub now | `scrub [<set> \| <artifact>]` | the per-copy record | **gap (CLI only)**: no route starts a scrub, so the production client offers no button |
-| Run recovery test | none | | **gap (neither surface)**: it runs only from the daemon's schedule, and the browser's button exists in the mock only |
-| Validator output and log | none | | **gap (UI only, mock only)**: no route reports it |
+| Scrub now | `scrub [<set> \| <artifact>]` | the per-copy record, and the same exit status from the command the page prints | **planned (route pending)**: `POST /backup-sets/{source}/{set}/scrub` is retnd#1059's, so the production client offers no button yet. The printed command's exit status against the CLI's, success and a failing scrub, is **proved** (`specs/exit-codes.986.spec.ts`) |
+| Run recovery test | `recovery-test <set> [--json]` | the copy's recovery claim, and the same verdict | **unproved**: both exist (`POST /backup-sets/{source}/{set}/recovery-test` behind the button). The CLI half is pinned in Suite A (`recovery-test/a-validator-that-reads-nothing-is-not-a-pass` and its control); a pass needs the Host Workflow Runner |
+| Cancel a scrub or a recovery test | `assurance cancel <op>` | the operation ends `cancelled`, not complete and not failed | **planned (route and verb pending)**: `POST /assurance/operations/{op}/cancel` and the verb are retnd#1059's; neither exists at this pin |
+| Validator output and log | `recovery-test <set> --show-output` | the sanitised, bounded record of the newest test's validator | **planned (route and flag pending)**: `GET /backup-sets/{source}/{set}/recovery-test/output` and the flag are retnd#1059's; today the browser shows it from the mock only |
+| The exit status of a refused or successful recovery or scrub | the command the page prints | the real exit status of the printed command equals the CLI's own, success and refusal | **proved** (`specs/exit-codes.986.spec.ts`): recover to a staging name and as a download, a corrupted copy refused, scrub clean and scrub failing |
 | The three claims on Backups and Backup detail | `artifacts`, `settings assurance due` | | **unproved**: the Stored and Content claims are built from the placements and the schedule; the Recovery claim has no route and renders Unknown |
 | Dashboard assurance summary | `settings assurance due [--due\|--overdue]` | | **unproved**: counts derived client-side from the same schedule |
 
@@ -263,3 +273,13 @@ to it, so the SSH-shaped fields can name a host nothing dials, and the
 comparison is about what the two surfaces persist. What genuinely needs
 an endpoint is the wizard's own path, whose Verify-server step probes the
 host, and that is a different row.
+
+## EPIC Q additions
+
+`specs/exit-codes.986.spec.ts` compares real exit statuses: the command the page
+prints ("Same thing from the terminal") is taken off the page, run against the
+deployment the browser acted on, and compared with the same operation run against the
+CLI's own deployment. It covers a success and a refusal for recover and for scrub.
+Three rows stay **planned** until retnd#1059 lands the scrub-start, cancel and
+validator-output routes and verbs; they are pinned as absent in
+`specs/contract-gaps.spec.ts`, and that spec going red is how this file learns it.

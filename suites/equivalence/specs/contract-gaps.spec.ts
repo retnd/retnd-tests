@@ -126,6 +126,19 @@ const UI_CALLS: {
   // A name that cannot exist: `requireCSRF` refuses before the handler looks
   // an artifact up, so this probe mints nothing.
   { path: "/backups/{source}/{set}/e2e-no-such-artifact/recovery", method: "POST", served: true, status: 403, note: "mint a recovery grant; 403 is CSRF, and notably not the destructive gate" },
+  { path: "/backup-sets/{source}/{set}/recovery-test", method: "POST", served: true, status: 403, note: "start a recovery test now; 403 is CSRF, not a gate" },
+
+  // PLANNED, not shipped: the three routes retnd#1059 adds for the Scrub now,
+  // Cancel and Validator output controls (EPIC Q panel 2, work item W-08).
+  // They are recorded as absent, like the two pairs above, so this table is
+  // red the day each one lands and MATRIX.md has to be updated with it: a
+  // POST should then read 403 (CSRF, and notably not the destructive gate,
+  // for the same reason the rows above give) and the GET 200. The paths use
+  // the parameter names the plan gives them, so the contract check below
+  // reads the right spelling out of api/v1/openapi.json when they exist.
+  { path: "/backup-sets/{source}/{set}/scrub", method: "POST", served: false, status: 405, note: "PLANNED (retnd#1059, W-08): start a scrub from the browser; 202 with an operation id. 405 and not 404 today, because the set path answers other methods" },
+  { path: "/assurance/operations/{op}/cancel", method: "POST", served: false, status: 404, note: "PLANNED (retnd#1059, W-08): cancel a running scrub or recovery test; deliberately not under /operations, which is gated" },
+  { path: "/backup-sets/{source}/{set}/recovery-test/output", method: "GET", served: false, status: 404, note: "PLANNED (retnd#1059, W-08): the newest recovery test's validator output, sanitised and bounded" },
 ];
 
 /** The CLI verbs this matrix's rows depend on, and whether the product has
@@ -220,16 +233,22 @@ const CLI_VERBS: { verb: string; present: boolean; note: string }[] = [
     note: "`recovery show|resume-cleanup|acknowledge`, the CLI half of the recovery banner and both of its buttons"
   },
   // EPIC Q (retnd#953). Recovery and assurance arrived on both surfaces, with
-  // the two exceptions MATRIX.md's EPIC Q section names (no route starts a
-  // scrub, and nothing starts a recovery test but the schedule).
+  // the exceptions MATRIX.md's EPIC Q section names (no route starts a scrub,
+  // cancels one, or reads a validator's output yet: retnd#1059).
   { verb: "settings assurance", present: true, note: "the deployment-wide assurance policy: `settings assurance [patch ...]` and `settings assurance due`" },
   { verb: "backup-set assurance", present: true, note: "one set's resolved policy, its own override, and `--reset`" },
   { verb: "scrub", present: true, note: "check the durable copies now: the CLI half of a scrub the browser can only show the command for" },
   { verb: "recover", present: true, note: "stream one retained copy to stdout, a staging name or a medium: the CLI half of Recover artifact" },
+  { verb: "recovery-test", present: true, note: "prove now that the newest known good copy can be got back: the CLI half of Run recovery test" },
+  // PLANNED (retnd#1059, W-08): `retnd assurance cancel <op>` and
+  // `recovery-test <set> --show-output`. Recorded as absent so the day each
+  // ships, this table says so and the MATRIX.md rows move with it.
+  { verb: "assurance cancel", present: false, note: "PLANNED (retnd#1059, W-08): the CLI half of Cancel" },
+  { verb: "--show-output", present: false, note: "PLANNED (retnd#1059, W-08): the CLI half of Show validator output, `recovery-test <set> --show-output`" },
   {
     verb: "activity",
-    present: false,
-    note: "the activity feed row: no CLI command exposes an event log"
+    present: true,
+    note: "the activity feed row: `activity [--follow]`, the durable log an operator reads from a terminal (EPIC Q)"
   }
 ];
 
@@ -312,10 +331,12 @@ test.describe("the matrix's gap rows", () => {
     const surprises: string[] = [];
     for (const call of UI_CALLS) {
       const [source, set] = (anySet ?? "/").split("/");
-      const path = call.path.replace("{source}", encodeURIComponent(source)).replace(
-        "{set}",
-        encodeURIComponent(set)
-      );
+      const path = call.path
+        .replace("{source}", encodeURIComponent(source))
+        .replace("{set}", encodeURIComponent(set))
+        // A name that cannot exist, so a route that answers for it is
+        // refused on the strength of the request and not of a lookup.
+        .replace("{op}", "e2e-no-such-operation");
       const url = pair.ui.uiUrl + "/api/v1" + path;
       // `fetch` rather than the per-verb helpers: EPIC L's configuration
       // surface writes with PATCH, PUT and DELETE, and a table that
