@@ -119,6 +119,9 @@ export async function withCopyCorrupted<T>(
 
 /** The recovery-test set whose validator holds long enough to be caught. */
 export const SLOW_RECOVERY_SET_VAR = "RETND_RECOVERY_SLOW_SET";
+/** A backup set with no validator whose newest copy is a type the built-in
+ *  structure check can read (retnd#1111, retnd-tests#91). */
+export const BUILTIN_CHECK_SET_VAR = "RETND_BUILTIN_CHECK_SET";
 /** A backup too big for a stream to finish before the browser leaves. */
 export const BIG_ARTIFACT_VAR = "RETND_BIG_ARTIFACT";
 export const BIG_ARTIFACT_BYTES_VAR = "RETND_BIG_ARTIFACT_BYTES";
@@ -135,6 +138,8 @@ export const MIN_STREAM_BYTES = 32 * 1024 * 1024;
 export interface AssuranceFixtures {
   /** `source/set`, or null when the rig has no slow recovery test. */
   readonly slowRecoverySet: string | null;
+  /** `source/set`, or null when the rig has no set the built-in check can read. */
+  readonly builtinCheckSet: string | null;
   readonly bigArtifact: { readonly id: string; readonly bytes: number } | null;
 }
 
@@ -148,6 +153,10 @@ export function resolveAssuranceFixtures(env: NodeJS.ProcessEnv = process.env): 
   const slow = (env[SLOW_RECOVERY_SET_VAR] ?? "").trim();
   if (slow !== "" && slow.split("/").length !== 2) {
     throw new Error(SLOW_RECOVERY_SET_VAR + " is " + JSON.stringify(slow) + ", which is not source/set");
+  }
+  const builtin = (env[BUILTIN_CHECK_SET_VAR] ?? "").trim();
+  if (builtin !== "" && builtin.split("/").length !== 2) {
+    throw new Error(BUILTIN_CHECK_SET_VAR + " is " + JSON.stringify(builtin) + ", which is not source/set");
   }
   const id = (env[BIG_ARTIFACT_VAR] ?? "").trim();
   const rawBytes = (env[BIG_ARTIFACT_BYTES_VAR] ?? "").trim();
@@ -168,7 +177,7 @@ export function resolveAssuranceFixtures(env: NodeJS.ProcessEnv = process.env): 
     }
     bigArtifact = { id, bytes };
   }
-  return { slowRecoverySet: slow === "" ? null : slow, bigArtifact };
+  return { slowRecoverySet: slow === "" ? null : slow, builtinCheckSet: builtin === "" ? null : builtin, bigArtifact };
 }
 
 export const NEEDS_SLOW_RECOVERY_SET =
@@ -178,3 +187,7 @@ export const NEEDS_SLOW_RECOVERY_SET =
 export const NEEDS_BIG_ARTIFACT =
   "a backup of at least 32 MiB (" + BIG_ARTIFACT_VAR + " and " + BIG_ARTIFACT_BYTES_VAR +
   " name it), because a small one finishes streaming before a browser can leave; the rig seeds three small files";
+
+export const NEEDS_BUILTIN_CHECK_SET =
+  "a backup set with no validator whose newest copy is a .tar.gz, .tar.zst, .gz, .zst or .tar (" + BUILTIN_CHECK_SET_VAR +
+  " names it as source/set), which the rig does not seed yet";

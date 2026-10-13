@@ -1,6 +1,9 @@
 package fixtures
 
 import (
+	"bytes"
+	"compress/gzip"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -174,5 +177,46 @@ func TestScenarioFilesCannotEscapeTheWorkDirectory(t *testing.T) {
 		Files: []File{{Path: "x", Mode: "rwx", Content: "x"}}}
 	if _, err := Materialize(scn, Options{Work: t.TempDir()}); err == nil {
 		t.Error("an unparsable mode should have been refused")
+	}
+}
+
+// TestGzipFormatWritesARealStream is what lets a case about a reader trust
+// its fixture: a file named .gz that is not gzip would make the built-in
+// recovery check fail for the fixture's reason, not the product's. The bytes
+// inside must still be the deterministic ones, at the size the scenario gave.
+func TestGzipFormatWritesARealStream(t *testing.T) {
+	scn := func(format string) Scenario {
+		return Scenario{
+			Name: "gzip-format",
+			Sources: []Source{{ID: "production", BackupSets: []BackupSet{{
+				ID:         "logs",
+				Remote:     Remote{Type: "local"},
+				Include:    []string{"*"},
+				Completion: Completion{Strategy: "rename"},
+				StaleAfter: "30h",
+				Artifacts:  []Artifact{{Name: "a.gz", Size: 2048, Seed: "s", Format: format}},
+			}}}},
+			State: "none",
+		}
+	}
+	raw := read(t, filepath.Join(materialize(t, scn("")).Sets[0].RemotePath, "a.gz"))
+	packed := read(t, filepath.Join(materialize(t, scn("gzip")).Sets[0].RemotePath, "a.gz"))
+	zr, err := gzip.NewReader(bytes.NewReader(packed))
+	if err != nil {
+		t.Fatalf("format: gzip did not write a gzip stream: %v", err)
+	}
+	inner, err := io.ReadAll(zr)
+	if err != nil {
+		t.Fatalf("reading the stream back: %v", err)
+	}
+	if !bytes.Equal(inner, raw) {
+		t.Error("the stream does not hold the same deterministic bytes the raw file does")
+	}
+	if again := read(t, filepath.Join(materialize(t, scn("gzip")).Sets[0].RemotePath, "a.gz")); !bytes.Equal(again, packed) {
+		t.Error("two materialisations of a gzip artifact differ, so no digest assertion built on it means anything")
+	}
+	bad := scn("rar")
+	if _, err := Materialize(bad, Options{Work: t.TempDir(), Now: time.Now()}); err == nil {
+		t.Error("an unknown format was accepted, so a typo would write a raw file and the case would pass for the wrong reason")
 	}
 }

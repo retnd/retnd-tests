@@ -155,6 +155,13 @@ type Artifact struct {
 	// something.
 	Size int    `yaml:"size"`
 	Seed string `yaml:"seed"`
+	// Format wraps those bytes so the file is a real one of its kind:
+	// "gzip" writes them as a gzip stream (header time zero, so it is as
+	// deterministic as the bytes). Empty leaves them raw, which is what a
+	// dump or an opaque blob is. A case about a reader that decodes the file
+	// (the built-in recovery check, retnd#1111) needs the first; one about a
+	// checksum over opaque bytes needs the second.
+	Format string `yaml:"format"`
 	// MTime is a coarse offset from now: "now", "now-90d", "now-1h",
 	// "now-45m". This is the single documented place wall-clock time
 	// enters a fixture, and it is here only because `status` freshness

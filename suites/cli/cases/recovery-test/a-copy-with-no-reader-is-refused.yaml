@@ -1,0 +1,18 @@
+doc: >
+  The other refusal that survives: no validator, built-in check on, but the
+  newest copy is an opaque dump the check has no reader for. It is refused
+  before anything is staged, with the file type named, so the operator learns
+  to declare a validator rather than that a dump is "readable" (retnd#1111).
+scenario: seeded-local-builtin
+argv: ["recovery-test", "production/postgres-primary", "--json", "--config", "${CONFIG}"]
+exit: 1
+stdout:
+  - contains: '"state":"not_configured"'
+  - contains: "no reader for this file type"
+  - absent: '"check":"builtin"'
+  - absent: '"state":"readable"'
+stderr: ignored
+state:
+  mode: changed
+contract:
+  - "retnd/retnd#1111 (a file type with no reader is refused before anything is staged)"

@@ -111,3 +111,52 @@ export async function liveFeed(
     unfinished: (mine?.unfinished_actions ?? []).map((u) => ({ actionId: u.action_id, action: u.action }))
   };
 }
+
+/** The route for one set's assurance policy, from its `source/set` id. */
+const assuranceRoute = (setId: string): string => "/api/v1/backup-sets/" + setId.split("/").map(encodeURIComponent).join("/") + "/assurance";
+
+/** What a set's assurance policy says about its recovery test (retnd#1111). */
+export interface RecoveryTestPolicy {
+  validator_id?: string;
+  mode?: string;
+  builtin_check?: string;
+  effective_check?: string;
+  effective_check_reason?: string;
+}
+
+export async function recoveryTestPolicy(api: APIRequestContext, setId: string): Promise<RecoveryTestPolicy> {
+  const res = await api.get(assuranceRoute(setId));
+  expect(res.status(), "reading the set's assurance policy: " + (await res.text())).toBe(200);
+  return ((await res.json()) as { recovery_test?: RecoveryTestPolicy }).recovery_test ?? {};
+}
+
+/** Sets the set's own built-in check (`off` or `structure`); an empty value
+ *  clears it back to what the set inherits. This is the route the page uses,
+ *  and `retnd backup-set assurance <set> --recovery-test-builtin-check` is
+ *  its command. */
+export async function setBuiltinCheck(api: APIRequestContext, setId: string, value: "off" | "structure" | ""): Promise<void> {
+  const res = await api.patch(assuranceRoute(setId), {
+    headers: await csrfHeaders(api),
+    data: { recovery_test_builtin_check: value }
+  });
+  expect(res.status(), "setting the built-in check to " + JSON.stringify(value) + ": " + (await res.text())).toBe(200);
+}
+
+/** Runs `body` with the set's built-in check off, which is the state the
+ *  refusal cases of retnd#1108 are about once retnd#1111 exists, and puts
+ *  the check back however `body` ends. One deployment is shared by every
+ *  spec, so a check left off would turn every later reader of the set into a
+ *  refusal with nothing in its own output saying why. */
+export async function withBuiltinCheckOff<T>(api: APIRequestContext, setId: string, body: () => Promise<T>): Promise<T> {
+  const before = await recoveryTestPolicy(api, setId);
+  await setBuiltinCheck(api, setId, "off");
+  try {
+    const now = await recoveryTestPolicy(api, setId);
+    expect(now.effective_check, "with the built-in check off and no validator, no check would run").toBe("none");
+    return await body();
+  } finally {
+    // "" clears the set's own value, so it inherits again; a set that
+    // inherited "off" would be put back by this as well.
+    await setBuiltinCheck(api, setId, before.builtin_check === "off" ? "off" : "");
+  }
+}

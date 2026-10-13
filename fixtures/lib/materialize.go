@@ -2,6 +2,7 @@ package fixtures
 
 import (
 	"bytes"
+	"compress/gzip"
 	"fmt"
 	"hash/fnv"
 	"math/rand"
@@ -260,6 +261,21 @@ func writeArtifact(dir, scenario, setID string, a Artifact, now time.Time) error
 	fmt.Fprintf(h, "%s\x00%s\x00%s\x00%s", scenario, setID, a.Name, a.Seed)
 	buf := make([]byte, size)
 	rand.New(rand.NewSource(int64(h.Sum64()))).Read(buf)
+	switch a.Format {
+	case "":
+	case "gzip":
+		var packed bytes.Buffer
+		zw := gzip.NewWriter(&packed)
+		if _, err := zw.Write(buf); err != nil {
+			return err
+		}
+		if err := zw.Close(); err != nil {
+			return err
+		}
+		buf = packed.Bytes()
+	default:
+		return fmt.Errorf("scenario %s, artifact %s: format %q is not one of gzip", scenario, a.Name, a.Format)
+	}
 
 	path := filepath.Join(dir, a.Name)
 	if err := os.WriteFile(path, buf, 0o644); err != nil {

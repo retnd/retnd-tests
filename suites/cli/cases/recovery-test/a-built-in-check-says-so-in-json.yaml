@@ -1,0 +1,21 @@
+doc: >
+  The same run as its sibling, read by a program: the report names the check
+  as "builtin", carries the product's reserved identity for it in the
+  validator field (no operator validator ran), and its state is "readable".
+  The state is not "passed", which on the wire means a validator accepted the
+  copy (retnd#1111).
+scenario: seeded-local-builtin
+argv: ["recovery-test", "production/app-logs", "--json", "--config", "${CONFIG}"]
+exit: 0
+stdout:
+  - contains: '"check":"builtin"'
+  - contains: '"digest_matched":true'
+  - contains: '"validator":"retnd-builtin-structure"'
+  - contains: '"state":"readable"'
+  - absent: '"state":"passed"'
+  - absent: '"state":"failed"'
+stderr: ignored
+state:
+  mode: changed
+contract:
+  - "retnd/retnd#1111 (recovery-test --json gains check: builtin)"

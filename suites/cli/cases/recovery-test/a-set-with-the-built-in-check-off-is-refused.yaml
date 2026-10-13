@@ -1,0 +1,23 @@
+doc: >
+  The refusal that still applies once the built-in check exists (retnd#1108):
+  the same readable copy, but the set's built-in check is switched off and no
+  validator is declared, so the test says it did not run and why. Nothing is
+  read, and the report never says "readable". This is the control for the
+  sibling cases: without it, "check: built-in" would prove only that the verb
+  prints the word.
+scenario: seeded-local-builtin
+setup:
+  - ["backup-set", "assurance", "production/app-logs", "--recovery-test-builtin-check", "off", "--config", "${CONFIG}"]
+argv: ["recovery-test", "production/app-logs", "--json", "--config", "${CONFIG}"]
+exit: 1
+stdout:
+  - contains: '"state":"not_configured"'
+  - contains: "no validator is declared"
+  - absent: '"check":"builtin"'
+  - absent: '"state":"readable"'
+stderr: ignored
+state:
+  mode: changed
+contract:
+  - "retnd/retnd#1111 (builtin_check: off restores the refusal)"
+  - "retnd/retnd#1108 (a refusal is never a pass)"
