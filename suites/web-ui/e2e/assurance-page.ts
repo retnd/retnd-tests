@@ -77,6 +77,8 @@ export async function startRecoveryTest(api: APIRequestContext, setId: string): 
 export interface LiveEvent {
   sequence: number;
   event: string;
+  /** The engine's own words for the line (`recovery test complete`). */
+  message?: string;
   result?: string;
   fields: Record<string, string>;
 }
@@ -93,7 +95,7 @@ export async function liveFeed(
   const body = (await res.json()) as {
     sets?: {
       backup_set_id?: string;
-      events?: { sequence: number; event: string; result?: string; fields?: { key: string; value: string }[] }[];
+      events?: { sequence: number; event: string; message?: string; result?: string; fields?: { key: string; value: string }[] }[];
       unfinished_actions?: { action_id: string; action: string }[];
     }[];
   };
@@ -102,6 +104,7 @@ export async function liveFeed(
     events: (mine?.events ?? []).map((e) => ({
       sequence: e.sequence,
       event: e.event,
+      message: e.message,
       result: e.result,
       fields: Object.fromEntries((e.fields ?? []).map((f) => [f.key, f.value]))
     })),
