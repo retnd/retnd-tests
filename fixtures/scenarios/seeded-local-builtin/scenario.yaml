@@ -1,0 +1,35 @@
+doc: >
+  Two backup sets with no recovery-test validator declared anywhere, which is
+  how every set starts out, and a readable newest copy in one of them. The
+  point is what a recovery test does with nothing declared (retnd#1111): the
+  set whose newest copy is a gzip stream runs the product's built-in
+  structure check and comes back readable, and the set whose newest copy is
+  an opaque dump has no reader for its type and is refused with the reason,
+  as it was before the built-in check existed (retnd#1108).
+
+  The gzip is a real one (format: gzip wraps the deterministic bytes), because
+  a file that only had the right name would be a file the check rightly
+  fails. Unlike seeded-local-validator, no workflows root and no script are
+  configured, on purpose: "no validator" has to mean no validator.
+poll_interval: 15m
+sources:
+  - id: production
+    backup_sets:
+      - id: app-logs
+        remote: {type: local}
+        include: ["*.gz"]
+        completion: {strategy: rename}
+        stale_after: 30h
+        validation: {hash: sha256}
+        artifacts:
+          - {name: app-2026-06-01.log.gz, size: 8192, seed: c1, mtime: now-2h, format: gzip}
+      - id: postgres-primary
+        remote: {type: local}
+        include: ["*.dump"]
+        completion: {strategy: rename}
+        stale_after: 30h
+        validation: {hash: sha256}
+        artifacts:
+          - {name: pg-2026-06-01.dump, size: 4096, seed: a1, mtime: now-2h}
+state: replay
+replay: fetch

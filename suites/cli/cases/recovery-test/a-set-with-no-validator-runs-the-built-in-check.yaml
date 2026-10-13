@@ -1,0 +1,21 @@
+doc: >
+  With no validator declared and a newest copy the product can read, a
+  recovery test runs the built-in structure check instead of refusing
+  (retnd#1111, which retnd-tests#91 follows). The copy is a real gzip
+  stream, the digest gate is crossed as always, and the verb says in words
+  which check it ran, so nobody reads a structure check as a validator's
+  pass. Exit 0: a test that ran and found the file readable is not a failure.
+scenario: seeded-local-builtin
+argv: ["recovery-test", "production/app-logs", "--config", "${CONFIG}"]
+exit: 0
+stdout:
+  - contains: "check:"
+  - contains: "built-in structure check"
+  - contains: "matched what was recorded"
+  - absent: "not compared"
+stderr: ignored
+state:
+  mode: changed
+contract:
+  - "retnd/retnd#1111 (a set with no validator and a readable copy runs the built-in structure check)"
+  - "FR-72 (the digest is compared before anything reads the file)"

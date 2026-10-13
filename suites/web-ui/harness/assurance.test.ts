@@ -29,6 +29,7 @@ import {
   RESTORE_REQUEST,
   SLOW_RECOVERY_SET_VAR,
   corruptCopy,
+  BUILTIN_CHECK_SET_VAR,
   resolveAssuranceFixtures,
   resolveCopyControl,
   restoreCopy,
@@ -119,7 +120,7 @@ describe("the copy control channel", () => {
 
 describe("the assurance fixtures", () => {
   it("are absent unless the rig names them", () => {
-    expect(resolveAssuranceFixtures({})).toEqual({ slowRecoverySet: null, bigArtifact: null });
+    expect(resolveAssuranceFixtures({})).toEqual({ slowRecoverySet: null, builtinCheckSet: null, bigArtifact: null });
   });
 
   it("names the slow set and the big artifact", () => {
@@ -148,5 +149,7 @@ describe("the assurance fixtures", () => {
 
   it("refuses a slow set that is not source/set", () => {
     expect(() => resolveAssuranceFixtures({ [SLOW_RECOVERY_SET_VAR]: "nosep" })).toThrow(/source\/set/);
+    expect(() => resolveAssuranceFixtures({ [BUILTIN_CHECK_SET_VAR]: "nosep" })).toThrow(/source\/set/);
+    expect(resolveAssuranceFixtures({ [BUILTIN_CHECK_SET_VAR]: " e2e/builtin-check " }).builtinCheckSet).toBe("e2e/builtin-check");
   });
 });
