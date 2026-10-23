@@ -975,7 +975,23 @@ export async function crashIntoHook(
   for (let attempt = 0; attempt < attempts; attempt++) {
     const caught = await catchRunInFlight(api, backupSetId);
     await crashEngine(control);
-    const hold = await waitForHold(api, backupSetId, runAppearMs()).catch(() => null);
+    // Three scheduler intervals for the hold, not one. An interrupted run
+    // is not a hold until it finalises, which on the rig means waiting out
+    // the crash fixture's own 90s script bound and whatever confirmation
+    // the engine does on restart. One interval (60s) was inside that
+    // window, so a first attempt gave up on a hold that then landed
+    // anyway, and the second attempt waited five intervals for a run of a
+    // set the engine was by then right to be refusing. The line below says
+    // how long it really took, so the next reader of a red run has a
+    // number rather than a guess.
+    const crashedAt = Date.now();
+    const hold = await waitForHold(api, backupSetId, runAppearMs() * 3).catch(() => null);
+    if (hold !== null) {
+      console.log(
+        "e2e: " + backupSetId + " was held " + String(Math.round((Date.now() - crashedAt) / 1000)) +
+          "s after the engine was crashed into " + caught.step.script_name
+      );
+    }
     if (hold !== null) return { run: caught.run, step: caught.step, hold };
     missed.push(
       caught.run.run_id + " was " + caught.step.script_name + " when the crash was requested, " +
@@ -1046,7 +1062,14 @@ export async function acknowledgeHolds(
           response.status() + " " + (await response.text()).slice(0, 200)
       );
     }
-  } catch {
+  } catch (failed) {
+    // Said out loud rather than swallowed: a sweep that could not read or
+    // acknowledge is the difference between "no hold" and "could not look",
+    // and a waiter reads an empty answer as the first.
+    console.log(
+      "e2e: the hold sweep for " + String(backupSetId) + " did not complete: " +
+        (failed instanceof Error ? failed.message : String(failed))
+    );
     return settled;
   }
 
