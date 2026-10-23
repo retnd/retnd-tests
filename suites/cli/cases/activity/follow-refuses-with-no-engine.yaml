@@ -19,7 +19,7 @@ exit: 1
 stdout: empty
 stderr:
   - contains: "--follow"
-  - contains: "needs a route to the process serving this deployment"
+  - contains: "nothing to follow without a route to that process"
   - absent: "DISCOVERED"
 state: unchanged
 contract:
