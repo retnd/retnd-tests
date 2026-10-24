@@ -145,7 +145,7 @@ test.describe("a workflow run that was interrupted", () => {
     // One run raises more than one hold - the engine records the global
     // scope and the set scope separately - so what is required is a
     // hold belonging to THIS set, about the run that was interrupted.
-    const crashed = await crashIntoHook(bm.api, control!, set!);
+    const crashed = await crashIntoHook(bm.api, control!, set!, () => bm.reauthenticate());
     const started = crashed.run;
     expect(crashed.step.script_name).toBe(CRASH_HOLD);
     expect(crashed.hold.run_id).toBe(started.run_id);
