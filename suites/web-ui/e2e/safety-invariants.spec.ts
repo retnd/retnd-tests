@@ -116,7 +116,7 @@ test.describe("safety invariants", () => {
     }
   });
 
-  test("remote deletion is always described as post-commit", async ({ bm, page }) => {
+  test("remote deletion is always described as post-commit", async ({ bm, deployment, page }) => {
     // The dashboard half of this sentence lives under the active transfer,
     // so it is on screen while something is running. The wizard half is
     // always there, which is why it is the half that carries the case on a
@@ -128,11 +128,55 @@ test.describe("safety invariants", () => {
       ).toBeVisible();
     }
 
+    // Since retnd#864 the wizard's rail is locked behind the connection
+    // test: Review cannot be clicked cold, and a case that could was
+    // asserting a sentence on a step nobody could reach that way. So the
+    // source is proven for real, the way an operator proves it, with the
+    // machine this deployment can reach and the key its store already
+    // holds for it (the topology imports the source's own key; a
+    // synthetic one is refused by a real sshd). Steps 3 to 6 are complete
+    // on their defaults, step 7 wants the acknowledgement, and the
+    // sentence under test is on the Review step that follows.
+    needs(
+      deployment.source !== null,
+      "a source machine this deployment can really reach (RETND_VPS_HOST and friends) AND a key " +
+        "in its store that authenticates against it"
+    );
+    const source = deployment.source!;
     await page.goto("/sets/new");
-    await page.getByRole("button", { name: "Review" }).click();
+    await page.getByLabel("Server hostname").fill(source.host);
+    await page.getByLabel("SSH port").fill(String(source.port));
+    await page.getByLabel("Username").fill(source.user);
+    // The directory too: the connection test lists it, and the wizard's
+    // example folder is not on this machine.
+    await page.getByLabel("Directory to back up").fill(source.path);
+
+    await page.getByRole("button", { name: "Connection test" }).click();
+    await page.getByRole("radio", { name: /Use managed key/ }).click();
+    const managed = page.getByRole("button").filter({ hasText: /SHA256:/ });
+    await expect(managed.first()).toBeVisible();
+    await managed.first().click();
+    await expect(managed.first()).toHaveAttribute("aria-pressed", "true");
+    const trust = page.getByRole("button", { name: "Trust host" });
+    await expect(trust).toBeEnabled();
+    await trust.click();
+    await expect(page.getByRole("button", { name: "Host trusted" })).toBeDisabled();
+    await page.getByRole("button", { name: /^Test connection$/ }).click();
+    await expect(page.getByText(/This source has been proven/)).toBeVisible({ timeout: 60_000 });
+
+    // The remote-source handling policy is the Retention step's (step 7
+    // of eight; it was the Review step's in the six-step wizard). The
+    // sentence has to be there before the operator acknowledges anything,
+    // and the Review step's card then restates it as the moment deletion
+    // happens.
+    await page.getByRole("button", { name: "Retention" }).click();
     await expect(
       page.getByText(/transferred, verified, durably committed to this NAS, and recorded as safe/)
     ).toBeVisible();
+    await page.getByRole("checkbox", { name: /remote backup will be removed only after/i }).check();
+
+    await page.getByRole("button", { name: "Review" }).click();
+    await expect(page.getByText(/after a verified backup/)).toBeVisible();
   });
 
   test("freshness is stated as an age, not a bare date", async ({ bm, page }) => {
