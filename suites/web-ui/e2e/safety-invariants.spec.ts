@@ -144,6 +144,12 @@ test.describe("safety invariants", () => {
     );
     const source = deployment.source!;
     await page.goto("/sets/new");
+    // The terminal dock is a fixed overlay along the bottom of the window,
+    // and the connection-test controls scroll to exactly where it sits, so
+    // a click there lands on the dock. One run in three did that and the
+    // test never started. Out of the way first.
+    const hideTerminal = page.getByRole("button", { name: "Hide terminal" });
+    if (await hideTerminal.isVisible()) await hideTerminal.click();
     await page.getByLabel("Server hostname").fill(source.host);
     await page.getByLabel("SSH port").fill(String(source.port));
     await page.getByLabel("Username").fill(source.user);
