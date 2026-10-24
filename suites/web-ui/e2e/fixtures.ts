@@ -177,6 +177,19 @@ export class Retnd {
     await expect(this.page.getByRole("heading", { name: "Sign in" })).toBeVisible();
     this.session.spent();
   }
+
+  /** Signs this worker in again, for a case that has just crashed the
+   *  engine. Sessions live in the engine's memory for the life of one
+   *  process (apps/common/auth/local), so the cookie this worker carried
+   *  is a stranger to the restarted engine, and every read through `api`
+   *  (the browser context's own request) answers 401. `api` is the
+   *  context's request, so refreshing the context's cookies refreshes it. */
+  async reauthenticate() {
+    this.session.spent();
+    const ctx = this.page.context();
+    await ctx.clearCookies();
+    await ctx.addCookies([...(await this.session.cookiesForContext())]);
+  }
 }
 
 export const test = base.extend<

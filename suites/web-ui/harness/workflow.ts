@@ -446,6 +446,18 @@ export interface WireWorkflowSettings {
  *  worker fixture, which fails every spec in the directory. */
 async function readOrNull<T>(api: APIRequestContext, path: string): Promise<T | null> {
   const response = await api.get(BASE + path);
+  if (response.status() === 401 || response.status() === 403) {
+    // Loud, not null. A null here reads as "no runs" and "no holds" to
+    // every waiter in this file, and that is exactly how the crash case
+    // waited eight minutes for a hold the engine had raised within
+    // seconds: the engine it crashed came back with an empty session
+    // store (sessions are in memory for one process), the worker's cookie
+    // was a stranger to it, and every read said 401.
+    throw new Error(
+      "GET " + path + " answered " + response.status() + ": this worker's session is gone. A case that " +
+        "crashed or restarted the engine has to call bm.reauthenticate() before it reads again."
+    );
+  }
   if (response.status() !== 200) return null;
   try {
     return (await response.json()) as T;
@@ -969,12 +981,17 @@ export async function crashIntoHook(
   api: APIRequestContext,
   control: WorkflowControl,
   backupSetId: string,
+  /** Signs the caller in again after the crash. The engine that comes
+   *  back has an empty session store, so without this every read below
+   *  answers 401 and readOrNull refuses. */
+  afterCrash: () => Promise<void>,
   attempts = 2
 ): Promise<{ run: WireWorkflowRun; step: WireWorkflowStep; hold: WireWorkflowHold }> {
   const missed: string[] = [];
   for (let attempt = 0; attempt < attempts; attempt++) {
     const caught = await catchRunInFlight(api, backupSetId);
     await crashEngine(control);
+    await afterCrash();
     // Three scheduler intervals for the hold, not one. An interrupted run
     // is not a hold until it finalises, which on the rig means waiting out
     // the crash fixture's own 90s script bound and whatever confirmation
