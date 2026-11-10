@@ -1,0 +1,18 @@
+doc: >
+  After the mismatched patch the key registry still holds exactly the one
+  age/v1 key, active: answering `rotation_needed` wrote nothing to the key
+  store. The rotation case is the control that the same list does change
+  when a rotation really happens.
+scenario: seeded-local
+setup:
+  - [encryption, key, create, --suite, age/v1, --config, "${CONFIG}"]
+  - [encryption, policy, patch, --mode, required, --managed, --suite, age-pq/v1, --config, "${CONFIG}"]
+argv: [encryption, key, list, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - re: "k[0-9a-f]{16}: active, suite age/v1, created .*"
+  - absent: "age-pq/v1"
+stderr: ignored
+state: ignored
+contract:
+  - "retnd#1319 Suite A (the mismatch refusal writes nothing)"

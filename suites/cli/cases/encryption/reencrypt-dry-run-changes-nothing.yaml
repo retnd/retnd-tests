@@ -1,0 +1,17 @@
+doc: >
+  `encryption reencrypt --suite age/v1 --dry-run` over a deployment with no
+  encrypted copies plans nothing and says it changed nothing; it needs no
+  `--to`, because a dry run proposes the destination (FR-88, retnd#1317).
+scenario: seeded-local
+setup:
+  - [encryption, key, create, --suite, age/v1, --config, "${CONFIG}"]
+  - [encryption, policy, patch, --mode, required, --managed, --suite, age-pq/v1, --config, "${CONFIG}"]
+  - [encryption, key, rotate, --suite, age-pq/v1, --config, "${CONFIG}"]
+argv: [encryption, reencrypt, --suite, age/v1, --dry-run, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "dry run: 0 would be re-encrypted, 0 refused; nothing was changed"
+stderr: ignored
+state: ignored
+contract:
+  - "retnd#1319 Suite C (reencrypt dry run)"

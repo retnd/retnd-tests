@@ -1,0 +1,18 @@
+doc: >
+  With no suite configured the policy follows the active key's suite, so an
+  EPIC N deployment upgraded with an age/v1 key keeps writing age/v1 and is
+  not told to rotate (ADR 0033 D4). The pinned-suite mismatch case is its
+  control: there the same key is not enough.
+scenario: seeded-local
+setup:
+  - [encryption, key, create, --suite, age/v1, --config, "${CONFIG}"]
+  - [encryption, policy, patch, --mode, required, --managed, --config, "${CONFIG}"]
+argv: [encryption, policy, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "  suite: age/v1 (configured: default)"
+  - absent: "no active key for suite"
+stderr: ignored
+state: ignored
+contract:
+  - "retnd#1319 Suite A (an unset suite resolves to the active key's suite)"

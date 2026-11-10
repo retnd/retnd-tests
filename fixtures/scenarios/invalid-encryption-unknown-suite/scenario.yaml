@@ -1,0 +1,26 @@
+doc: >
+  A deployment whose retained-copy encryption pins a suite this build does
+  not register. Load has to refuse it naming the id, rather than fall back
+  to the default or to the active key's suite (retnd#1319, FR-86).
+raw_config: |
+  poll_interval: 15m
+  state:
+    database: ${STATE_DB}
+  retained_copy_encryption:
+    mode: required
+    suite: never-registered/v9
+    key_provider:
+      managed: true
+  sources:
+    - id: production
+      backup_sets:
+        - id: postgres-primary
+          remote: {type: local}
+          remote_path: ${REMOTE}/a
+          local_path: ${LOCAL}/a
+          completion: {strategy: rename}
+          stale_after: 30h
+  retention:
+    timezone: UTC
+    week_starts_on: monday
+state: none

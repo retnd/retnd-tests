@@ -1,0 +1,20 @@
+doc: >
+  `encryption suites` lists exactly the two suites this build ships, each
+  with its status and the one sentence the registry gives it, and marks
+  age-pq/v1 as the default for a first key. A deployment that encrypts
+  nothing lists them with zero copies and zero keys (FR-84, FR-89).
+scenario: seeded-local
+argv: [encryption, suites, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "age/v1 (v1): supported, 0 active copies, 0 keys"
+  - line: "age-pq/v1 (v1): supported, default for a first key, 0 active copies, 0 keys"
+  - contains: "Not post-quantum"
+  - contains: "Not AES, not FIPS-validated"
+  - absent: "military"
+  - count: 4
+stderr: ignored
+state: ignored
+contract:
+  - "retnd#1319 Suite A (the default suite on a fresh enable)"
+  - "FR-84 (the build names exactly one default and states it from code)"

@@ -1,0 +1,14 @@
+doc: >
+  A re-encryption run needs `--to`: a new copy cannot sit beside its source
+  on the same medium and a medium is never chosen for you. Exit 2, nothing
+  written. The dry-run case beside it is the control that the selection
+  itself is accepted.
+scenario: seeded-local
+argv: [encryption, reencrypt, --suite, age/v1, --config, "${CONFIG}"]
+exit: 2
+stdout: empty
+stderr:
+  - contains: "--to MEDIUM is required for a run"
+state: ignored
+contract:
+  - "retnd#1319 Suite C (reencrypt refuses to choose a medium)"

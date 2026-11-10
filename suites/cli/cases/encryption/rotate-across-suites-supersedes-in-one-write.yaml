@@ -1,0 +1,22 @@
+doc: >
+  The rotate-across-suites flow from the terminal: age/v1 key, policy moved
+  to age-pq/v1, `key rotate --suite age-pq/v1`. The registry ends with the
+  age-pq/v1 key active and the age/v1 key superseded, not retired, so every
+  copy it guards still opens; two keys, never two active (FR-85, FR-88).
+  suites/equivalence/specs/encryption-suites.1319.spec.ts ends the browser
+  flow with the same suite and status per key (bundle state aside).
+scenario: seeded-local
+setup:
+  - [encryption, key, create, --suite, age/v1, --config, "${CONFIG}"]
+  - [encryption, policy, patch, --mode, required, --managed, --suite, age-pq/v1, --config, "${CONFIG}"]
+  - [encryption, key, rotate, --suite, age-pq/v1, --config, "${CONFIG}"]
+argv: [encryption, key, list, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - re: "k[0-9a-f]{16}: superseded, suite age/v1, created .*"
+  - re: "k[0-9a-f]{16}: active, suite age-pq/v1, created .*"
+  - absent: ": retired,"
+stderr: ignored
+state: ignored
+contract:
+  - "retnd#1319 Suite A (rotate across suites, CLI half)"

@@ -1,0 +1,16 @@
+doc: >
+  A fresh enable mints its first key under the build's default suite when
+  none is named: the key list says age-pq/v1. The pinned-suite case beside
+  this one is its control (FR-84, ADR 0033 D2).
+scenario: seeded-local
+setup:
+  - [encryption, key, create, --config, "${CONFIG}"]
+argv: [encryption, key, list, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - re: "k[0-9a-f]{16}: active, suite age-pq/v1, created .*"
+  - absent: "suite age/v1,"
+stderr: ignored
+state: ignored
+contract:
+  - "retnd#1319 Suite A (default suite on a fresh enable: age-pq/v1)"

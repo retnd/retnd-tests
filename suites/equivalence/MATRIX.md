@@ -197,6 +197,23 @@ rather than imply a pair:
 | The three claims on Backups and Backup detail | `artifacts`, `settings assurance due` | | **unproved**: the Stored and Content claims are built from the placements and the schedule; the Recovery claim has no route and renders Unknown |
 | Dashboard assurance summary | `settings assurance due [--due\|--overdue]` | | **unproved**: counts derived client-side from the same schedule |
 
+## Encryption suites (EPIC T, retnd#1319)
+
+The suite surfaces a person drives with no encrypted copy in play. A copy
+needs an S3 medium this suite cannot stand up (`suites/cli/COVERAGE.md`,
+Known gaps), so the copy-level rows (crypto negatives per suite, the
+cross-suite key, the mismatch across a real cycle, re-encryption, recovery)
+are proved in retnd's own `core/tests` and are listed there, not here.
+
+| UI function | CLI equivalent | Equivalent state means | Status |
+|---|---|---|---|
+| Settings > Retained-copy encryption: enable (first key) | `encryption key create`, `encryption policy patch --mode required --managed` | the key registry as suite and status per key (`encryption key list --json`): one active age-pq/v1 key on both | **proved** (`specs/encryption-suites.1319.spec.ts`) |
+| Settings > Suite: choose a suite with no key | `encryption policy patch --suite ID` | the policy as the GET reads it (`encryption policy --json`: mode, suite, configured suite) and an unchanged registry on both; that a rotation is owed comes from the patch's own answer (`rotation_needed`, `rotate_command`) on the CLI and from the dialog moving to Rotate key in the browser, because the GET never carries it | **proved** (same spec) |
+| Change the suite > Rotate key | `encryption key rotate --suite ID` | the registry, as suite and status per key: the old key superseded and one active key under the new suite | **proved** (same spec). The printed command for each step is compared with the argv the CLI ran for it |
+| Change the suite > Download bundle, Confirm | `encryption key export ID --out FILE`, `encryption key confirm ID` | the bundle's export and confirmation records | **unproved**: the browser does both steps in the spec above, the CLI twin does neither, and bundle state is left out of the comparison |
+| Settings > Suite list | `encryption suites` | | **unproved** in this suite; the CLI half is pinned in Suite A (`encryption/suites-list-both-shipped-suites-and-the-default`), the browser half in retnd's `ui/shared/e2e/1319-suite-equivalence.spec.ts` |
+| Dashboard > Re-encrypt under current suite | `encryption reencrypt --suite ID [--dry-run] --to MEDIUM` | the copies moved and the sources retired | **unproved**: needs an encrypted copy on a medium. The selection and the dry run are pinned in Suite A (`encryption/reencrypt-dry-run-changes-nothing`, `encryption/reencrypt-run-without-a-destination-is-a-usage-error`) |
+
 ## CLI functions with no UI equivalent
 
 | CLI command | Why there is no UI row |

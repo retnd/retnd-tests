@@ -1,0 +1,12 @@
+doc: >
+  `key create --suite` with an id this build does not register is refused
+  before anything is generated, naming the id (TV.6).
+scenario: seeded-local
+argv: [encryption, key, create, --suite, never-registered/v9, --config, "${CONFIG}"]
+exit: 1
+stdout: empty
+stderr:
+  - contains: "never-registered/v9"
+state: ignored
+contract:
+  - "retnd#1319 Suite A (unknown ids refused)"
