@@ -1,0 +1,19 @@
+doc: >
+  The mismatch, from the terminal: with an active age/v1 key, pinning the
+  policy to age-pq/v1 is accepted and answered with the rotate command, and
+  nothing is rotated for you (FR-86, no auto-rotation). The key list read
+  afterwards in the next case shows no new key was minted.
+scenario: seeded-local
+setup:
+  - [encryption, key, create, --suite, age/v1, --config, "${CONFIG}"]
+argv: [encryption, policy, patch, --mode, required, --managed, --suite, age-pq/v1, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "  suite: age-pq/v1 (configured: age-pq/v1)"
+  - contains: "no active key for suite age-pq/v1 yet, so copies are refused until you run:"
+  - contains: "encryption key rotate --suite age-pq/v1"
+stderr: ignored
+state: changed
+contract:
+  - "retnd#1319 Suite A (the mismatch refusal)"
+  - "FR-86 (a policy that cannot be honoured is never substituted with another suite)"

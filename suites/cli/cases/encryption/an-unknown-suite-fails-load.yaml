@@ -1,0 +1,16 @@
+doc: >
+  `suite: never-registered/v9` in config.yaml fails at load, naming the id:
+  the deployment never starts on a suite it cannot write (FR-86). A retired
+  id is refused the same way, but this build ships no retired suite, so a
+  black-box binary has none to name; core/tests/movecrash covers retired
+  over the registry's test hook.
+scenario: invalid-encryption-unknown-suite
+argv: [check, --config, "${CONFIG}"]
+exit: 1
+stdout: empty
+stderr:
+  - contains: "retnd: "
+  - contains: "never-registered/v9"
+state: unchanged
+contract:
+  - "retnd#1319 Suite A (unknown and retired ids refused at load)"

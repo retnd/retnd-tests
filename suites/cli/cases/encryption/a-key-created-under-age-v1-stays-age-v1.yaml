@@ -1,0 +1,19 @@
+doc: >
+  A key created with `--suite age/v1` and a policy pinned to age/v1 keep the
+  deployment on age/v1: the policy reads age/v1 as both the suite in force
+  and the configured one, and the key list says age/v1 (FR-85).
+scenario: seeded-local
+setup:
+  - [encryption, key, create, --suite, age/v1, --config, "${CONFIG}"]
+  - [encryption, policy, patch, --mode, required, --managed, --suite, age/v1, --config, "${CONFIG}"]
+argv: [encryption, policy, --config, "${CONFIG}"]
+exit: 0
+stdout:
+  - line: "retained-copy encryption: required"
+  - line: "  suite: age/v1 (configured: age/v1)"
+  - absent: "no active key for suite"
+stderr: ignored
+state: ignored
+contract:
+  - "retnd#1319 Suite A (pinned age/v1)"
+  - "FR-85 (a copy is written only under the active key of the policy's suite)"

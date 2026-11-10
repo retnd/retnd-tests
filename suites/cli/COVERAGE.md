@@ -158,6 +158,7 @@ place that catches it per command is a case per command.
 | `scrub` (EPIC Q, #978) | `scrub/a-local-copy-passes-and-says-which-class-ran`, `scrub/naming-an-artifact-checks-it-now` | `scrub/a-corrupted-copy-fails-and-exits-nonzero`, `scrub/a-failing-scrub-degrades-the-set`, `scrub/content-on-a-medium-needs-the-egress-acknowledgement` |
 | `recovery-test` (EPIC Q, #980) | `recovery-test/an-intact-copy-clears-the-digest-gate`; `recovery-test/a-set-with-no-validator-runs-the-built-in-check` and `recovery-test/a-built-in-check-says-so-in-json`: with no validator declared and a real gzip as the newest copy the verb runs the built-in structure check, says so in words (`check: built-in structure check`) and in JSON (`"check":"builtin"`, state `readable`, never `passed`), and exits 0 (retnd#1111, retnd-tests#91) | `recovery-test/a-set-with-the-built-in-check-off-is-refused` (`--recovery-test-builtin-check off` brings the #1108 refusal back, the control for the two beside it), `recovery-test/a-copy-with-no-reader-is-refused` (an opaque dump has no reader, refused before anything is staged), `recovery-test/a-validator-that-reads-nothing-is-not-a-pass`: a validator that exits 0 without opening the file, over a copy whose bytes changed at the same size, comes back `failed` with the digest not matching and the validator never consulted (#986's reads-nothing criterion) |
 | `recover` (EPIC Q, #976) | `recover/a-local-copy-to-the-staging-root-reports-the-recorded-digest`, `recover/json-carries-the-same-digest` | `recover/a-corrupted-local-copy-is-refused-with-its-own-code`, `recover/a-recover-with-no-target-is-a-usage-error`, `recover/a-target-that-leaves-the-staging-root-is-refused`, `recover/an-artifact-nobody-recorded-is-not-found`, `recover/json-and-standard-output-do-not-mix` |
+| `encryption suites`, `encryption policy`, `encryption key create\|rotate --suite`, `encryption reencrypt` (EPIC T, retnd#1319) | `encryption/suites-list-both-shipped-suites-and-the-default` (both suites, their statuses and sentences, age-pq/v1 the default for a first key, zero counts while nothing is encrypted), `encryption/a-first-key-with-no-suite-named-is-age-pq` (a fresh enable mints under the default), `encryption/a-key-created-under-age-v1-stays-age-v1` (pinned age/v1), `encryption/an-unset-suite-follows-the-active-key` (an upgraded age/v1 deployment is not told to rotate), `encryption/a-patch-to-a-suite-with-no-key-says-rotate` and `encryption/a-mismatch-mints-no-key` (the mismatch answers with the rotate command and writes nothing to the key store), `encryption/rotate-across-suites-supersedes-in-one-write` (age/v1 superseded, age-pq/v1 active, nothing retired), `encryption/reencrypt-dry-run-changes-nothing` | `encryption/an-unknown-suite-fails-load`, `encryption/a-patch-to-an-unknown-suite-is-refused`, `encryption/a-key-under-an-unknown-suite-is-refused`, `encryption/reencrypt-run-without-a-destination-is-a-usage-error` (exit 2) |
 | `version` | `version/happy`: all four fields, shapes asserted, and this case doubles as the identity handshake | `version/no-config-flag` (exit 2 from the flag package), `version/rejects-an-operand` (exit 2 through usageError) |
 
 ## Multi-command sequences
@@ -202,6 +203,23 @@ Stated rather than implied.
   (`assuranceNow` in core/service/assurance.go), the cadence floor is an hour,
   and the notification sink belongs to the platform app. They are written down
   in `suites/equivalence/MATRIX.md` under EPIC Q.
+- **EPIC T's rows that need an encrypted copy on a medium are not here, for
+  the reason EPIC Q's S3 cases are not: the fixture.** A configurable medium
+  is S3 only, this suite has no S3-compatible endpoint, and a fixture may not
+  carry key material, so no case here can make an encrypted retained copy.
+  That rules out, black-box: the crypto negatives per suite and the
+  cross-suite key (Suite B), the mismatch refusal observed across a real
+  cycle with the source still present afterwards, a retired suite refusing a
+  write and still recovering (this build ships no retired suite either), the
+  kill in a re-encryption stream, catalog rebuild over copies under two suites
+  and an unknown one, clean-machine recovery per suite with the pinned `age`,
+  and the feature-off capture diff. They are proved in retnd itself, over the
+  real engine and journal: `core/tests/encryptionsuites`,
+  `core/tests/movecrash/suite_cells_1319_test.go` and
+  `core/internal/app/catalog_suites_1319_test.go` (retnd#1319), with the
+  capture diff owed by retnd#1320. What is here is every suite surface a
+  person drives that needs no copy: the listing, the default, pinning, the
+  mismatch answer, rotation across suites and the re-encrypt selection.
 - **`daemon` is exercised for one cycle and one signal.** Its
   single-instance journal lock, its behaviour when a second daemon
   attaches to the same state database, and multi-cycle scheduling are not
