@@ -24,7 +24,10 @@ import type { Locator, Page } from "@playwright/test";
 //     `encryption key list --json` and `encryption policy --json` on both
 //     work directories, compared on suite and status per key and on the
 //     resolved and configured suite, with ids and instants left out because
-//     no two deployments share them.
+//     no two deployments share them. That a rotation is owed after the
+//     patch is read from the patch's own answer (the GET never carries
+//     `rotation_needed`), and bundle state is not compared: the browser
+//     downloads and confirms the bundle, the CLI twin does neither.
 //
 // What this does not do: produce an encrypted copy. A configurable medium is
 // S3 only and this suite has no endpoint (suites/cli/COVERAGE.md, Known gaps);
@@ -47,11 +50,15 @@ function registry(build: Build, work: string): string[] {
   return keys.map((k) => `${k.suite} ${k.status}`).sort();
 }
 
-function policy(build: Build, work: string): { mode: string; suite: string; suite_configured: string; rotation_needed: boolean } {
+/** The policy as the GET reads it: mode, the suite in force and the
+ *  configured one. `rotation_needed` is not here on purpose: only the
+ *  patch's own answer carries it, never the GET. Managed keys only; an
+ *  external key's suite is not something this spec reads from the GET. */
+function policy(build: Build, work: string): { mode: string; suite: string; suite_configured: string } {
   const r = cli(build, work, ["encryption", "policy", "--json"]);
   expect(r.code, r.stderr).toBe(0);
   const p = JSON.parse(r.stdout);
-  return { mode: p.mode, suite: p.suite, suite_configured: p.suite_configured, rotation_needed: !!p.rotation_needed };
+  return { mode: p.mode, suite: p.suite, suite_configured: p.suite_configured };
 }
 
 /** Every `retnd encryption ...` command printed under scope, normalised. */
@@ -105,13 +112,20 @@ test.describe("retnd#1319: rotating across suites in the browser and on the CLI"
     sameStep(await printed(change), ["encryption", "policy", "patch", "--suite", "age/v1"]);
     await change.getByRole("button", { name: "Change suite" }).click();
     await expect(change.locator('[data-suite-step="rotate"]')).toHaveAttribute("data-state", "now");
-    const patched = cli(build, twin, ["encryption", "policy", "patch", "--suite", "age/v1"]);
+    const patched = cli(build, twin, ["encryption", "policy", "patch", "--suite", "age/v1", "--json"]);
     expect(patched.code, patched.stderr).toBe(0);
+    // The patch's own answer is what says a rotation is owed, and the
+    // browser said the same thing by moving to the Rotate key step above.
+    const answer = JSON.parse(patched.stdout);
+    expect(answer.rotation_needed).toBe(true);
+    expect(String(answer.rotate_command)).toContain("encryption key rotate --suite age/v1");
     expect(policy(build, ui)).toEqual(policy(build, twin));
-    expect(policy(build, twin)).toEqual({ mode: "required", suite: "age/v1", suite_configured: "age/v1", rotation_needed: true });
+    expect(policy(build, twin)).toEqual({ mode: "required", suite: "age/v1", suite_configured: "age/v1" });
     expect(registry(build, ui)).toEqual(registry(build, twin));
 
-    // Step 3: rotate into it, then the bundle.
+    // Step 3: rotate into it. The browser then downloads and confirms the
+    // bundle; the CLI twin does not export or confirm, so the comparison
+    // below is over suite and status per key and says nothing about bundles.
     sameStep(await printed(change), ["encryption", "key", "rotate", "--suite", "age/v1"]);
     await change.getByRole("button", { name: "Rotate key" }).click();
     await change.getByRole("checkbox", { name: /I understand this file can decrypt every copy/ }).check();
@@ -127,6 +141,5 @@ test.describe("retnd#1319: rotating across suites in the browser and on the CLI"
     expect(registry(build, ui)).toEqual(registry(build, twin));
     expect(registry(build, twin)).toEqual(["age-pq/v1 superseded", "age/v1 active"]);
     expect(policy(build, ui)).toEqual(policy(build, twin));
-    expect(policy(build, twin).rotation_needed).toBe(false);
   });
 });

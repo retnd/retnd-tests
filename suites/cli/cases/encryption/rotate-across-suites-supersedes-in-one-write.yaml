@@ -4,7 +4,7 @@ doc: >
   age-pq/v1 key active and the age/v1 key superseded, not retired, so every
   copy it guards still opens; two keys, never two active (FR-85, FR-88).
   suites/equivalence/specs/encryption-suites.1319.spec.ts ends the browser
-  flow in this same state.
+  flow with the same suite and status per key (bundle state aside).
 scenario: seeded-local
 setup:
   - [encryption, key, create, --suite, age/v1, --config, "${CONFIG}"]
