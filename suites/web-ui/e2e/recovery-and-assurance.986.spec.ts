@@ -68,9 +68,6 @@ test.describe("recovery in the browser", () => {
     // what this case is for, a download that completes with nobody opening
     // anything, is asserted above.
   });
-    expect(refused.status(), "the gate must still be shut, or this case proved nothing").toBe(403);
-    expect(await refused.text()).toContain("DESTRUCTIVE_OPERATIONS_DISABLED");
-  });
 
   test("a recovery of an artifact nobody recorded is refused, and the page says so", async ({ bm }) => {
     const mint = await bm.api.post("/api/v1/backups/nowhere/nothing/nope.bin/recovery", {
