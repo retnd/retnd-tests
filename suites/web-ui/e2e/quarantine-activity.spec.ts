@@ -305,7 +305,12 @@ test.describe("activity", () => {
     // one-set deployment and two hundred on a real feed, which is a
     // strict-mode violation rather than a product defect.
     await expect(page.getByRole("combobox", { name: "Backup set" })).toBeVisible();
-    await expect(page.getByLabel("Severity")).toBeVisible();
+    // A combobox named exactly Severity. getByLabel matches substrings, and
+    // every feed row carries a closed "Close help for Event severity"
+    // button (hidden, but getByLabel does not filter on visibility), so the
+    // bare label resolved to dozens of nodes. Same fix the Backup set
+    // filter above already carries.
+    await expect(page.getByRole("combobox", { name: "Severity", exact: true })).toBeVisible();
     // Time range used to sit here, `defaultValue="24"` with no `onChange`
     // and nothing reading it: listActivity() takes no window argument.
     await expect(page.getByLabel("Time range", { exact: true })).toHaveCount(0);
@@ -321,7 +326,7 @@ test.describe("activity", () => {
    *  not grow", which is true of a filter wired to nothing. */
   test("severity filter narrows the list", async ({ page }) => {
     const before = await page.getByRole("listitem").count();
-    await page.getByLabel("Severity").selectOption("2");
+    await page.getByRole("combobox", { name: "Severity", exact: true }).selectOption("2");
     const after = await page.getByRole("listitem").count();
     // Both halves of the premise, because either one alone is satisfied
     // by a feed this case cannot say anything about. The first real run
@@ -358,7 +363,7 @@ test.describe("activity", () => {
    *  A severity nothing reaches, on a set that exists, is a combination
    *  every feed is empty for. */
   test("over-filtering shows an empty state, not a blank panel", async ({ page }) => {
-    await page.getByLabel("Severity").selectOption("2");
+    await page.getByRole("combobox", { name: "Severity", exact: true }).selectOption("2");
     await page.getByRole("combobox", { name: "Backup set" }).selectOption({ index: 1 });
     const items = page.getByRole("listitem");
     if ((await items.count()) === 0) {

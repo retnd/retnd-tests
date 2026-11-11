@@ -1,4 +1,5 @@
 import { CONTENT_COLUMN, expect, needs, test } from "./fixtures";
+import { NEEDS_SOURCE, acknowledge, fillSource, proveConnection, rail, reachReview } from "./wizard-steps";
 
 /**
  * The add-backup-set wizard, against a real deployment.
@@ -32,61 +33,6 @@ import { CONTENT_COLUMN, expect, needs, test } from "./fixtures";
  *    exist at all.
  */
 
-/** Types this deployment's real source machine into step 1.
- *
- *  The wizard ships an example hostname, and against the mock that was
- *  enough: every probe and every connection test answered from a fixture,
- *  so the field's contents never mattered. A real probe opens a real
- *  outbound connection, so a case that goes past step 3 has to name a
- *  machine that answers. */
-async function fillSource(
-  page: import("@playwright/test").Page,
-  source: { host: string; port: number; user: string; path: string }
-) {
-  await page.getByRole("button", { name: "Source" }).click();
-  await page.getByLabel("Server hostname").fill(source.host);
-  await page.getByLabel("SSH port").fill(String(source.port));
-  await page.getByLabel("Username").fill(source.user);
-}
-
-/** Everything the wizard demands before Save can be pressed, done the way
- *  a real deployment forces it to be done.
- *
- *  Two of the three preconditions changed meaning in the move, and this
- *  helper exists because all three cases below hit both changes.
- *
- *  The key: the old flow pasted `FAKE-TEST-KEY-MATERIAL-not-a-real-key-…`
- *  into the import box, and the mock accepted it, because nothing was ever
- *  going to authenticate with it. A real sshd will not, so a wizard driven
- *  that far now fails #624's connection check at the `authenticate` step,
- *  correctly. The way through is the key store: the deployment holds a key
- *  that really does authenticate against the source machine (the topology
- *  imports it), and the wizard's own "Use managed key" panel picks it.
- *  That also means this suite never handles private key material at all,
- *  which the import route could not promise.
- *
- *  The host key: "Trust host" used to write nothing. It now pins a real
- *  known_hosts line for the fingerprint a real probe read off the source. */
-async function satisfySavePreconditions(
-  page: import("@playwright/test").Page,
-  source: { host: string; port: number; user: string; path: string }
-) {
-  await fillSource(page, source);
-
-  await page.getByRole("button", { name: "Authentication" }).click();
-  await page.getByRole("radio", { name: /Use managed key/ }).click();
-  const managed = page.getByRole("button").filter({ hasText: /SHA256:/ });
-  await expect(managed.first()).toBeVisible();
-  await managed.first().click();
-  await expect(managed.first()).toHaveAttribute("aria-pressed", "true");
-
-  await page.getByRole("button", { name: "Verify server" }).click();
-  const trust = page.getByRole("button", { name: "Trust host" });
-  await expect(trust).toBeEnabled();
-  await trust.click();
-  await expect(page.getByRole("button", { name: "Host trusted" })).toBeDisabled();
-}
-
 test.describe("add backup set wizard", () => {
   test.beforeEach(async ({ bm, page }) => {
     await bm.goto("/sets");
@@ -94,30 +40,52 @@ test.describe("add backup set wizard", () => {
     await expect(bm.heading("Add backup set")).toBeVisible();
   });
 
-  test("groups the flow into exactly six steps", async ({ page }) => {
+  // Six until #788, eight since: Authentication and Verify server became
+  // one Connection test step, and Engine, Repository, Consistency,
+  // Verification and Retention took the place of Discovery and "Storage &
+  // validation". The rail is the contract an operator navigates by, so the
+  // names are pinned, not just the count.
+  test("groups the flow into exactly eight steps", async ({ page }) => {
     const steps = page.getByRole("listitem");
-    await expect(steps).toHaveCount(6);
-    for (const label of ["Source", "Authentication", "Verify server", "Discovery", "Storage & validation", "Review"]) {
-      await expect(page.getByRole("button", { name: label })).toBeVisible();
+    await expect(steps).toHaveCount(8);
+    const labels = ["Source", "Connection test", "Engine", "Repository", "Consistency", "Verification", "Retention", "Review"];
+    for (const label of labels) {
+      await expect(rail(page, label)).toBeVisible();
     }
+    // And in this order: a rail that lists the right names shuffled would
+    // teach the wrong dependency between them.
+    await expect(steps).toHaveText(labels.map((label) => new RegExp(label)));
   });
 
   test("marks the current step and advances with Continue", async ({ page }) => {
-    await expect(page.getByRole("button", { name: "Source" })).toHaveAttribute("aria-current", "step");
-    await expect(page.getByText("Step 1 of 6")).toBeVisible();
+    await expect(rail(page, "Source")).toHaveAttribute("aria-current", "step");
+    await expect(page.getByText("Step 1 of 8")).toBeVisible();
+    // #864 gates Continue on the step's own answers. Step 1 ships with
+    // every answer it needs (a name, a host, a user, a port and a folder),
+    // so it is enabled here; the next case is about it being refused.
     await page.getByRole("button", { name: "Continue" }).click();
-    await expect(page.getByText("Step 2 of 6")).toBeVisible();
-    // exact: true — "← Cancel and return to backup sets" also contains
+    await expect(page.getByText("Step 2 of 8")).toBeVisible();
+    // exact: true: "← Cancel and return to backup sets" also contains
     // "back" (as a substring of "backup"), so a non-exact match is ambiguous
     // once that cancel link and the step-nav "Back" button are both present.
     await page.getByRole("button", { name: "Back", exact: true }).click();
-    await expect(page.getByText("Step 1 of 6")).toBeVisible();
+    await expect(page.getByText("Step 1 of 8")).toBeVisible();
   });
 
-  test("Back is disabled on the first step and Continue on the last", async ({ page }) => {
-    // exact: true — see the comment in the previous test.
+  test("Continue waits for the step's answers, and the rail will not skip past them", async ({ page }) => {
+    await page.getByLabel("Server hostname").fill("");
+    await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
+    await expect(rail(page, "Connection test")).toBeDisabled();
+    await page.getByLabel("Server hostname").fill("somewhere.internal");
+    await expect(page.getByRole("button", { name: "Continue" })).toBeEnabled();
+  });
+
+  test("Back is disabled on the first step and Continue on the last", async ({ deployment, page }) => {
+    needs(deployment.source !== null, NEEDS_SOURCE);
+    // exact: true: see the comment in the previous test.
     await expect(page.getByRole("button", { name: "Back", exact: true })).toBeDisabled();
-    await page.getByRole("button", { name: "Review" }).click();
+    await reachReview(page, deployment.source!);
+    await expect(page.getByText("Step 8 of 8")).toBeVisible();
     await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
   });
 
@@ -128,7 +96,7 @@ test.describe("add backup set wizard", () => {
   });
 
   test("step 2 offers three key sources, and Generate says plainly it can't be saved yet (backupd#299)", async ({ page }) => {
-    await page.getByRole("button", { name: "Authentication" }).click();
+    await rail(page, "Connection test").click();
     await expect(page.getByRole("radio")).toHaveCount(3);
     await expect(page.getByText("Generate dedicated SSH key")).toBeVisible();
     await expect(page.getByText(/never displayed/)).toBeVisible();
@@ -139,10 +107,16 @@ test.describe("add backup set wizard", () => {
     // other than Import can be saved (handleSave/saveHint refuse both),
     // so the panel now says that plainly instead of inventing detail for
     // a path that can never be saved.
-    await expect(page.getByText(/Generating a key on save isn.t available yet/)).toBeVisible();
-    await expect(page.getByText(/^ssh-ed25519 AAAA/)).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Copy public key" })).toHaveCount(0);
-    await expect(page.getByText(/authorized_keys/)).toHaveCount(0);
+    //
+    // Scoped to the page body: the terminal dock beside it keeps every
+    // connection test this deployment has run, and a passing test's own
+    // advice ("the string that has to appear in authorized_keys") is
+    // legitimately in it. The claim is about what THIS panel invents.
+    const body = page.locator(CONTENT_COLUMN);
+    await expect(body.getByText(/Generating a key on save isn.t available yet/)).toBeVisible();
+    await expect(body.getByText(/^ssh-ed25519 AAAA/)).toHaveCount(0);
+    await expect(body.getByRole("button", { name: "Copy public key" })).toHaveCount(0);
+    await expect(body.getByText(/authorized_keys/)).toHaveCount(0);
     // The step's own copy legitimately says "Private keys stay on this NAS
     // and are never shown" — a bare /PRIVATE KEY/i match flags that
     // sentence as a false positive. Match the actual PEM marker instead
@@ -167,7 +141,7 @@ test.describe("add backup set wizard", () => {
         "keys apart by fingerprint, so one key cannot show it and none cannot show anything"
     );
 
-    await page.getByRole("button", { name: "Authentication" }).click();
+    await rail(page, "Connection test").click();
     await page.getByRole("radio", { name: /Use managed key/ }).click();
 
     // This test used to assert a refusal, "Reusing a managed key on save
@@ -265,7 +239,7 @@ test.describe("add backup set wizard", () => {
    *  words), so the fingerprint on screen is the source machine's real
    *  one and trusting it really pins a known_hosts line. Against the mock
    *  it was a fixture string and "Trust host" wrote nothing anywhere. */
-  test("step 3 requires an explicit trust decision", async ({ deployment, page }) => {
+  test("step 2 requires an explicit trust decision", async ({ deployment, page }) => {
     needs(
       deployment.source !== null,
       "a source machine this deployment can really reach, named through RETND_VPS_HOST / " +
@@ -274,10 +248,13 @@ test.describe("add backup set wizard", () => {
         "wizard's built-in example hostname resolves to nothing and the step correctly fails"
     );
     await fillSource(page, deployment.source!);
-    await page.getByRole("button", { name: "Verify server" }).click();
-    await expect(page.getByText("Algorithm")).toBeVisible();
-    await expect(page.getByText(/SHA256:/)).toBeVisible();
-    await expect(page.getByText("Not yet trusted")).toBeVisible();
+    await rail(page, "Connection test").click();
+    // Scoped to the page body for the reason the Generate case gives: the
+    // terminal dock logs earlier connection tests, fingerprints included.
+    const body = page.locator(CONTENT_COLUMN);
+    await expect(body.getByText("Algorithm")).toBeVisible();
+    await expect(body.getByText(/SHA256:/).first()).toBeVisible();
+    await expect(body.getByText("Not yet trusted")).toBeVisible();
 
     const trust = page.getByRole("button", { name: "Trust host" });
     await expect(trust).toBeEnabled();
@@ -285,24 +262,30 @@ test.describe("add backup set wizard", () => {
     await expect(page.getByRole("button", { name: "Host trusted" })).toBeDisabled();
   });
 
-  test("step 3 warns what a future host-key change will do", async ({ page }) => {
+  test("step 2 warns what a future host-key change will do", async ({ page }) => {
     // The warning is the step's own copy and is on screen before any
     // probe, so this one needs no reachable host.
-    await page.getByRole("button", { name: "Verify server" }).click();
+    await rail(page, "Connection test").click();
     await expect(page.getByText(/stops all backup operations for the set/)).toBeVisible();
     await expect(page.getByText(/blocks remote artifact deletion/)).toBeVisible();
   });
 
-  test("step 4 separates recommended from advanced completion methods", async ({ page }) => {
-    await page.getByRole("button", { name: "Discovery" }).click();
+  // Completion methods are the artifact engine's branch of step 6 now,
+  // Verification: Discovery was deleted by #788 and its radios moved here.
+  test("step 6 separates recommended from advanced completion methods", async ({ deployment, page }) => {
+    needs(deployment.source !== null, NEEDS_SOURCE);
+    await proveConnection(page, deployment.source!);
+    await rail(page, "Verification").click();
     await expect(page.getByText("Recommended")).toBeVisible();
     await expect(page.getByText("Advanced")).toBeVisible();
     await expect(page.getByRole("radio", { name: /Atomic rename/ })).toBeVisible();
     await expect(page.getByRole("radio", { name: /Completion marker/ })).toBeChecked();
   });
 
-  test("step 4 warns when completion is inferred", async ({ page }) => {
-    await page.getByRole("button", { name: "Discovery" }).click();
+  test("step 6 warns when completion is inferred", async ({ deployment, page }) => {
+    needs(deployment.source !== null, NEEDS_SOURCE);
+    await proveConnection(page, deployment.source!);
+    await rail(page, "Verification").click();
     await expect(page.getByText(/infers completion/)).toHaveCount(0);
 
     await page.getByRole("radio", { name: /Stable file size/ }).click();
@@ -311,8 +294,10 @@ test.describe("add backup set wizard", () => {
     ).toBeVisible();
   });
 
-  test("step 5 no longer draws its own per-set retention fields (backupd#299)", async ({ page }) => {
-    await page.getByRole("button", { name: "Storage & validation" }).click();
+  test("step 7 no longer draws its own per-set retention fields (backupd#299)", async ({ deployment, page }) => {
+    needs(deployment.source !== null, NEEDS_SOURCE);
+    await proveConnection(page, deployment.source!);
+    await rail(page, "Retention").click();
     // Daily/Weekly/Monthly/Week-starts and their own always-checked
     // "protect newest known-good" toggle used to sit here, drawing a
     // per-set retention shape #111 already decided against: retention is
@@ -334,8 +319,10 @@ test.describe("add backup set wizard", () => {
     await expect(page.getByRole("checkbox", { name: /Protect newest known-good/ })).toHaveCount(0);
   });
 
-  test("step 5 lists the two validation layers that still exist, and no longer the fake Checksum toggle (backupd#299)", async ({ page }) => {
-    await page.getByRole("button", { name: "Storage & validation" }).click();
+  test("step 6 lists the two validation layers that still exist, and no longer the fake Checksum toggle (backupd#299)", async ({ deployment, page }) => {
+    needs(deployment.source !== null, NEEDS_SOURCE);
+    await proveConnection(page, deployment.source!);
+    await rail(page, "Verification").click();
     const transferVerification = page.getByRole("checkbox", { name: /Transfer verification/ });
     await expect(transferVerification).toBeChecked();
     // Unconditional server-side (no field anywhere can turn it off), so
@@ -389,8 +376,9 @@ test.describe("add backup set wizard", () => {
     await expect(validator.getByRole("option", { name: "trailer-marker", exact: true })).toHaveCount(1);
   });
 
-  test("step 6 summarises source, destination and validation, and no longer a hardcoded retention card (backupd#299)", async ({ page }) => {
-    await page.getByRole("button", { name: "Review" }).click();
+  test("step 8 summarises source, destination and validation, and no longer a hardcoded retention card (backupd#299)", async ({ deployment, page }) => {
+    needs(deployment.source !== null, NEEDS_SOURCE);
+    await reachReview(page, deployment.source!);
     for (const label of ["Source", "Destination", "Validation"]) {
       await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
     }
@@ -403,71 +391,69 @@ test.describe("add backup set wizard", () => {
     // each line in its own <div> whose whole text is the line, so equality
     // catches every one of these coming back while substring would also
     // match longer copy that merely mentions them.
-    await expect(page.getByText("Retention", { exact: true })).toHaveCount(0);
+    // One match is the rail's own "Retention" step, and it is the control
+    // for this zero: the same query finds the label that really is there,
+    // so a Review card that grew a Retention summary would make it two.
+    await expect(page.getByText("Retention", { exact: true })).toHaveCount(1);
     await expect(page.getByText("7 daily", { exact: true })).toHaveCount(0);
     await expect(page.getByText("13 weekly", { exact: true })).toHaveCount(0);
     await expect(page.getByText("12 monthly", { exact: true })).toHaveCount(0);
     await expect(page.getByText("SHA-256", { exact: true })).toHaveCount(0);
   });
 
-  test("step 6 discloses remote-source handling in full", async ({ page }) => {
-    await page.getByRole("button", { name: "Review" }).click();
-    await expect(page.getByText("Remote source handling")).toBeVisible();
+  // Not on Review any more: step 7 owns the acknowledgement and the
+  // sentence that explains what it is acknowledging.
+  test("step 7 discloses remote-source handling in full", async ({ deployment, page }) => {
+    needs(deployment.source !== null, NEEDS_SOURCE);
+    await proveConnection(page, deployment.source!);
+    await rail(page, "Retention").click();
+    await expect(page.getByText("Remote source handling").first()).toBeVisible();
     await expect(
       page.getByText(/transferred, verified, durably committed to this NAS, and recorded as safe/)
     ).toBeVisible();
     await expect(page.getByText("Remote artifact deleted")).toBeVisible();
   });
 
+  // The acknowledgement is step 7's, and the rail enforces it: Review is
+  // not reachable until it is checked (or the source is read-only, which
+  // leaves nothing to acknowledge deleting). So "saving is blocked until"
+  // is a claim about the rail's Review button first and the Save buttons
+  // second.
   test("saving is blocked until the acknowledgement is checked", async ({ deployment, page }) => {
+    needs(deployment.source !== null, NEEDS_SOURCE);
+
+    // Every OTHER save precondition is satisfied first (key, trusted host,
+    // a proven connection), so this isolates the acknowledgement checkbox
+    // as the one variable under test.
+    await proveConnection(page, deployment.source!);
+    await rail(page, "Retention").click();
+
+    const ack = page.getByRole("checkbox", { name: /remote backup will be removed only after/i });
     needs(
-      deployment.source !== null,
-      "a source machine this deployment can really reach (RETND_VPS_HOST and friends) AND a key " +
-        "in its store that authenticates against it. See satisfySavePreconditions: a synthetic key " +
-        "is refused by a real sshd, so the topology has to import the source's own key"
+      (await ack.count()) > 0,
+      "a source this deployment may delete from. The connection test's write probe decides it, and a " +
+        "read-only source waives the acknowledgement because there is nothing to acknowledge deleting"
     );
+    await expect(rail(page, "Review")).toBeDisabled();
 
-    // Every OTHER save precondition is satisfied first — a key on step 2
-    // and a trusted host on step 3 — so this isolates the acknowledgement
-    // checkbox as the one variable under test. Since M7 (#146 review)
-    // those two also gate the Save buttons, so reaching Review cold would
-    // leave Save disabled for reasons this test isn't about.
-    await satisfySavePreconditions(page, deployment.source!);
-
-    await page.getByRole("button", { name: "Review" }).click();
+    await ack.check();
+    await expect(rail(page, "Review")).toBeEnabled();
+    await rail(page, "Review").click();
 
     const runNow = page.getByRole("button", { name: /Save, enable & run/ });
     const enable = page.getByRole("button", { name: /^Save & enable$/ });
-    await expect(runNow).toBeDisabled();
-    await expect(enable).toBeDisabled();
-    await expect(page.getByText(/Acknowledge remote-source handling/)).toBeVisible();
-
-    await page.getByRole("checkbox", { name: /remote backup will be removed only after/i }).check();
-
-    // backupd#624 added a fourth precondition after the
-    // acknowledgement: the connection itself has to have been proven. A
-    // trusted host key settles which machine answers and settles nothing
-    // about whether the key authenticates or whether the account can read
-    // the folder, so the wizard now runs the six-step check and keeps Save
-    // disabled until it passes, the way the S3 destination wizard has kept
-    // its own Save disabled since #594.
-    //
-    // It is satisfied here rather than asserted, because this case is about
-    // the acknowledgement. The gate itself is the case below.
-    await expect(runNow).toBeDisabled();
-    await page.getByRole("button", { name: /^Test connection$/ }).click();
-    await expect(page.getByText(/This source has been proven/i)).toBeVisible();
-
     await expect(runNow).toBeEnabled();
     await expect(enable).toBeEnabled();
 
     // Unchecking must re-arm the guard, not leave it latched open.
-    await page.getByRole("checkbox", { name: /remote backup will be removed only after/i }).uncheck();
-    await expect(runNow).toBeDisabled();
+    await rail(page, "Retention").click();
+    await ack.uncheck();
+    await expect(rail(page, "Review")).toBeDisabled();
   });
 
-  test("offers a save-disabled escape hatch that needs no acknowledgement", async ({ page }) => {
-    await page.getByRole("button", { name: "Review" }).click();
+  test("offers a save-disabled escape hatch that needs no acknowledgement", async ({ deployment, page }) => {
+    needs(deployment.source !== null, NEEDS_SOURCE);
+    await reachReview(page, deployment.source!);
     await expect(page.getByRole("button", { name: "Save disabled" })).toBeEnabled();
   });
 
@@ -484,48 +470,39 @@ test.describe("add backup set wizard", () => {
   // because the two answer different questions and a case that flips both
   // at once can only ever say "something is still missing".
   test("saving is blocked until the connection has been proven", async ({ deployment, page }) => {
-    needs(
-      deployment.source !== null,
-      "a source machine this deployment can really reach, named through RETND_VPS_HOST / " +
-        "RETND_VPS_USER / RETND_VPS_PATH. The mock answered every probe and every " +
-        "connection test with a fixture; a real probe opens a real outbound connection, so the " +
-        "wizard's built-in example hostname resolves to nothing and the step correctly fails"
-    );
+    needs(deployment.source !== null, NEEDS_SOURCE);
+    const source = deployment.source!;
 
-    await page.getByRole("button", { name: "Authentication" }).click();
-    await page.getByRole("radio", { name: /Import key/ }).click();
-    // Synthetic fixture only, never a real key.
-    await page.getByLabel(/private key/i).fill("FAKE-TEST-KEY-MATERIAL-not-a-real-key-0123456789");
-    await page.getByRole("button", { name: "Import key" }).click();
-    await expect(page.getByText(/key imported/i)).toBeVisible();
-
-    await page.getByRole("button", { name: "Verify server" }).click();
+    await fillSource(page, source);
+    await rail(page, "Connection test").click();
+    await page.getByRole("radio", { name: /Use managed key/ }).click();
+    const managed = page.getByRole("button").filter({ hasText: /SHA256:/ });
+    await expect(managed.first()).toBeVisible();
+    await managed.first().click();
     const trust = page.getByRole("button", { name: "Trust host" });
     await expect(trust).toBeEnabled();
     await trust.click();
 
-    await page.getByRole("button", { name: "Review" }).click();
-    await page.getByRole("checkbox", { name: /remote backup will be removed only after/i }).check();
-
-    // Every other precondition is met, so this isolates the connection as
-    // the one variable under test.
-    const enable = page.getByRole("button", { name: /^Save & enable$/ });
-    await expect(enable).toBeDisabled();
-    // The reason is stated, not merely enforced: a disabled button with no
-    // reason reads as an application that is broken.
-    await expect(page.getByText(/Test connection before saving/i)).toBeVisible();
+    // Every other precondition on this step is met, so this isolates the
+    // connection as the one variable under test: the rail will not leave
+    // step 2, and Continue is refused too.
+    await expect(rail(page, "Engine")).toBeDisabled();
+    await expect(rail(page, "Review")).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
 
     await page.getByRole("button", { name: /^Test connection$/ }).click();
 
-    // Six named outcomes, never one verdict. backupd#596 split DNS,
-    // the connect, the host key, the key material, the authentication and
-    // the listing apart precisely because one boolean made a typo'd
-    // hostname, an unauthorised key, a rotated host key and a missing path
-    // read identically, and those are four different afternoons.
+    // Named outcomes, never one verdict. backupd#596 split DNS, the
+    // connect, the host key, the key material, the authentication and the
+    // listing apart precisely because one boolean made a typo'd hostname,
+    // an unauthorised key, a rotated host key and a missing path read
+    // identically, and those are four different afternoons.
     for (const step of ["credentials", "resolve", "connect", "host_key", "authenticate", "list"]) {
       await expect(page.getByText(step, { exact: true })).toBeVisible();
     }
-    await expect(enable).toBeEnabled();
+    await expect(page.getByText(/This source has been proven/i)).toBeVisible();
+    await expect(rail(page, "Engine")).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Continue" })).toBeEnabled();
   });
 
   test("cancel returns to the sets list", async ({ bm, page }) => {
@@ -533,30 +510,26 @@ test.describe("add backup set wizard", () => {
     await expect(bm.heading("Backup sets")).toBeVisible();
   });
 
-  test("a hostname typed in step 1 shows up in the review step, not the built-in example", async ({ page }) => {
+  test("a hostname typed in step 1 shows up in the review step, not the built-in example", async ({ deployment, page }) => {
+    needs(deployment.source !== null, NEEDS_SOURCE);
     // Scoped to the content column, and the first real run is what showed
-    // why. The Review card is right: it says warehouse-nas.internal. The
-    // page-wide negative failed on the TERMINAL, which had truthfully
-    // logged a refused host-key probe naming the example host:
+    // why. The page-wide negative failed on the TERMINAL, which had
+    // truthfully logged a refused host-key probe naming the example host.
+    // That line is the terminal doing its job. What this case is about is
+    // what the REVIEW STEP reports, so that is what it reads.
     //
-    //   [you] post /ssh/host-key-probe refused: HOST_KEY_PROBE_FAILED
-    //   connecting to prod-db-01.internal:22: ... no such host
-    //
-    // That line is the terminal doing its job. Against the mock there was
-    // no probe to refuse and no line to log, so an unscoped negative was
-    // accidentally safe. What this case is about is what the REVIEW STEP
-    // reports, so that is what it reads.
+    // The host is the source machine's own, not a made-up name: since #864
+    // Review is unreachable until the host on the form has answered a
+    // probe and a connection test, so a hostname that resolves to nothing
+    // can no longer be typed all the way to the end.
     const wizard = page.locator(CONTENT_COLUMN);
-    const host = page.getByLabel("Server hostname");
-    await host.fill("warehouse-nas.internal");
-
-    await page.getByRole("button", { name: "Review" }).click();
-    await expect(wizard.getByText("warehouse-nas.internal")).toBeVisible();
+    await reachReview(page, deployment.source!);
+    await expect(wizard.getByText(deployment.source!.host, { exact: true }).first()).toBeVisible();
     await expect(wizard.getByText("prod-db-01.internal")).toHaveCount(0);
   });
 
   test("importing a key never leaves the pasted material on screen", async ({ page }) => {
-    await page.getByRole("button", { name: "Authentication" }).click();
+    await rail(page, "Connection test").click();
     await page.getByRole("radio", { name: /Import key/ }).click();
 
     // Synthetic fixture only, never a real key. Against the mock this was
@@ -622,24 +595,11 @@ test.describe("add backup set wizard", () => {
     await fillSource(page, deployment.source!);
     await page.getByLabel("Backup set name").fill(uniqueName);
 
-    await page.getByRole("button", { name: "Authentication" }).click();
-    await page.getByRole("radio", { name: /Import key/ }).click();
-    await page.getByLabel(/private key/i).fill("FAKE-TEST-KEY-MATERIAL-not-a-real-key-0123456789");
-    await page.getByRole("button", { name: "Import key" }).click();
-    await expect(page.getByText(/key imported/i)).toBeVisible();
-
-    await page.getByRole("button", { name: "Verify server" }).click();
-    const trust = page.getByRole("button", { name: "Trust host" });
-    await expect(trust).toBeEnabled();
-    await trust.click();
-    await expect(page.getByRole("button", { name: "Host trusted" })).toBeDisabled();
-
-    await page.getByRole("button", { name: "Review" }).click();
-    await page.getByRole("checkbox", { name: /remote backup will be removed only after/i }).check();
-    // backupd#624: the source has to be proven before it can be
-    // saved. See the acknowledgement case above for why.
-    await page.getByRole("button", { name: /^Test connection$/ }).click();
-    await expect(page.getByText(/This source has been proven/i)).toBeVisible();
+    // proveConnection fills step 1 again, which is harmless: it types the
+    // same values, and the name above is not one of them.
+    await proveConnection(page, deployment.source!);
+    await acknowledge(page);
+    await rail(page, "Review").click();
 
     await page.getByRole("button", { name: /^Save & enable$/ }).click();
 
@@ -658,20 +618,20 @@ test.describe("add backup set wizard", () => {
     await expect(page.getByText(uniqueName, { exact: true })).toBeVisible();
   });
 
-  test("Save stays disabled without an imported key or a trusted host, even after acknowledging", async ({ page }) => {
+  test("Review, and so Save, stays out of reach without an imported key or a trusted host", async ({ page }) => {
     // Before M7 (#146 review) this scenario was reachable by clicking
     // Save: the button stayed enabled with no key imported and no host
     // trusted, and handleSave's own ad hoc guard rejected the request
-    // after the click, surfacing an inline error. Save is now
-    // structurally disabled for this same combination instead — proven
-    // here by the buttons refusing to be clicked at all, mirroring
-    // wizard.test.tsx's "keeps Save disabled without an imported key or
-    // a trusted host" unit test.
-    await page.getByRole("button", { name: "Review" }).click();
-    await page.getByRole("checkbox", { name: /remote backup will be removed only after/i }).check();
-
-    await expect(page.getByRole("button", { name: /Save, enable & run/ })).toBeDisabled();
-    await expect(page.getByRole("button", { name: /^Save & enable$/ })).toBeDisabled();
+    // after the click. M7 made Save structurally disabled, and #864 went
+    // further: a flow with no key and no trusted host cannot reach Review
+    // at all, because the rail refuses every step past the connection
+    // test. So the Save buttons are not merely disabled here, they are
+    // not on screen, and the wizard has not moved off step 1.
+    await expect(rail(page, "Review")).toBeDisabled();
+    await expect(rail(page, "Retention")).toBeDisabled();
+    await expect(page.getByRole("button", { name: /Save, enable & run/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Save & enable$/ })).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 1, name: "Add backup set" })).toBeVisible();
+    await expect(page.getByText("Step 1 of 8")).toBeVisible();
   });
 });

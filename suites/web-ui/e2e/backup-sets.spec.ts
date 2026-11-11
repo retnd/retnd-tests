@@ -16,6 +16,18 @@ import { expect, needs, test } from "./fixtures";
  * something went wrong, so those three cases read the health report and
  * say which state they were looking for.
  */
+/** The header row that carries the title AND the page's actions.
+ *
+ *  PageHeader nests the h1 in a flex div (beside the "i" tooltip host,
+ *  #834), inside the title column, inside the row the actions sit in. So
+ *  the row is three levels up. Counted here once, with the reason, rather
+ *  than guessed at in every case: at "../.." this resolved to the title
+ *  column, where no action is, and a zero asserted against it (the
+ *  destructive-actions case) passed by matching nothing. */
+function pageHeader(page: import("@playwright/test").Page) {
+  return page.getByRole("heading", { level: 1 }).locator("xpath=../../..");
+}
+
 test.describe("backup sets", () => {
   test.beforeEach(async ({ bm }) => {
     needs(bm.facts.configured, "a configured deployment: this page refuses with NOT_CONFIGURED before the first backup set exists");
@@ -24,7 +36,10 @@ test.describe("backup sets", () => {
 
   test("summarises the fleet in the subtitle", async ({ bm, page }) => {
     await bm.goto("/sets");
-    await expect(page.getByText(/healthy .* stale .* failing/)).toBeVisible();
+    // The subtitle is the one node whose own text carries the counts. The
+    // tooltip bodies beside it (#834) are hidden nodes that getByText
+    // still sees, so the match is pinned to the visible one.
+    await expect(page.getByText(/\d+ healthy · \d+ stale · \d+ failing/).first()).toBeVisible();
   });
 
   test("each card carries state, freshness, retention and validation", async ({ bm, page }) => {
@@ -87,7 +102,7 @@ test.describe("backup sets", () => {
   test("the run control belongs to the page, not to a card, and says how far it reaches", async ({ bm, page }) => {
     await bm.goto("/sets");
 
-    const header = page.getByRole("heading", { level: 1 }).locator("xpath=../..");
+    const header = pageHeader(page);
     // "Run all due sets" until #597's batch renamed it, and the rename is
     // the same class of correction as #214's above: "due" named a filter
     // that does not exist. RunCycle walks every ENABLED set and skips
@@ -177,7 +192,7 @@ test.describe("backup set detail", () => {
     // further down the page, so the old form proved less than its name.
     // exact: true — "Preview retention" is otherwise a substring match of
     // the Retention section's "Preview retention plan" button too.
-    const header = page.getByRole("heading", { level: 1 }).locator("xpath=../..");
+    const header = pageHeader(page);
     for (const action of [
       "Run this backup set", "Run all enabled sets", "Test connection", "Edit", "Preview retention"
     ]) {
@@ -234,7 +249,7 @@ test.describe("backup set detail", () => {
   });
 
   test("keeps destructive actions out of the header", async ({ page }) => {
-    const header = page.getByRole("heading", { level: 1 }).locator("xpath=../..");
+    const header = pageHeader(page);
     await expect(header.getByRole("button", { name: /Remove set configuration/ })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Remove set configuration/ })).toBeVisible();
   });
@@ -254,7 +269,7 @@ test.describe("backup set detail", () => {
     // machine's own, read back out of the service, rather than a fixture
     // string, and "Trusted" is a state the deployment is genuinely in.
     await expect(page.getByText(/SHA256:/).first()).toBeVisible();
-    await expect(page.getByText("Trusted")).toBeVisible();
+    await expect(page.getByText("Trusted", { exact: true })).toBeVisible();
   });
 
   test("states that removing configuration keeps retained backups", async ({ page }) => {

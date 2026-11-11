@@ -89,18 +89,17 @@ test.describe("application shell", () => {
     await badge("Backup sets", bm.facts.sets.length);
     await badge("Quarantine", bm.facts.quarantined.length);
 
-    // And the third one is not what its label suggests, which is worth
-    // pinning rather than glossing. The badge beside "Backups" counts
-    // backup SETS, not backups: appNodes.ts's countsNode sums the health
-    // report's per-set totals, deliberately, because nothing computes a
-    // retained-artifact figure server-side and the one the UI used to show
-    // came off the dev-server mock (backupd#211).
-    //
-    // So on this deployment it reads 1 beside a page that lists 3, and
-    // that is the product working as decided. My own first version of this
-    // case asserted the artifact count and was wrong; the mock could not
-    // have told me, because there the two numbers happened to agree.
-    await expect(bm.nav("Backups")).toContainText(String(bm.facts.sets.length));
+    // The badge beside "Backups" counts backups now, the ones outside
+    // quarantine (retnd#1186), and no longer backup SETS. Until backupd#211 it summed the
+    // health report's per-set totals because nothing computed a retained
+    // artifact figure server-side; the catalogue has since grown that
+    // figure, and the link's own accessible name says what it is ("3
+    // backups outside quarantine"). On this deployment it reads the length
+    // of the list the Backups page draws, which is the claim worth making.
+    // Past a hundred it reads "more than 100", which is not a number to
+    // compare against.
+    needs(bm.facts.backups.length <= 100, "a deployment holding no more than a hundred backups, where the badge is an exact count");
+    await expect(bm.nav("Backups")).toContainText(String(bm.facts.backups.length));
   });
 
   test("names the platform it is running on", async ({ bm, page }) => {
