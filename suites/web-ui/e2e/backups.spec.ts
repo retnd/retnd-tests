@@ -30,6 +30,30 @@ import type { Retnd } from "./fixtures";
  * nothing if it is rewritten to accept either.
  */
 
+/** How many column headers the backups table should have, built from the
+ *  columns this deployment actually draws rather than from a total.
+ *
+ *  Seven is the number of columns that carry information: Time, Backup
+ *  set, Artifact, Size, Assurance, Retention and Status. The table also
+ *  draws an Actions column of its own (visually hidden title), a leading
+ *  select-all checkbox column for an operator who may recover, an
+ *  Encryption column once the deployment has encryption to speak of, and
+ *  Medium when it declares a storage medium. The first two are about who
+ *  is looking and the last two about what the deployment holds, so a bare
+ *  total goes red every time one of them appears and says nothing about
+ *  whether the seven are there. */
+async function expectedColumnHeaders(page: import("@playwright/test").Page, mediums: boolean) {
+  const table = page.getByRole("table");
+  await expect(table).toBeVisible();
+  for (const col of ["Time", "Backup set", "Artifact", "Size", "Assurance", "Retention", "Status"]) {
+    await expect(table.getByRole("columnheader", { name: col, exact: true })).toHaveCount(1);
+  }
+  await expect(table.getByRole("columnheader", { name: "Actions", exact: true })).toHaveCount(1);
+  const select = await page.getByRole("checkbox", { name: "Select all matching backups" }).count();
+  const encryption = await table.getByRole("columnheader", { name: "Encryption", exact: true }).count();
+  return 7 + 1 + select + encryption + (mediums ? 1 : 0);
+}
+
 test.describe("backups table", () => {
   test.beforeEach(async ({ bm }) => {
     needs(bm.facts.configured, "a configured deployment: this page refuses with NOT_CONFIGURED before the first backup set exists");
@@ -89,7 +113,7 @@ test.describe("backups table", () => {
     // Assurance column took the place of Validation rather than joining it,
     // and carries the three claims, Stored, Content verified and Recovery
     // tested, inside its cells.
-    const expected = bm.facts.mediums.length > 0 ? 8 : 7;
+    const expected = await expectedColumnHeaders(page, bm.facts.mediums.length > 0);
     await expect(page.getByRole("columnheader")).toHaveCount(expected);
     await expect(page.getByRole("columnheader", { name: "Assurance" })).toHaveCount(1);
     await expect(page.getByRole("columnheader", { name: "Validation" })).toHaveCount(0);
@@ -492,7 +516,7 @@ test.describe("a deployment that never heard of storage mediums", () => {
 
     const table = page.getByRole("table");
     await expect(table).toBeVisible();
-    await expect(page.getByRole("columnheader")).toHaveCount(7);
+    await expect(page.getByRole("columnheader")).toHaveCount(await expectedColumnHeaders(page, false));
     await expect(table.getByRole("columnheader", { name: "Assurance" })).toHaveCount(1);
     await expect(table.getByRole("columnheader", { name: "Validation" })).toHaveCount(0);
     await expect(table.getByRole("columnheader", { name: "Medium" })).toHaveCount(0);

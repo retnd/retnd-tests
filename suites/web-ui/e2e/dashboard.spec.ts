@@ -106,8 +106,12 @@ test.describe("dashboard", () => {
     // "Retained artifacts" and "Success rate · 7d" used to sit in this
     // same list. #211 removed both: no endpoint has ever computed either,
     // so against a real deployment they each rendered a confident zero.
-    // "Free space" is the honest figure that took their place here, and it
-    // comes off the health report. Deliberate removal, recorded so a later
+    // "Free space" took their place here for a while, and has since moved
+    // out too (#842): the per-set readings this panel is built from carry
+    // no filesystem key, so summing them counted a shared volume once per
+    // set (21.6 TB free on a 13.9 TB disk). It lives on the Storage metric,
+    // off GET /api/v1/system/storage, which measures each volume once.
+    // Deliberate removal, recorded so a later
     // reader does not read the shorter list as an assertion someone
     // deleted: the retained-artifact count and the seven-day success rate
     // have NO replacement, in this list or anywhere else.
@@ -116,7 +120,11 @@ test.describe("dashboard", () => {
     // those two figures were fixture-only and would render nonsense
     // against a real service. This run is that real service, so the
     // negative below has stopped being a prediction.
-    await expect(figure("Free space")).toHaveText(/^[\d.]+ (B|KB|MB|GB|TB|PB)$/);
+    await expect(figure("Free space")).toHaveCount(0);
+    const storage = page
+      .getByRole("region", { name: "Key metrics" })
+      .getByText(/^([\d.,]+ \S*B free|Not known yet)$/);
+    await expect(storage).toHaveCount(1);
     await expect(summary.getByText(/Success rate|Retained artifacts/)).toHaveCount(0);
     // Control for that zero: the same query shape, on a label that is
     // there, finds it. Without this, a typo would also read as "absent".

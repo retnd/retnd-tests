@@ -133,11 +133,19 @@ test.describe("retnd#1108 a recovery test on a set with no validator", () => {
     await bm.goto(setPath(setId));
     const terminal = bm.terminal();
     await expect(terminal).toContainText("recovery test did not complete");
-    // The dock holds every set's lines, and a set with a built-in check
-    // (retnd#1111) legitimately reaches Complete, so only this set's are read.
-    await expect(terminal, "a stage line that says Complete above a line that says it did not").not.toContainText(
-      new RegExp("\\[" + escapeRegExp(setId) + "\\] recovery stage: Complete")
-    );
+    // The dock holds every line this session has produced, for every set and
+    // for every earlier case that recovered something from this one, and a
+    // recovery that did have something to check legitimately reaches
+    // Complete (retnd#1111, and the download case in
+    // recovery-and-assurance.986). So only the lines from THIS run's start
+    // are read: the last "recovery test started" and what follows it.
+    const lines = await terminal.innerText();
+    const from = lines.lastIndexOf("recovery test started");
+    expect(from, "the dock shows the start of the run it is being asked about").toBeGreaterThanOrEqual(0);
+    expect(
+      lines.slice(from),
+      "a stage line that says Complete above a line that says it did not"
+    ).not.toMatch(new RegExp("\\[" + escapeRegExp(setId) + "\\] recovery stage: Complete"));
   });
 
   test("1108: the closing line does not say the test is complete while its state is not_configured", async ({ bm }) => {

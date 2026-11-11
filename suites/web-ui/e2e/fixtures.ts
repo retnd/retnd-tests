@@ -111,7 +111,13 @@ export class Retnd {
   }
 
   nav(label: string) {
-    return this.page.getByRole("navigation", { name: "Sections" }).getByRole("link", { name: new RegExp(label, "i") });
+    // Anchored at the start of the accessible name. A link's name is its
+    // label followed by its badge and the badge's own words, and the
+    // Backups badge says "3 backups outside quarantine", so an unanchored
+    // /Quarantine/i matched two links and failed strict mode.
+    return this.page
+      .getByRole("navigation", { name: "Sections" })
+      .getByRole("link", { name: new RegExp("^" + label, "i") });
   }
 
   async navigateTo(label: string) {

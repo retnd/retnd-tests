@@ -30,13 +30,13 @@ import { expect, needs, test } from "./fixtures";
 
 const sha256 = (b: Buffer) => createHash("sha256").update(b).digest("hex");
 
-test.describe("recovery on a deployment whose destructive gate is shut", () => {
+test.describe("recovery in the browser", () => {
   test.beforeEach(({ bm }) => {
     needs(bm.facts.configured, "a configured deployment");
     needs(bm.facts.backups.length > 0, "at least one ingested backup with a local copy");
   });
 
-  test("a download in the browser completes, and the gate that refuses operations is still shut", async ({ bm }) => {
+  test("a download in the browser completes", async ({ bm }) => {
     await bm.goto("/backups");
     await bm.page.getByRole("row").filter({ hasText: /\.(sql|tar|dump|gz|zst|bin|dat|txt|log)/ }).first().click();
     await bm.page.getByRole("button", { name: "Recover artifact", exact: true }).click();
@@ -56,11 +56,18 @@ test.describe("recovery on a deployment whose destructive gate is shut", () => {
     // it. What it received is compared to what the journal recorded below.
     expect(sha256(bytes)).toMatch(/^[0-9a-f]{64}$/);
 
-    // The same session, the same engine: the destructive gate is shut.
-    const refused = await bm.api.post("/api/v1/operations", {
-      headers: await csrfHeaders(bm.api),
-      data: { kind: "run_cycle" }
-    });
+    // This case used to finish by proving the destructive gate was still
+    // shut: it posted run_cycle in the same session and expected a 403
+    // DESTRUCTIVE_OPERATIONS_DISABLED, to show a recovery needs no gate
+    // opened. #1163 opened that gate for the local-account profiles, which
+    // is the profile this rig runs, so the same request is now ACCEPTED (202)
+    // and would start a real cycle on the deployment every later case reads.
+    // The premise cannot be observed here any more, and a request that
+    // starts a backup is not a probe. The gate's own refusal on a gateway
+    // profile is held by apps/common/webhost's gate_profile_1163 tests, and
+    // what this case is for, a download that completes with nobody opening
+    // anything, is asserted above.
+  });
     expect(refused.status(), "the gate must still be shut, or this case proved nothing").toBe(403);
     expect(await refused.text()).toContain("DESTRUCTIVE_OPERATIONS_DISABLED");
   });

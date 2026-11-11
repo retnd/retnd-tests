@@ -1,5 +1,6 @@
 import { resolvePlatform } from "../harness/deployment";
 import { expect, needs, test } from "./fixtures";
+import { NEEDS_SOURCE, proveConnection, rail } from "./wizard-steps";
 
 /** §46 — provider treatment is 5-10%: accent token, window chrome, native
  *  capabilities. This spec proves the shared product is identical across
@@ -58,7 +59,7 @@ test.describe("provider: " + PLATFORM, () => {
     await page.goto("/");
     const nav = page.getByRole("navigation", { name: "Sections" });
     for (const label of ["Dashboard", "Backup sets", "Backups", "Activity", "Quarantine", "Settings"]) {
-      await expect(nav.getByRole("link", { name: new RegExp(label, "i") })).toBeVisible();
+      await expect(nav.getByRole("link", { name: new RegExp("^" + label, "i") })).toBeVisible();
     }
   });
 
@@ -109,11 +110,17 @@ test.describe("provider: " + PLATFORM, () => {
     }
   });
 
-  test("offers a native storage picker only when supported", async ({ page }) => {
+  test("offers a native storage picker only when supported", async ({ deployment, page }) => {
     // /sets/new is reachable on any instance, configured or not: it is the
     // page a first-run deployment sends an operator to.
+    //
+    // The destination field is on step 7 now, and #864 puts that behind a
+    // proven connection, which needs the source machine this suite's
+    // topology stands up.
+    needs(deployment.source !== null, NEEDS_SOURCE);
     await page.goto("/sets/new");
-    await page.getByRole("button", { name: "Storage & validation" }).click();
+    await proveConnection(page, deployment.source!);
+    await rail(page, "Retention").click();
 
     if (expected.picker) {
       await expect(page.getByRole("button", { name: /Browse volumes/ })).toBeVisible();
