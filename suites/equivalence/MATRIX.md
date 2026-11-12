@@ -214,6 +214,19 @@ are proved in retnd's own `core/tests` and are listed there, not here.
 | Settings > Suite list | `encryption suites` | | **unproved** in this suite; the CLI half is pinned in Suite A (`encryption/suites-list-both-shipped-suites-and-the-default`), the browser half in retnd's `ui/shared/e2e/1319-suite-equivalence.spec.ts` |
 | Dashboard > Re-encrypt under current suite | `encryption reencrypt --suite ID [--dry-run] --to MEDIUM` | the copies moved and the sources retired | **unproved**: needs an encrypted copy on a medium. The selection and the dry run are pinned in Suite A (`encryption/reencrypt-dry-run-changes-nothing`, `encryption/reencrypt-run-without-a-destination-is-a-usage-error`) |
 
+## Agent access (EPIC U, retnd#1352)
+
+An agent is a third client of the same contract, so it is held to the same
+table. The browser has no exit status; its half is retnd's
+`ui/shared/e2e/1352-agent-equivalence.spec.ts`, which compares the code and
+the message the page prints against these rows.
+
+| Surface | CLI equivalent | Equivalent answer means | Status |
+|---|---|---|---|
+| Agent read: `status`, `backups_list`, `encryption_state` over stdio and `POST /api/v1/agent/mcp` | the twin `retnd agent tools --json` names for each tool | the tool result's exit code is the status the CLI ended with, its echoed `command` is the twin, and stdio and http answer equally | **proved** (`specs/agent-equivalence.1352.spec.ts`) |
+| Agent refusal: a `read` token asking `run_cycle` | the twin of `run_cycle`, presented the same token | `AGENT_SCOPE_INSUFFICIENT`, the same message, and the CLI's own exit status on stdio and http | **proved** (same spec) |
+| Agent refusal: an approved `run_cycle` at the shut gate | the twin of `run_cycle` as the administrator | `DESTRUCTIVE_OPERATIONS_DISABLED`, the same message, exit 50, as for a person | **proved** (same spec) |
+
 ## CLI functions with no UI equivalent
 
 | CLI command | Why there is no UI row |
