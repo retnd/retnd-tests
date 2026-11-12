@@ -27,14 +27,24 @@ import { materialise, resolveBuild, type Build } from "../harness/tools";
 // The rows:
 //   reads:    status, backups_list, encryption_state
 //   refusals: a read token asking run_cycle (AGENT_SCOPE_INSUFFICIENT), and a
-//             person at the shut gate, reached by the transports as an
-//             operate token's call approved by the operator (the gate then
-//             refuses it exactly as it refuses a person: DESTRUCTIVE_OPERATIONS_DISABLED, 50).
+//             person's run_cycle against the same call approved for an
+//             operate token.
 //
-// Written against the spec's names table (section 12) while the transports
-// were still being written; not run. The places that assume a name the spec
-// does not fix are marked ASSUMES and are the first thing to read if a row
-// goes red for the wrong reason.
+// What "the CLI twin" can mean. The CLI is the cookie client: it signs in as
+// the administrator and never presents a bearer, so it cannot be refused for
+// a scope and has no way to make a read token's call. For the scope refusal
+// the equivalent is therefore the API itself (the same POST with the token's
+// bearer), and the CLI's part is the exit status it gives an engine refusal
+// whose code it has no mapping of its own for, which a real CLI refusal
+// (`agent confirmations approve` on an id that is not there) shows.
+//
+// What "a shut gate" cannot mean here. The destructive gate is open for the
+// generic profile (NewProfileGate: a local-account profile with no gateway
+// opens it), and this harness boots the generic engine, so `operation run`
+// really does exit 0 and queue the cycle. The earlier draft of this spec
+// expected exit 50 from a gate nothing in this rig can shut; the third test
+// now holds what is real on this rig, a person's run and an approved one
+// ending alike, and is marked as expected to fail until retnd#1385 is fixed.
 
 interface Answer {
   code: string;
@@ -60,17 +70,11 @@ function cli(build: Build, work: string, argv: string[], env: Record<string, str
   return { code: r.status ?? -1, stdout: r.stdout, stderr: r.stderr };
 }
 
-/** What a routed CLI call needs to reach the engine and be a person (or, with
- *  `token`, an agent). ASSUMES RETND_AGENT_TOKEN is what the attached CLI
- *  presents as a bearer when set, the way the stdio verb takes it. */
-function attach(stack: Stack, token?: string): Record<string, string> {
-  const env: Record<string, string> = { RETND_API_URL: stack.engineUrl };
-  if (token) env.RETND_AGENT_TOKEN = token;
-  else {
-    env.RETND_API_USERNAME = stack.username;
-    env.RETND_API_PASSWORD = stack.password;
-  }
-  return env;
+/** What a routed CLI call needs to reach the engine and sign in as the
+ *  administrator. The CLI is the cookie client and presents no bearer:
+ *  RETND_AGENT_TOKEN is read only by `agent serve --stdio`. */
+function attach(stack: Stack): Record<string, string> {
+  return { RETND_API_URL: stack.engineUrl, RETND_API_USERNAME: stack.username, RETND_API_PASSWORD: stack.password };
 }
 
 function mint(build: Build, stack: Stack, name: string, scope: string): string {
@@ -94,7 +98,7 @@ class StdioSurface implements Surface {
   private id = 0;
 
   constructor(build: Build, stack: Stack, tokenFile: string) {
-    this.child = spawn(build.cli, ["agent", "serve", "--stdio", "--token-file", tokenFile, "--config", resolve(stack.work, "config.yaml")], {
+    this.child = spawn(build.cli, ["agent", "serve", "--stdio", "--token-file", tokenFile], {
       env: { ...process.env, RETND_API_URL: stack.engineUrl },
       stdio: ["pipe", "pipe", "pipe"]
     });
@@ -192,17 +196,16 @@ async function person(stack: Stack) {
   return { csrf, cookie: `retnd_csrf=${csrf}; retnd_session=${session}` };
 }
 
-/** The CLI twin the catalogue names for a tool. ASSUMES a `retnd agent tools
- *  --json` row carries it as a string beginning "retnd " under one of these
- *  keys. */
+/** The CLI twin the catalogue names for a tool: `retnd agent tools --json`
+ *  carries it in the row's `twin` field, as a string beginning "retnd ". */
 function twinOf(build: Build, stack: Stack, tool: string): string {
   const r = cli(build, stack.work, ["agent", "tools", "--json"], attach(stack));
   expect(r.code, r.stderr).toBe(0);
-  const rows = (JSON.parse(r.stdout).tools ?? JSON.parse(r.stdout)) as Array<Record<string, any>>;
-  const row = rows.find((x) => x.tool === tool || x.name === tool);
+  const rows = JSON.parse(r.stdout).tools as Array<Record<string, any>>;
+  const row = rows.find((x) => x.name === tool);
   expect(row, `the catalogue has no row for ${tool}`).toBeDefined();
-  const twin = ["twin", "command", "cli", "retnd"].map((k) => row![k]).find((v) => typeof v === "string" && v.startsWith("retnd "));
-  expect(twin, `the ${tool} row names no retnd twin`).toBeDefined();
+  const twin = row!.twin;
+  expect(typeof twin === "string" && twin.startsWith("retnd "), `the ${tool} row names no retnd twin`).toBe(true);
   return twin as string;
 }
 
@@ -268,51 +271,69 @@ test.describe("retnd#1352: the same read and the same refusal on the CLI, stdio 
     });
   }
 
-  test("refusal: a read token asking run_cycle is refused alike by the CLI, stdio and http", async () => {
+  test("refusal: a read token asking run_cycle is refused alike by the API, stdio and http, with the exit status the CLI gives that refusal", async () => {
+    // The API twin: the same POST, the read token's bearer, no confirmation.
+    const direct = await fetch(`${stack.engineUrl}/api/v1/operations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${readToken}`, "Idempotency-Key": "equivalence-1352-scope" },
+      body: JSON.stringify({ action: "run_cycle" })
+    });
+    const envelope = ((await direct.json()) as { error: { code: string; message: string } }).error;
+    expect(direct.status).toBe(403);
+    expect(envelope.code).toBe("AGENT_SCOPE_INSUFFICIENT");
+
+    // The CLI's own exit for an engine refusal it has no mapping for: a real
+    // refusal from a real CLI call, so the number is read and not assumed.
+    const anchor = cli(build, stack.work, ["agent", "confirmations", "approve", "cnf_not_there"], attach(stack));
+    expect(anchor.stderr, "the anchor refusal is the one it was meant to be").toContain("AGENT_CONFIRMATION_NOT_FOUND");
+    expect(anchor.code, "the anchor must be a refusal").not.toBe(0);
+
     const answers: Array<[string, Answer]> = [];
     for (const s of surfacesAs.get("read")!) {
       const result = await s.call("run_cycle");
       answers.push([s.name, answerOf(result)]);
     }
-    const twin = twinOf(build, stack, "run_cycle");
-    const typed = runTwin(build, stack, twin, attach(stack, readToken));
-    expect(typed.code, "the CLI under a read token should be refused").not.toBe(0);
-
     for (const [name, a] of answers) {
-      expect(a.code, `${name}`).toBe("AGENT_SCOPE_INSUFFICIENT");
-      expect(a.exit, `${name} exit code against the CLI's own`).toBe(typed.code);
-      expect(typed.stderr, `${name}'s message is not the one the CLI printed`).toContain(a.message);
+      expect(a.code, `${name}`).toBe(envelope.code);
+      expect(a.message, `${name}'s message is not the API's`).toBe(envelope.message);
+      expect(a.exit, `${name}'s exit code against the CLI's exit for an unmapped engine refusal`).toBe(anchor.code);
     }
     expect(answers[0][1], "stdio and http answered differently").toEqual(answers[1][1]);
   });
 
-  test("refusal: a person at the shut gate, and an approved operate call, are refused alike", async () => {
+  test("refusal: a person's run_cycle and an approved operate token's run_cycle end alike", async () => {
+    // Known red: the replay of an approved request is built without a
+    // connection, so the engine reads it as plain http from another machine
+    // and refuses it INSECURE_TRANSPORT_ACK_REQUIRED (exit 52) even on
+    // loopback. Drop this line when retnd#1385 is fixed; the test then holds.
+    test.fail(true, "retnd#1385: an approved agent request is replayed without a connection, so the transport rule refuses it");
+
     // The person: the CLI routed to the engine, as the administrator.
     const twin = twinOf(build, stack, "run_cycle");
     const typed = runTwin(build, stack, twin, attach(stack));
-    expect(typed.code, typed.stderr).toBe(50);
+    expect(typed.code, typed.stderr).toBe(0);
 
-    // The agent: an operate token's call becomes a confirmation, the operator
-    // approves it with a step-up, and the gate refuses what was approved.
+    // The agent: an operate token's call becomes a confirmation, and the
+    // operator approves it with a step-up.
     const { csrf, cookie } = await person(stack);
-    const answers: Array<[string, Answer]> = [];
+    const executions: Array<[string, Record<string, any>]> = [];
     for (const s of surfacesAs.get("operate")!) {
       const pending = await s.call("run_cycle");
       expect(answerOf(pending).code).toBe("AGENT_CONFIRMATION_REQUIRED");
-      const id = String(pending.structuredContent?.confirmation_id ?? pending.structuredContent?.confirmation?.id ?? "");
+      const id = String(pending.structuredContent?.confirmation_id ?? "");
       expect(id, "the pending call names its confirmation").not.toBe("");
       const approved = await fetch(`${stack.engineUrl}/api/v1/agent/confirmations/${id}/approve`, {
         method: "POST",
         headers: { "X-CSRF-Token": csrf, Cookie: cookie, "X-Retnd-Step-Up-Password": stack.password }
       });
+      expect(approved.status).toBe(200);
       const body = (await approved.json()) as Record<string, any>;
-      answers.push([s.name, { code: String(body.code ?? ""), message: String(body.message ?? ""), exit: Number(body.exit_code ?? 0) }]);
+      executions.push([s.name, body.execution ?? {}]);
     }
-    for (const [name, a] of answers) {
-      expect(a.code, name).toBe("DESTRUCTIVE_OPERATIONS_DISABLED");
-      expect(a.exit, `${name} exit code against the CLI's own`).toBe(typed.code);
-      expect(typed.stderr, `${name}'s message is not the one the CLI printed`).toContain(a.message);
+    for (const [name, e] of executions) {
+      expect(e.code, `${name}: what the approved call ended with`).not.toBe("INSECURE_TRANSPORT_ACK_REQUIRED");
+      expect(e.exit_code, `${name}: exit code against the CLI's own`).toBe(typed.code);
+      expect(e.status, `${name}: the engine's status`).toBeLessThan(400);
     }
-    expect(answers[0][1], "stdio and http answered differently").toEqual(answers[1][1]);
   });
 });
