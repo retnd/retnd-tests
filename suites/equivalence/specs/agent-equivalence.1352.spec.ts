@@ -311,16 +311,11 @@ test.describe("retnd#1352: the same read and the same refusal on the CLI, stdio 
     // The agent: an operate token's call becomes a confirmation, and the
     // operator approves it with a step-up.
     const { csrf, cookie } = await person(stack);
-    // The revision a run is checked against. The CLI reads it from
-    // GET /system/version itself; no agent tool reads that route, so an agent
-    // has to be handed it (retnd#1387), and this test hands it over the way an
-    // operator would.
-    const version = await fetch(`${stack.engineUrl}/api/v1/system/version`, { headers: { Cookie: cookie } });
-    const revision = String(((await version.json()) as Record<string, any>).config_revision ?? "");
-    expect(revision, "the engine names its configuration revision").not.toBe("");
+    // No revision is handed in: the engine records its own against the
+    // proposal (retnd#1387), the way the CLI reads it for a person.
     const executions: Array<[string, Record<string, any>]> = [];
     for (const s of surfacesAs.get("operate")!) {
-      const pending = await s.call("run_cycle", { body: { config_revision: revision } });
+      const pending = await s.call("run_cycle");
       expect(answerOf(pending).code).toBe("AGENT_CONFIRMATION_REQUIRED");
       const id = String(pending.structuredContent?.confirmation_id ?? "");
       expect(id, "the pending call names its confirmation").not.toBe("");
