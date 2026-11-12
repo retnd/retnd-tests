@@ -225,7 +225,7 @@ the message the page prints against these rows.
 |---|---|---|---|
 | Agent read: `status`, `backups_list`, `encryption_state` over stdio and `POST /api/v1/agent/mcp` | the twin `retnd agent tools --json` names for each tool | the tool result's exit code is the status the CLI ended with, its echoed `command` is the twin, and stdio and http answer equally | **proved** (`specs/agent-equivalence.1352.spec.ts`) |
 | Agent refusal: a `read` token asking `run_cycle` | the same POST with the token's bearer (the CLI is the cookie client and presents no bearer), and the exit the CLI gives an engine refusal it has no mapping of its own for | `AGENT_SCOPE_INSUFFICIENT`, the API's message, and that exit status, on stdio and http | **proved** (same spec) |
-| Agent: an approved `run_cycle` | `operation run` as the administrator (the gate is open for the generic profile, so it exits 0 and queues the cycle) | the approved call ends with the same exit status and a 2xx, not a transport refusal | **blocked** by retnd#1385 (the approval replay is refused `INSECURE_TRANSPORT_ACK_REQUIRED`, exit 52); the spec test is marked expected-to-fail until it is fixed |
+| Agent: an approved `run_cycle` | `operation run` as the administrator (the gate is open for the generic profile, so it exits 0 and queues the cycle) | the approved call ends with the same exit status and a 2xx, not a transport refusal | **proved** (same spec), with the configuration revision handed in through `body` because no agent tool can read it (retnd#1387) |
 
 ## CLI functions with no UI equivalent
 

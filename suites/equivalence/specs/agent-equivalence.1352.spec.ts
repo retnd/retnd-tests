@@ -44,7 +44,8 @@ import { materialise, resolveBuild, type Build } from "../harness/tools";
 // really does exit 0 and queue the cycle. The earlier draft of this spec
 // expected exit 50 from a gate nothing in this rig can shut; the third test
 // now holds what is real on this rig, a person's run and an approved one
-// ending alike, and is marked as expected to fail until retnd#1385 is fixed.
+// ending alike. It was red until retnd#1385 (the approval replay was refused
+// as plain http, exit 52) was fixed, and is the reproduction of that.
 
 interface Answer {
   code: string;
@@ -302,12 +303,6 @@ test.describe("retnd#1352: the same read and the same refusal on the CLI, stdio 
   });
 
   test("refusal: a person's run_cycle and an approved operate token's run_cycle end alike", async () => {
-    // Known red: the replay of an approved request is built without a
-    // connection, so the engine reads it as plain http from another machine
-    // and refuses it INSECURE_TRANSPORT_ACK_REQUIRED (exit 52) even on
-    // loopback. Drop this line when retnd#1385 is fixed; the test then holds.
-    test.fail(true, "retnd#1385: an approved agent request is replayed without a connection, so the transport rule refuses it");
-
     // The person: the CLI routed to the engine, as the administrator.
     const twin = twinOf(build, stack, "run_cycle");
     const typed = runTwin(build, stack, twin, attach(stack));
@@ -316,9 +311,16 @@ test.describe("retnd#1352: the same read and the same refusal on the CLI, stdio 
     // The agent: an operate token's call becomes a confirmation, and the
     // operator approves it with a step-up.
     const { csrf, cookie } = await person(stack);
+    // The revision a run is checked against. The CLI reads it from
+    // GET /system/version itself; no agent tool reads that route, so an agent
+    // has to be handed it (retnd#1387), and this test hands it over the way an
+    // operator would.
+    const version = await fetch(`${stack.engineUrl}/api/v1/system/version`, { headers: { Cookie: cookie } });
+    const revision = String(((await version.json()) as Record<string, any>).config_revision ?? "");
+    expect(revision, "the engine names its configuration revision").not.toBe("");
     const executions: Array<[string, Record<string, any>]> = [];
     for (const s of surfacesAs.get("operate")!) {
-      const pending = await s.call("run_cycle");
+      const pending = await s.call("run_cycle", { body: { config_revision: revision } });
       expect(answerOf(pending).code).toBe("AGENT_CONFIRMATION_REQUIRED");
       const id = String(pending.structuredContent?.confirmation_id ?? "");
       expect(id, "the pending call names its confirmation").not.toBe("");
@@ -332,7 +334,7 @@ test.describe("retnd#1352: the same read and the same refusal on the CLI, stdio 
     }
     for (const [name, e] of executions) {
       expect(e.code, `${name}: what the approved call ended with`).not.toBe("INSECURE_TRANSPORT_ACK_REQUIRED");
-      expect(e.exit_code, `${name}: exit code against the CLI's own`).toBe(typed.code);
+      expect(e.exit_code, `${name}: exit code against the CLI's own, execution ${JSON.stringify(e)}`).toBe(typed.code);
       expect(e.status, `${name}: the engine's status`).toBeLessThan(400);
     }
   });
