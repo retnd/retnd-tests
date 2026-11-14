@@ -98,10 +98,39 @@ async function scrollToBottom(page: import("@playwright/test").Page): Promise<vo
   );
 }
 
+/** Waits for the dashboard to have drawn everything it is going to.
+ *
+ *  The dashboard holds Recent activity, and the sections that sit with it,
+ *  until the claims have been read (retnd#1430, up to 4s). Measured as soon
+ *  as the terminal is visible the page is the short one that precedes that
+ *  (about 248px of scroll), so the precondition below skipped on a dashboard
+ *  that is, a moment later, far taller than the window (#102). Recent
+ *  activity is the signal because it is what the hold releases; the height
+ *  then has to stop moving, because the list inside it can still be
+ *  filling in. */
+async function settledDashboard(page: import("@playwright/test").Page): Promise<void> {
+  await expect(page.getByRole("region", { name: "Recent activity" })).toBeVisible({ timeout: 15_000 });
+  await page.waitForFunction(
+    () => {
+      const w = window as unknown as { __dockLastHeight?: number; __dockStableSince?: number };
+      const h = document.documentElement.scrollHeight;
+      const now = performance.now();
+      if (w.__dockLastHeight !== h) {
+        w.__dockLastHeight = h;
+        w.__dockStableSince = now;
+      }
+      return now - (w.__dockStableSince ?? now) >= 500;
+    },
+    undefined,
+    { polling: 100, timeout: 15_000 }
+  );
+}
+
 test.describe("the terminal is pinned to the browser window", () => {
   test.beforeEach(async ({ bm, page }) => {
     await bm.goto(LONG_PAGE);
     await expect(bm.terminal()).toBeVisible();
+    await settledDashboard(page);
     // The premise all three cases rest on, checked once and stated as a
     // skip rather than asserted as a failure. A dashboard that fits in the
     // window is a correct dashboard on a quiet deployment; it is just not
