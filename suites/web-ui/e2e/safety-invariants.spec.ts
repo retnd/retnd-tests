@@ -1,3 +1,4 @@
+import { FRESHNESS_AGE } from "../harness/freshness";
 import { expect, needs, test } from "./fixtures";
 
 /** The product's non-negotiables, asserted across the whole UI rather than in
@@ -196,6 +197,6 @@ test.describe("safety invariants", () => {
         "rather than the word never"
     );
     await page.goto("/");
-    await expect(page.getByText(/(minutes|hours|days) ago/).first()).toBeVisible();
+    await expect(page.getByText(FRESHNESS_AGE).first()).toBeVisible();
   });
 });

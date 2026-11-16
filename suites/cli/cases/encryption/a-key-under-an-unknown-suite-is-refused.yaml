@@ -4,7 +4,12 @@ doc: >
 scenario: seeded-local
 argv: [encryption, key, create, --suite, never-registered/v9, --config, "${CONFIG}"]
 exit: 1
-stdout: empty
+stdout:
+  # Direct mode announces itself on stdout before anything is validated,
+  # the same notice every mutating command prints with no engine serving.
+  - contains: "mode: direct"
+  # The refusal still mints nothing.
+  - absent: "key_created\",\"result\":\"ok"
 stderr:
   - contains: "never-registered/v9"
 state: ignored
