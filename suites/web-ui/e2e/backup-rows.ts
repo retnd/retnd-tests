@@ -9,5 +9,5 @@ import type { WireArtifactRow } from "../harness/api";
  *  time a later spec looks the name up there are many rows carrying it.
  *  The set it lives in is what tells them apart (retnd-tests#106). */
 export function artifactRow(page: Page, artifact: Pick<WireArtifactRow, "name" | "set_name">): Locator {
-  return page.getByRole("row").filter({ hasText: artifact.name });
+  return page.getByRole("row").filter({ hasText: artifact.name }).filter({ hasText: artifact.set_name });
 }
