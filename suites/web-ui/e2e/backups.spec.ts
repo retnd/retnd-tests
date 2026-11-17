@@ -1,4 +1,5 @@
 import { retentionClasses } from "../harness/api";
+import { artifactRow } from "./backup-rows";
 import { expect, mockOnly, needs, test } from "./fixtures";
 import type { Retnd } from "./fixtures";
 
@@ -133,7 +134,7 @@ test.describe("backups table", () => {
       "a backup carrying more than one retention class. Retention has to have classified this " +
         "deployment's catalogue first; until it runs, every artifact carries at most one"
     );
-    const row = page.getByRole("row").filter({ hasText: multi!.name });
+    const row = artifactRow(page, multi!);
     // Two of its real classes, whichever two they are, on its own row.
     for (const cls of retentionClasses(multi!).slice(0, 2)) {
       await expect(row).toContainText(new RegExp(cls, "i"));
@@ -302,9 +303,13 @@ test.describe("where a backup's copies are", () => {
   const copies = (page: import("@playwright/test").Page) =>
     page.getByRole("region", { name: "Copies" });
 
-  async function openBackup(bm: Retnd, page: import("@playwright/test").Page, filename: string) {
+  async function openBackup(
+    bm: Retnd,
+    page: import("@playwright/test").Page,
+    artifact: Parameters<typeof artifactRow>[1]
+  ) {
     await bm.goto("/backups");
-    await page.getByRole("row").filter({ hasText: filename }).click();
+    await artifactRow(page, artifact).click();
     await expect(copies(page)).toBeVisible();
   }
 
@@ -329,7 +334,7 @@ test.describe("where a backup's copies are", () => {
   test("lists one row per durable copy, with where it is and what it is on", async ({ bm, page }) => {
     const artifact = bm.facts.backups.find((b) => (b.placements ?? []).length > 0);
     needs(artifact !== undefined, "a backup with at least one recorded copy");
-    await openBackup(bm, page, artifact!.name);
+    await openBackup(bm, page, artifact!);
 
     const card = copies(page);
     for (const col of ["Where", "Location", "Copy size", "Class", "Access", "Verification"]) {
@@ -367,7 +372,7 @@ test.describe("where a backup's copies are", () => {
       "a backup with copies verified to different depths. That needs a declared remote medium and " +
         "something moved to it: on a local-only deployment every copy is content-verified"
     );
-    await openBackup(bm, page, artifact!.name);
+    await openBackup(bm, page, artifact!);
 
     const card = copies(page);
     await expect(card.getByText("Content verified")).toBeVisible();
@@ -384,7 +389,7 @@ test.describe("where a backup's copies are", () => {
       "a backup with a copy on an archive class. That needs a declared archive medium (DEEP_ARCHIVE " +
         "or equivalent) with a copy already on it, which no deployment reaches by running one cycle"
     );
-    await openBackup(bm, page, artifact!.name);
+    await openBackup(bm, page, artifact!);
 
     const card = copies(page);
     await expect(card.getByText("Needs a restore")).toBeVisible();
@@ -411,7 +416,7 @@ test.describe("where a backup's copies are", () => {
       artifact !== undefined,
       "a backup with a copy on a medium this deployment cannot currently reach"
     );
-    await openBackup(bm, page, artifact!.name);
+    await openBackup(bm, page, artifact!);
 
     const card = copies(page);
     await expect(card.getByText("Out of reach")).toBeVisible();
@@ -427,7 +432,7 @@ test.describe("where a backup's copies are", () => {
       "a backup still arriving, with no confirmed copy yet. That is a window of seconds on a real " +
         "deployment rather than the permanent fixture the mock held"
     );
-    await openBackup(bm, page, artifact!.name);
+    await openBackup(bm, page, artifact!);
 
     const card = copies(page);
     await expect(card.getByText("No confirmed copy yet")).toBeVisible();
@@ -446,7 +451,7 @@ test.describe("where a backup's copies are", () => {
       artifact !== undefined,
       "a backup with a copy on a provider that bills for retrieval, which needs a declared S3 medium"
     );
-    await openBackup(bm, page, artifact!.name);
+    await openBackup(bm, page, artifact!);
 
     await expect(copies(page).getByText(/billed by your provider/i)).toBeVisible();
     // backupd#211's rule: this product holds no price list and
@@ -476,7 +481,7 @@ test.describe("where a backup's copies are", () => {
     const arriving = bm.facts.backups.find((b) => (b.placements ?? []).length === 0);
     if (arriving) {
       await expect(
-        page.getByRole("row").filter({ hasText: arriving.name }).getByText("No copy yet")
+        artifactRow(page, arriving).getByText("No copy yet")
       ).toBeVisible();
     }
   });
