@@ -41,11 +41,12 @@ test.describe("settings", () => {
     // writable Retention policy card asserted in its own describe below.
     //
     // "Polling interval" and "Log level" used to be here too, both
-    // decorative selects wired to nothing (backupd#299). Neither
-    // is on the page any more: poll_interval is a real config key but a
-    // duration in minutes, not the 15/30/60 seconds that select offered,
-    // and there is no log-level concept in config.Config to wire the
-    // other one to.
+    // decorative selects wired to nothing (backupd#299). The polling one is
+    // still gone: poll_interval is a real config key but a duration in
+    // minutes, not the 15/30/60 seconds that select offered. Log level is
+    // back as a real control (retnd#900): the Observability card saves it
+    // through PATCH /observability/settings and the engine applies it on its
+    // next line, so it is asserted present, by its label, and not absent.
     for (const label of [
       "Storage warning threshold", "Storage critical threshold",
       "Retention policy"
@@ -53,7 +54,9 @@ test.describe("settings", () => {
       await expect(page.getByText(label, { exact: true })).toBeVisible();
     }
     await expect(page.getByText("Polling interval", { exact: true })).toHaveCount(0);
-    await expect(page.getByText("Log level", { exact: true })).toHaveCount(0);
+    const logLevel = page.getByLabel("Log level", { exact: true });
+    await expect(logLevel).toBeVisible();
+    await expect(logLevel.locator("option")).toHaveText(["debug", "info", "warn", "error"]);
   });
 
   test("makes the platform abstraction explicit", async ({ page }) => {
